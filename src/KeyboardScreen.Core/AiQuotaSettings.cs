@@ -1,0 +1,13 @@
+namespace KeyboardScreen.Core;
+
+public enum AiQuotaSourceKind
+{
+    XiaomiMiMoTokenPlanChina
+}
+
+public sealed class AiQuotaSettings
+{
+    public AiQuotaSourceKind SourceKind { get; set; } = AiQuotaSourceKind.XiaomiMiMoTokenPlanChina;
+
+    public string DisplayName { get; set; } = "MiMo";
+}
