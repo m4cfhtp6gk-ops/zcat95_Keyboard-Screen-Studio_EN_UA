@@ -59,8 +59,6 @@ dotnet restore KeyboardScreenStudio.sln
 dotnet run --project src/KeyboardScreen.App/KeyboardScreen.App.csproj
 ```
 
-如果最终 GitHub 仓库名称不同，请同步调整上面的克隆地址。
-
 ## 构建与验证
 
 ```powershell
