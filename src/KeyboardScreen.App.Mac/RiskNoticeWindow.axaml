@@ -1,0 +1,71 @@
+<Window
+    x:Class="KeyboardScreen.App.Avalonia.RiskNoticeWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="使用提示"
+    Width="520"
+    SizeToContent="Height"
+    CanResize="False"
+    ShowInTaskbar="False"
+    WindowStartupLocation="CenterOwner"
+    WindowDecorations="None"
+    ExtendClientAreaToDecorationsHint="True"
+    Background="Transparent"
+    TransparencyLevelHint="Transparent">
+  <Border
+      x:Name="NoticeRoot"
+      Margin="22"
+      Padding="30"
+      Background="{DynamicResource KssWindowSurfaceBrush}"
+      BorderBrush="{DynamicResource KssWindowBorderBrush}"
+      BorderThickness="1"
+      CornerRadius="{DynamicResource KssWindowCornerRadius}"
+      BoxShadow="0 8 28 0 #2927303C"
+      Opacity="0">
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.28" />
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.28" />
+      </Transitions>
+    </Border.Transitions>
+    <Border.RenderTransform>
+      <TransformOperations>translate(0px, 28px)</TransformOperations>
+    </Border.RenderTransform>
+
+    <Grid RowDefinitions="Auto,24,*,28,Auto">
+      <Grid ColumnDefinitions="*,44">
+        <StackPanel Spacing="7">
+          <TextBlock x:Name="NoticeTitle" FontSize="24" FontWeight="SemiBold" />
+          <TextBlock x:Name="NoticeSubtitle" Classes="secondary" />
+        </StackPanel>
+        <Button
+            Grid.Column="1"
+            Classes="titlebar close modal"
+            Width="44"
+            Height="44"
+            MinHeight="0"
+            Padding="0"
+            Click="CloseButton_OnClick"
+            Content="×" />
+      </Grid>
+
+      <Border Grid.Row="2" Classes="card" Padding="20">
+        <StackPanel Spacing="12">
+          <TextBlock x:Name="NoticeBody" FontSize="14" LineHeight="23" TextWrapping="Wrap" />
+          <TextBlock
+              Classes="secondary"
+              Text="你可以继续使用；此提示只会显示一次。"
+              TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <Button
+          Grid.Row="4"
+          Height="48"
+          HorizontalAlignment="Stretch"
+          FontWeight="SemiBold"
+          Click="ContinueButton_OnClick"
+          Content="我已了解" />
+    </Grid>
+  </Border>
+</Window>

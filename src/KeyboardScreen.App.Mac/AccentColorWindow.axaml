@@ -1,0 +1,61 @@
+<Window
+    x:Class="KeyboardScreen.App.Avalonia.AccentColorWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="选择主题强调色"
+    Width="480"
+    Height="540"
+    CanResize="False"
+    ShowInTaskbar="False"
+    WindowStartupLocation="CenterOwner"
+    WindowDecorations="None"
+    ExtendClientAreaToDecorationsHint="True"
+    Background="Transparent"
+    TransparencyLevelHint="Transparent">
+  <Border
+      Padding="24"
+      Background="{DynamicResource KssWindowSurfaceBrush}"
+      BorderBrush="{DynamicResource KssWindowBorderBrush}"
+      BorderThickness="1"
+      CornerRadius="{DynamicResource KssWindowCornerRadius}"
+      ClipToBounds="True">
+    <Grid RowDefinitions="Auto,20,*,20,Auto">
+      <Grid ColumnDefinitions="*,44">
+        <StackPanel Spacing="5">
+          <TextBlock FontSize="20" FontWeight="SemiBold" Text="选择主题强调色" />
+          <TextBlock Classes="secondary" Text="拖动色域与色相条选择颜色" />
+        </StackPanel>
+        <Button
+            Grid.Column="1"
+            Classes="titlebar close modal"
+            Click="CancelButton_OnClick"
+            Content="×" />
+      </Grid>
+
+      <ColorView
+          x:Name="Picker"
+          Grid.Row="2"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Stretch"
+          ColorSpectrumShape="Box"
+          ColorSpectrumComponents="SaturationValue"
+          IsAlphaEnabled="False"
+          IsAlphaVisible="False"
+          IsAccentColorsVisible="False"
+          IsColorComponentsVisible="False"
+          IsColorModelVisible="False"
+          IsColorPaletteVisible="False"
+          IsColorPreviewVisible="False"
+          IsColorSpectrumVisible="True"
+          IsColorSpectrumSliderVisible="True"
+          IsComponentSliderVisible="False"
+          IsComponentTextInputVisible="False"
+          IsHexInputVisible="True" />
+
+      <Grid Grid.Row="4" ColumnDefinitions="*,12,*">
+        <Button Grid.Column="0" Click="CancelButton_OnClick" Content="取消" />
+        <Button Grid.Column="2" FontWeight="SemiBold" Click="ApplyButton_OnClick" Content="应用颜色" />
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

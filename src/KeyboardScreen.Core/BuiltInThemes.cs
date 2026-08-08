@@ -40,6 +40,8 @@ public static class BuiltInThemes
 			new FiveDayWeatherTheme(),
 			new DotMatrixClockTheme(),
 			new DotMatrixWeatherClockTheme(),
+			new DotMatrixAnalogClockTheme(),
+			new DotMatrixProgressTheme(),
 			new MusicTheme(),
 			Make("music-minimal", "音乐极简", "无封面的纯文字音乐页", "使用大号曲名、歌手和播放进度，适合封面质量不稳定时。", MusicMinimal),
 			Make("music-poster", "音乐海报", "全屏封面音乐页", "全屏封面、曲名、歌手、进度与两端时间。", MusicPoster),

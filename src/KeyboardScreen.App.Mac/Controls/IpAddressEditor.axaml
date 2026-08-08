@@ -1,0 +1,68 @@
+<UserControl
+    x:Class="KeyboardScreen.App.Avalonia.Controls.IpAddressEditor"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Border
+      Height="50"
+      Background="{DynamicResource KssControlBrush}"
+      BorderBrush="{DynamicResource KssControlBorderBrush}"
+      BorderThickness="1"
+      CornerRadius="{DynamicResource KssCornerRadius}"
+      ClipToBounds="True">
+    <Grid ColumnDefinitions="*,1,*,1,*,1,*">
+      <TextBox x:Name="Part1" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Grid.Column="0" Classes="ip-part" />
+      <Border Grid.Column="1" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+      <TextBox x:Name="Part2" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Grid.Column="2" Classes="ip-part" />
+      <Border Grid.Column="3" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+      <TextBox x:Name="Part3" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Grid.Column="4" Classes="ip-part" />
+      <Border Grid.Column="5" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+      <TextBox x:Name="Part4" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Grid.Column="6" Classes="ip-part" />
+    </Grid>
+  </Border>
+
+  <UserControl.Styles>
+    <Style Selector="TextBox.ip-part">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="MaxLength" Value="3" />
+      <Setter Property="SelectionBrush" Value="{DynamicResource KssSelectedBrush}" />
+      <Setter Property="FocusAdorner" Value="{x:Null}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ScrollViewer
+              x:Name="PART_ScrollViewer"
+              HorizontalScrollBarVisibility="Hidden"
+              VerticalScrollBarVisibility="Hidden">
+            <TextPresenter
+                x:Name="PART_TextPresenter"
+                Margin="{TemplateBinding Padding}"
+                Text="{TemplateBinding Text, Mode=TwoWay}"
+                CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
+                CaretIndex="{TemplateBinding CaretIndex}"
+                SelectionStart="{TemplateBinding SelectionStart}"
+                SelectionEnd="{TemplateBinding SelectionEnd}"
+                TextAlignment="{TemplateBinding TextAlignment}"
+                TextWrapping="{TemplateBinding TextWrapping}"
+                PasswordChar="{TemplateBinding PasswordChar}"
+                RevealPassword="{TemplateBinding RevealPassword}"
+                SelectionBrush="{TemplateBinding SelectionBrush}"
+                SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                CaretBrush="{TemplateBinding CaretBrush}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </ScrollViewer>
+        </ControlTemplate>
+      </Setter>    </Style>
+    <Style Selector="TextBox.ip-part:focus">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+  </UserControl.Styles>
+</UserControl>

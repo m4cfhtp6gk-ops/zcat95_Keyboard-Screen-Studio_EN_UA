@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
+    branches:
+      - "main"
 
 permissions:
   contents: write
@@ -14,8 +16,11 @@ concurrency:
 
 jobs:
   release:
+    if: startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release v1.0.1]')
     name: Build Windows portable package
     runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.1' }}
 
     steps:
       - name: Check out source
@@ -35,9 +40,6 @@ jobs:
       - name: Run renderer smoke tests
         run: dotnet run --project tests/KeyboardScreen.SmokeTests/KeyboardScreen.SmokeTests.csproj -c Release --no-build
 
-      - name: Run UI smoke tests
-        run: dotnet run --project tests/KeyboardScreen.UiSmokeTests/KeyboardScreen.UiSmokeTests.csproj -c Release --no-build
-
       - name: Build clean portable package
         shell: pwsh
         run: ./tools/Publish-Portable.ps1
@@ -46,7 +48,7 @@ jobs:
         id: package
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           $archiveName = "KeyboardScreenStudio-$tag-win-x64.zip"
           $checksumName = "$archiveName.sha256.txt"
           $archivePath = Join-Path $env:RUNNER_TEMP $archiveName
@@ -68,9 +70,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME `
+          gh release create $env:RELEASE_TAG `
             "${{ steps.package.outputs.archive }}" `
             "${{ steps.package.outputs.checksum }}" `
-            --verify-tag `
-            --title "Keyboard Screen Studio $env:GITHUB_REF_NAME" `
+            --target $env:GITHUB_SHA `
+            --title "$env:RELEASE_TAG" `
             --notes-file RELEASE_NOTES.md

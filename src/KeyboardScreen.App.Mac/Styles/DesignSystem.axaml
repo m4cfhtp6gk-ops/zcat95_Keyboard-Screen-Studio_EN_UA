@@ -1,0 +1,324 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:KeyboardScreen.App.Avalonia.Behaviors">
+
+  <Styles.Resources>
+    <LinearGradientBrush x:Key="KssEdgeFadeTopBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Color="#00000000" Offset="0" />
+      <GradientStop Color="#FF000000" Offset="0.025" />
+      <GradientStop Color="#FF000000" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="KssEdgeFadeBottomBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Color="#FF000000" Offset="0" />
+      <GradientStop Color="#FF000000" Offset="0.975" />
+      <GradientStop Color="#00000000" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="KssEdgeFadeBothBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Color="#00000000" Offset="0" />
+      <GradientStop Color="#FF000000" Offset="0.025" />
+      <GradientStop Color="#FF000000" Offset="0.975" />
+      <GradientStop Color="#00000000" Offset="1" />
+    </LinearGradientBrush>
+    <CornerRadius x:Key="KssCornerRadius">16</CornerRadius>
+    <Thickness x:Key="ComboBoxDropdownBorderThickness">1</Thickness>
+    <Thickness x:Key="ComboBoxDropdownBorderPadding">6</Thickness>
+    <Thickness x:Key="ComboBoxDropdownContentMargin">0</Thickness>
+    <CornerRadius x:Key="OverlayCornerRadius">16</CornerRadius>
+  </Styles.Resources>
+
+  <!-- KSS desktop UI tokens. The silver device preview is intentionally excluded. -->
+  <Style Selector="Window">
+    <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource KssWindowSurfaceBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.secondary">
+    <Setter Property="Foreground" Value="{DynamicResource KssSecondaryBrush}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource KssCardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssCardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="Padding" Value="24" />
+  </Style>
+
+  <Style Selector="Border.inline">
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+  </Style>
+
+  <Style Selector="Button">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KssControlHoverBrush}" />
+  </Style>
+  <Style Selector="Button:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KssControlPressedBrush}" />
+  </Style>
+
+  <Style Selector="Button.titlebar">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="46" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border x:Name="TitleBarChrome" Background="{TemplateBinding Background}">
+          <ContentPresenter
+              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+              Content="{TemplateBinding Content}"
+              ContentTemplate="{TemplateBinding ContentTemplate}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.titlebar:pointerover">
+    <Setter Property="Background" Value="#E9EAEC" />
+  </Style>
+  <Style Selector="Button.titlebar:pressed">
+    <Setter Property="Background" Value="#DEE0E3" />
+  </Style>
+  <Style Selector="Button.titlebar.close:pointerover">
+    <Setter Property="Background" Value="#E7E8EA" />
+  </Style>
+  <Style Selector="Button.titlebar:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.titlebar:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Button.nav">
+    <Setter Property="Transitions" Value="{x:Null}" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="48" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.nav.selected">
+    <Setter Property="Background" Value="{DynamicResource KssSelectedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssSelectedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssSelectedForegroundBrush}" />
+  </Style>
+
+  <Style Selector="Button.sidebar">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="54" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Margin" Value="0,0,0,9" />
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+  </Style>
+  <Style Selector="Button.sidebar.selected">
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlFocusBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource KssSelectedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssSelectedForegroundBrush}" />
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="SelectionBrush" Value="#D8DDE5" />
+  </Style>
+  <Style Selector="TextBox:focus">
+    <Setter Property="BorderBrush" Value="#7B8491" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Padding" Value="14,0,0,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="MaxDropDownHeight" Value="320" />
+  </Style>
+  <Style Selector="ComboBox:pointerover /template/ Border#Background">
+    <Setter Property="Background" Value="{DynamicResource KssControlHoverBrush}" />
+    <Setter Property="BorderBrush" Value="#C8CED7" />
+  </Style>
+  <Style Selector="ComboBox:pressed /template/ Border#Background">
+    <Setter Property="Background" Value="{DynamicResource KssControlHoverBrush}" />
+    <Setter Property="BorderBrush" Value="#AEB6C2" />
+  </Style>
+  <Style Selector="ComboBox:focus-visible /template/ Border#HighlightBackground">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="#7B8491" />
+  </Style>
+  <Style Selector="ComboBox:dropdownopen /template/ Border#Background">
+    <Setter Property="Background" Value="{DynamicResource KssCardBrush}" />
+    <Setter Property="BorderBrush" Value="#9AA3AF" />
+  </Style>
+  <Style Selector="ComboBox:dropdownopen /template/ Border#PopupBorder">
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="Padding" Value="6" />
+  </Style>
+  <Style Selector="ComboBox /template/ PathIcon#DropDownGlyph">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="Foreground" Value="#606977" />
+  </Style>
+  <Style Selector="ComboBox:disabled">
+    <Setter Property="Opacity" Value="0.54" />
+  </Style>
+  <Style Selector="ComboBoxItem">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter
+            x:Name="ItemPresenter"
+            Padding="{TemplateBinding Padding}"
+            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+            Background="{TemplateBinding Background}"
+            Foreground="{TemplateBinding Foreground}"
+            CornerRadius="{TemplateBinding CornerRadius}"
+            Content="{TemplateBinding Content}"
+            ContentTemplate="{TemplateBinding ContentTemplate}">
+          <ContentPresenter.Transitions>
+            <Transitions>
+              <BrushTransition Property="Background" Duration="0:0:0.1" />
+            </Transitions>
+          </ContentPresenter.Transitions>
+        </ContentPresenter>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#ItemPresenter">
+    <Setter Property="Background" Value="#F3F4F6" />
+  </Style>
+  <Style Selector="ComboBoxItem:pressed /template/ ContentPresenter#ItemPresenter">
+    <Setter Property="Background" Value="#E8EBEF" />
+  </Style>
+  <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#ItemPresenter">
+    <Setter Property="Background" Value="{DynamicResource KssSelectedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+  </Style>
+  <Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#ItemPresenter">
+    <Setter Property="Background" Value="#E3E7EC" />
+  </Style>
+  <Style Selector="ComboBoxItem:disabled">
+    <Setter Property="Opacity" Value="0.46" />
+  </Style>
+  <Style Selector="ToggleSwitch">
+    <Setter Property="MinWidth" Value="92" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid x:Name="PART_MovingKnobs" ColumnDefinitions="48,10,Auto" VerticalAlignment="Center">
+          <Border
+              x:Name="SwitchTrack"
+              Width="48"
+              Height="26"
+              Background="{DynamicResource KssToggleOffBrush}"
+              CornerRadius="13">
+            <Border
+                x:Name="SwitchThumb"
+                Width="20"
+                Height="20"
+                Margin="3"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Background="#FFFFFF"
+                CornerRadius="10">
+              <Border.Transitions>
+                <Transitions>
+                  <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+                </Transitions>
+              </Border.Transitions>
+            </Border>
+          </Border>
+          <TextBlock
+              x:Name="SwitchState"
+              Grid.Column="2"
+              VerticalAlignment="Center"
+              Text="关闭" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ToggleSwitch:checked /template/ Border#SwitchTrack">
+    <Setter Property="Background" Value="{DynamicResource KssToggleOnBrush}" />
+  </Style>
+  <Style Selector="ToggleSwitch:checked /template/ Border#SwitchThumb">
+    <Setter Property="RenderTransform" Value="translate(22px, 0px)" />
+  </Style>
+  <Style Selector="ToggleSwitch:checked /template/ TextBlock#SwitchState">
+    <Setter Property="Text" Value="启用" />
+  </Style>
+  <Style Selector="ToggleSwitch:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+
+  <Style Selector="Slider">
+    <Setter Property="Foreground" Value="{DynamicResource KssControlFocusBrush}" />
+  </Style>
+
+  <Style Selector="ScrollViewer">
+    <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+  </Style>
+  <Style Selector="ScrollBar">
+    <Setter Property="Width" Value="8" />
+  </Style>
+
+  <Style Selector="ScrollViewer.edge-fade">
+    <Setter Property="behaviors:EdgeFadeBehavior.IsEnabled" Value="True" />
+  </Style>
+</Styles>

@@ -17,14 +17,16 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme());
-Assert(themes.Count == 17, "built-in theme catalog should contain the 17 supported schemes");
+Assert(themes.Count == 19, "built-in theme catalog should contain the 19 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
 Assert(themes.Single(theme => theme.Id == "clock-dot-matrix").DisplayName == "点阵时钟", "dot-matrix clock theme must be registered");
 Assert(themes.Single(theme => theme.Id == "clock-weather-dot").DisplayName == "点阵时钟天气", "dot-matrix weather clock theme must be registered");
+Assert(themes.Single(theme => theme.Id == "clock-dot-analog").DisplayName == "点阵模拟时钟", "dot-matrix analog clock theme must be registered");
+Assert(themes.Single(theme => theme.Id == "clock-dot-progress").DisplayName == "点阵进度", "dot-matrix progress theme must be registered");
 Assert(themes.Single(theme => theme.Id == "image").DisplayName == "图片时间", "image theme must be named 图片时间");
-Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI用量 (Beta)", "AI quota theme must carry the Beta label");
+Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI用量（开发中）", "AI quota theme must carry the development label");
 Assert(themes.Any(theme => theme.Id == "weather-five-day"), "five-day weather theme must be registered");
 Assert(themes.Any(theme => theme.Id == "stocks"), "stock theme must be registered");
 Assert(themes.Select(theme => theme.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == themes.Count, "theme ids should be unique");
@@ -160,28 +162,72 @@ using (var stockSource = new YahooStockSnapshotSource(stockClient))
 }
 Console.WriteLine("PASS Yahoo chart parser, aliases, color preference and cache");
 
-var customLayoutOptions = new ScreenDisplayOptions(ImageTimePlacement.Top);
-var imageTimeFrame = renderer.Render(themes.Single(theme => theme.Id == "image"), SystemSnapshot.DesignSample, displayOptions: customLayoutOptions);
-Assert(imageTimeFrame.JpegBytes is [0xFF, 0xD8, ..], "image time placement option did not render");
-Console.WriteLine("PASS configurable image time placement render");
+var imageTheme = (ImageTheme)themes.Single(theme => theme.Id == "image");
+imageTheme.ImagePath = Path.Combine(Directory.GetCurrentDirectory(), "docs", "images", "keyboard-screen-studio-hero.png");
+foreach (ImageClockStyle clockStyle in Enum.GetValues<ImageClockStyle>())
+{
+    var customLayoutOptions = new ScreenDisplayOptions(
+        ImageTimePlacement.Top,
+        DotMatrixProgressPeriod.Today,
+        clockStyle,
+        ImageTimeBackground: true,
+        ImageTextColor.White,
+        ImageTextAlignment.Right,
+        ImageWeatherVisible: true,
+        ImageTimeFontSize: 34,
+        ImageDateFontSize: 15,
+        ImageWeatherFontSize: 13,
+        ImageDigitalOrder: ImageDigitalOrder.WeatherTimeDate,
+        ImageLargeTimeFontSize: 43,
+        ImageAnalogClockSize: 96,
+        ImageAnalogOrder: ImageAnalogOrder.WeatherClockDate,
+        ImageFlipTimeFontSize: 36);
+    var imageTimeFrame = renderer.Render(imageTheme, SystemSnapshot.DesignSample, displayOptions: customLayoutOptions);
+    Assert(imageTimeFrame.JpegBytes is [0xFF, 0xD8, ..], $"image {clockStyle} clock option did not render");
+    Assert(imageTimeFrame.JpegBytes.Length <= profile.MaxJpegBytes, $"image {clockStyle} clock exceeded device limit");
+}
+Console.WriteLine("PASS image digital/large/analog/flip clocks with integer sizing, ordering and weather render");
 
 var maxQualityFrame = renderer.Render(themes[0], SystemSnapshot.DesignSample, jpegQuality: 100);
 Assert(maxQualityFrame.JpegBytes.Length <= profile.MaxJpegBytes, "highest-quality JPEG exceeded device limit");
 Console.WriteLine("PASS fixed highest JPEG quality stays within device limit");
 
-var mimoSnapshot = XiaomiMiMoTokenPlanParser.Parse(
+var usageOptions = TokscaleDataSource.ParseUsage(
     """
-    {"code":0,"data":{"planCode":"lite","planName":"Lite","currentPeriodEnd":"2026-07-28 23:59:59","expired":false}}
-    """,
-    """
-    {"code":0,"data":{"usage":{"items":[{"name":"total_token","used":1944778516,"limit":4100000000,"percent":0.47},{"name":"compensation_total_token","used":0,"limit":0,"percent":0}]}}}
+    [{"provider":"Codex","account":"person@example.com","plan":"Plus","metrics":[{"label":"Weekly","used_percent":83,"remaining_percent":17,"resets_at":"2026-08-09T11:07:00Z"}]}]
     """);
-Assert(mimoSnapshot.PlatformName == "Xiaomi MiMo · Lite", "MiMo plan name was not parsed");
-Assert(Math.Abs(mimoSnapshot.ClampedRemainingPercent - 52.5663776585) < 0.001, "MiMo remaining Credits percentage is incorrect");
-Assert(mimoSnapshot.Balance?.Used == 1_944_778_516m, "MiMo used Credits were not parsed");
-Assert(mimoSnapshot.Balance?.Limit == 4_100_000_000m, "MiMo Credits limit was not parsed");
-Assert(mimoSnapshot.ResetsAt is not null, "MiMo period end was not parsed");
-Console.WriteLine("PASS Xiaomi MiMo Token Plan detail/usage parser");
+Assert(usageOptions.Count == 1, "Tokscale usage JSON was not parsed");
+Assert(Math.Abs(usageOptions[0].RemainingPercent!.Value - 17d) < 0.001, "Tokscale remaining percentage is incorrect");
+
+var modelOptions = TokscaleDataSource.ParseModels(
+    """
+    {"groupBy":"client,provider,model","entries":[{"client":"WorkBuddy","provider":"DeepSeek","model":"deepseek-v4-flash","input":124700000,"output":322000,"cacheRead":123900000,"cacheWrite":0,"cost":17.89}]}
+    """);
+Assert(modelOptions.Count == 1, "Tokscale model JSON was not parsed");
+Assert(modelOptions[0].Tokens == 248_922_000m, "Tokscale total tokens are incorrect");
+Assert(modelOptions[0].Cost == 17.89m, "Tokscale model cost is incorrect");
+
+var tokScaleCatalog = new TokscaleCatalog(TokscaleStatus.Ready, modelOptions, "ready", DateTimeOffset.Now);
+var tokScaleSnapshot = TokscaleDataSource.CreateSnapshot(
+    new AiQuotaSettings
+    {
+        DataKind = AiUsageDataKind.ModelTokens,
+        SelectedItemKey = modelOptions[0].Key,
+        DisplayName = "DeepSeek",
+        ProgressTarget = 500_000_000m
+    },
+    tokScaleCatalog);
+Assert(tokScaleSnapshot.Available && tokScaleSnapshot.PlatformName == "DeepSeek", "Tokscale snapshot selection failed");
+Assert(tokScaleSnapshot.PrimaryDisplay == "248.9M", "Tokscale compact token display is incorrect");
+Assert(Math.Abs(tokScaleSnapshot.ClampedRemainingPercent - 49.7844) < 0.001, "Tokscale target progress is incorrect");
+Console.WriteLine("PASS Tokscale usage/model JSON parsing and snapshot mapping");
+
+if (args.Contains("--tokscale-live", StringComparer.OrdinalIgnoreCase))
+{
+    TokscaleCatalog liveCatalog = await new TokscaleDataSource().ReadCatalogAsync(force: true);
+    Assert(liveCatalog.Status != TokscaleStatus.NotInstalled, "installed Tokscale was not discovered");
+    Console.WriteLine($"PASS live Tokscale discovery status={liveCatalog.Status}, items={liveCatalog.Options.Count}");
+}
 
 var aiPreviewArgumentIndex = Array.IndexOf(args, "--ai-preview");
 if (aiPreviewArgumentIndex >= 0)
@@ -208,7 +254,7 @@ var settingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-settings-{
 try
 {
     var settingsStore = new JsonSettingsStore(settingsPath);
-    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DisplayName = "MiMo Pro" }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯" }] }, ImageTimePlacement = ImageTimePlacement.Top, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedMiMoNotice = true };
+    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯" }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
     await settingsStore.SaveAsync(settings);
     var loadedSettings = await settingsStore.LoadAsync();
     Assert(loadedSettings.SelectedThemeId == "music", "settings theme did not persist");
@@ -216,14 +262,25 @@ try
     Assert(loadedSettings.AccentColor == "#A23BFF", "settings accent color did not persist");
     Assert(loadedSettings.SelectedFontId == "file:test.ttf|test", "settings font did not persist");
     Assert(loadedSettings.SafeArea == settings.SafeArea, "settings safe area did not persist");
-    Assert(loadedSettings.AiQuota.DisplayName == "MiMo Pro", "AI display name did not persist");
+    Assert(loadedSettings.AiQuota.DisplayName == "My AI" && loadedSettings.AiQuota.DataKind == AiUsageDataKind.ModelCost && loadedSettings.AiQuota.ProgressTarget == 25, "AI Tokscale settings did not persist");
     Assert(loadedSettings.Weather.LocationQuery == "上海" && loadedSettings.Weather.UseAutomaticLocation, "weather location settings did not persist");
     Assert(loadedSettings.LaunchAtStartup, "launch-at-startup setting did not persist");
     Assert(loadedSettings.HasCompletedOnboarding, "onboarding completion did not persist");
-    Assert(loadedSettings.HasAcknowledgedStockNotice && loadedSettings.HasAcknowledgedMiMoNotice,
+    Assert(loadedSettings.HasAcknowledgedStockNotice && loadedSettings.HasAcknowledgedAiUsageNotice,
         "feature notice acknowledgements did not persist");
     Assert(!loadedSettings.Stocks.RedForGain && loadedSettings.Stocks.Items[0].Alias == "腾讯", "stock settings did not persist");
     Assert(loadedSettings.ImageTimePlacement == ImageTimePlacement.Top, "image time placement did not persist");
+    Assert(loadedSettings.ImageClockStyle == ImageClockStyle.Flip && !loadedSettings.ImageTimeBackground, "image clock style/background did not persist");
+    Assert(loadedSettings.ImageTextColor == ImageTextColor.Black && loadedSettings.ImageTextAlignment == ImageTextAlignment.Right, "image text options did not persist");
+    Assert(loadedSettings.ImageWeatherVisible, "image weather visibility did not persist");
+    Assert(loadedSettings.ImageTimeFontSize == 34 && loadedSettings.ImageDateFontSize == 15 && loadedSettings.ImageWeatherFontSize == 13, "image font sizes did not persist");
+    Assert(loadedSettings.ImageDigitalOrder == ImageDigitalOrder.WeatherTimeDate, "image digital order did not persist");
+    Assert(loadedSettings.ImageLargeTimeFontSize == 42 && loadedSettings.ImageAnalogClockSize == 94 && loadedSettings.ImageFlipTimeFontSize == 35, "image style-specific sizes did not persist");
+    Assert(loadedSettings.ImageAnalogOrder == ImageAnalogOrder.DateWeatherClock, "image analog order did not persist");
+    Assert(!loadedSettings.IgnoreBrowserMediaSessions, "browser media filter setting did not persist");
+    Assert(loadedSettings.UiThemeMode == UiThemeMode.Dark, "control UI theme mode did not persist");
+    Assert(loadedSettings.DotMatrixProgressPeriod == DotMatrixProgressPeriod.Quarter, "dot-matrix progress period did not persist");
+    Assert(loadedSettings.DotMatrixProgressHeaderFontSize == 18, "dot-matrix progress header font size did not persist");
     Assert(loadedSettings.AutoMediaThemeSwitch, "media theme automation flag did not persist");
     Assert(loadedSettings.MediaPlayingThemeId == "music-poster", "playing theme did not persist");
     Assert(loadedSettings.MediaIdleThemeId == "clock-neon", "idle theme did not persist");
@@ -249,6 +306,11 @@ mediaAutomation.MediaIdleThemeId = "music";
 Assert(MediaThemeAutomation.ResolveThemeId(mediaAutomation, true, "clock") == "music", "invalid playing theme must fall back to music");
 Assert(MediaThemeAutomation.ResolveThemeId(mediaAutomation, false, "clock") == "system", "invalid idle theme must fall back to system");
 Console.WriteLine("PASS bidirectional media theme automation");
+
+Assert(WindowsMusicSnapshotSource.IsBrowserSessionId("Chrome.exe"), "Chrome session should be identified as browser media");
+Assert(WindowsMusicSnapshotSource.IsBrowserSessionId("Microsoft.MicrosoftEdge_8wekyb3d8bbwe!MSEdge"), "Edge session should be identified as browser media");
+Assert(!WindowsMusicSnapshotSource.IsBrowserSessionId("Spotify.exe"), "Spotify must not be identified as browser media");
+Console.WriteLine("PASS browser media session identification");
 var fontTestFolder = Path.Combine(Path.GetTempPath(), $"keyboard-screen-fonts-{Guid.NewGuid():N}");
 Directory.CreateDirectory(fontTestFolder);
 try

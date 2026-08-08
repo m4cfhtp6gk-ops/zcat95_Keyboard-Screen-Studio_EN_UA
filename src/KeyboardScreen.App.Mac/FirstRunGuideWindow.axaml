@@ -1,0 +1,110 @@
+<Window
+    x:Class="KeyboardScreen.App.Avalonia.FirstRunGuideWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:KeyboardScreen.App.Avalonia.Controls"
+    Title="连接你的 Linx68"
+    Width="520"
+    SizeToContent="Height"
+    CanResize="False"
+    ShowInTaskbar="False"
+    WindowStartupLocation="CenterOwner"
+    WindowDecorations="None"
+    ExtendClientAreaToDecorationsHint="True"
+    Background="Transparent"
+    TransparencyLevelHint="Transparent">
+  <Border
+      x:Name="GuideRoot"
+      Margin="22"
+      Padding="30"
+      Background="{DynamicResource KssWindowSurfaceBrush}"
+      BorderBrush="{DynamicResource KssWindowBorderBrush}"
+      BorderThickness="1"
+      CornerRadius="{DynamicResource KssWindowCornerRadius}"
+      BoxShadow="0 8 28 0 #2927303C"
+      Opacity="0">
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.28" />
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.28" />
+      </Transitions>
+    </Border.Transitions>
+    <Border.RenderTransform>
+      <TransformOperations>translate(0px, 28px)</TransformOperations>
+    </Border.RenderTransform>
+
+    <Grid RowDefinitions="Auto,24,Auto,22,1,20,Auto,18,48">
+      <Grid ColumnDefinitions="*,44">
+        <StackPanel Spacing="7">
+          <TextBlock FontSize="25" FontWeight="SemiBold" Text="连接你的 Linx68" />
+          <TextBlock Classes="secondary" FontSize="13" Text="开启键盘图像 API，只需完成下面四步" />
+        </StackPanel>
+        <Button
+            Grid.Column="1"
+            Classes="titlebar close modal"
+            Width="44"
+            Height="44"
+            MinHeight="0"
+            Padding="0"
+            Click="CloseButton_OnClick"
+            Content="×" />
+      </Grid>
+
+      <StackPanel Grid.Row="2" Spacing="10">
+        <Grid ColumnDefinitions="40,*">
+          <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="1" />
+          </Border>
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="确保键盘连接到和电脑相同的局域网" />
+        </Grid>
+        <Grid ColumnDefinitions="40,*">
+          <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="2" />
+          </Border>
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="单击旋钮进入菜单" />
+        </Grid>
+        <Grid ColumnDefinitions="40,*">
+          <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="3" />
+          </Border>
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="旋转选择图像 API" />
+        </Grid>
+        <Grid ColumnDefinitions="40,*">
+          <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="4" />
+          </Border>
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="扫码获取 IP 地址" />
+        </Grid>
+      </StackPanel>
+
+      <Border Grid.Row="4" Background="{DynamicResource KssDividerBrush}" />
+
+      <StackPanel Grid.Row="6">
+        <TextBlock FontSize="14" FontWeight="SemiBold" Text="设备 IP 地址" />
+        <controls:IpAddressEditor x:Name="IpEditor" Margin="0,12,0,0" />
+        <TextBlock
+            x:Name="ValidationText"
+            MinHeight="18"
+            Margin="0,8,0,0"
+            FontSize="12"
+            Foreground="#B43B33" />
+      </StackPanel>
+
+      <Grid Grid.Row="8" ColumnDefinitions="*,12,*">
+        <Button
+            Grid.Column="0"
+            Height="48"
+            HorizontalAlignment="Stretch"
+            Click="LaterButton_OnClick"
+            Content="稍后设置" />
+        <Button
+            Grid.Column="2"
+            Height="48"
+            HorizontalAlignment="Stretch"
+            FontWeight="SemiBold"
+            Click="ContinueButton_OnClick"
+            Content="保存并继续" />
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

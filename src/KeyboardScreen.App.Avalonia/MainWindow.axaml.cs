@@ -1,0 +1,226 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.Styling;
+using Avalonia.Media.Transformation;
+using KeyboardScreen.App.Avalonia.Platform;
+using KeyboardScreen.App.Avalonia.ViewModels;
+using KeyboardScreen.Core;
+
+namespace KeyboardScreen.App.Avalonia;
+
+public sealed partial class MainWindow : Window
+{
+    private readonly MainWindowViewModel _viewModel;
+    private bool _noticeOpen;
+
+    public MainWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        WindowsRoundedWindow.UseCustomCorners(this);
+        _viewModel = new MainWindowViewModel(new WindowsDesktopServices());
+        _viewModel.PickImageAsync = PickImageAsync;
+        DataContext = _viewModel;
+        _viewModel.PropertyChanged += ViewModel_OnPropertyChanged;
+        Opened += MainWindow_OnOpened;
+        Closed += MainWindow_OnClosed;
+    }
+
+    private async void MainWindow_OnOpened(object? sender, EventArgs e)
+    {
+        var settingsStore = new JsonSettingsStore();
+        AppSettings settings = await settingsStore.LoadAsync();
+        if (!settings.HasCompletedOnboarding)
+        {
+            var guide = new FirstRunGuideWindow(ExtractDeviceIp(settings.DeviceEndpoint));
+            string? selectedIp = await guide.ShowDialog<string?>(this);
+            settings.HasCompletedOnboarding = true;
+            if (!string.IsNullOrWhiteSpace(selectedIp))
+            {
+                settings.DeviceEndpoint = $"http://{selectedIp}/image/upload";
+            }
+            await settingsStore.SaveAsync(settings);
+        }
+
+        await _viewModel.InitializeAsync();
+        ApplyUiTheme();
+        AnimateCurrentPage();
+        if (_viewModel.StartMinimized ||
+            Environment.GetCommandLineArgs().Any(argument =>
+                string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase)))
+        {
+            WindowState = WindowState.Minimized;
+        }
+    }
+
+    private static string ExtractDeviceIp(string? value)
+    {
+        string candidate = value?.Trim() ?? string.Empty;
+        return Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri) &&
+               uri.Scheme is "http" or "https"
+            ? uri.Host
+            : candidate;
+    }
+
+    private async void MainWindow_OnClosed(object? sender, EventArgs e)
+    {
+        _viewModel.PropertyChanged -= ViewModel_OnPropertyChanged;
+        await _viewModel.DisposeAsync();
+    }
+
+    private void ViewModel_OnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.UiThemeMode))
+        {
+            ApplyUiTheme();
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedNavigation))
+        {
+            AnimateCurrentPage();
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedTheme))
+        {
+            _ = ShowPendingThemeNoticeAsync();
+        }
+    }
+
+    private void AnimateCurrentPage()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            StackPanel? page = _viewModel.SelectedNavigation switch
+            {
+                "screen" => this.FindControl<StackPanel>("ScreenPage"),
+                "theme" => this.FindControl<StackPanel>("ThemePage"),
+                "automation" => this.FindControl<StackPanel>("AutomationPage"),
+                "settings" => this.FindControl<StackPanel>("SettingsPage"),
+                "about" => this.FindControl<StackPanel>("AboutPage"),
+                _ => null
+            };
+
+            if (page is null || !page.IsVisible)
+            {
+                return;
+            }
+
+            page.Opacity = 0;
+            page.RenderTransform = TransformOperations.Parse("translate(0px, 8px)");
+            Dispatcher.UIThread.Post(() =>
+            {
+                page.Opacity = 1;
+                page.RenderTransform = TransformOperations.Parse("translate(0px, 0px)");
+            }, DispatcherPriority.Render);
+        }, DispatcherPriority.Loaded);
+    }
+
+    private async Task ShowPendingThemeNoticeAsync()
+    {
+        if (_noticeOpen || !_viewModel.NeedsCurrentThemeNotice)
+        {
+            return;
+        }
+
+        _noticeOpen = true;
+        try
+        {
+            (string title, string subtitle, string body) = _viewModel.SelectedTheme?.Id switch
+            {
+                "stocks" => (
+                    "股票行情风险提示",
+                    "实验性数据功能",
+                    "股票、基金与数字资产行情来自第三方公开接口，可能存在延迟、不准确、中断或代码映射错误。所展示的信息仅用于屏幕信息展示，不构成任何投资建议或交易依据。"),
+                "ai-quota" => (
+                    "AI 用量功能提示",
+                    "Tokscale 本地数据源",
+                    "此功能依赖用户自行安装的开源工具 Tokscale。KSS 只在本机调用 Tokscale 的 JSON 命令，不接管账号登录、不读取 API Key，也不会上传用量或凭据。不同客户端与平台的统计完整度可能不同，数据仅供个人信息展示。"),
+                _ => (string.Empty, string.Empty, string.Empty)
+            };
+
+            if (string.IsNullOrEmpty(title))
+            {
+                return;
+            }
+
+            var dialog = new RiskNoticeWindow(title, subtitle, body);
+            await dialog.ShowDialog<bool>(this);
+            await _viewModel.AcknowledgeCurrentThemeNoticeAsync();
+        }
+        finally
+        {
+            _noticeOpen = false;
+        }
+    }
+
+    private void TitleBar_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginMoveDrag(e);
+        }
+    }
+
+        private void ThemeModeButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        bool isDark = Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+        _viewModel.UiThemeMode = isDark ? UiThemeMode.Light : UiThemeMode.Dark;
+    }
+
+    private void ApplyUiTheme()
+    {
+        if (Application.Current is null)
+        {
+            return;
+        }
+
+        Application.Current.RequestedThemeVariant = _viewModel.UiThemeMode switch
+        {
+            UiThemeMode.Light => ThemeVariant.Light,
+            UiThemeMode.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
+    }
+private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void MaximizeButton_OnClick(object? sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+
+    private void CloseButton_OnClick(object? sender, RoutedEventArgs e) => Close();
+
+    private async void ChooseImageButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await _viewModel.ChooseImageAsync();
+
+    private async void AccentColorButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new AccentColorWindow(_viewModel.AccentColor);
+        string? selected = await dialog.ShowDialog<string?>(this);
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            _viewModel.AccentColor = selected;
+        }
+    }
+
+    private async Task<string?> PickImageAsync()
+    {
+        IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                Title = "选择屏幕图片",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("图片")
+                    {
+                        Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"]
+                    }
+                ]
+            });
+        return files.FirstOrDefault()?.TryGetLocalPath();
+    }
+}

@@ -1,0 +1,96 @@
+<Application
+    x:Class="KeyboardScreen.App.Avalonia.App"
+    x:CompileBindings="False"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <!-- Keep the desktop control layer neutral; theme color belongs to the keyboard canvas. -->
+      <Color x:Key="SystemAccentColor">#747D8B</Color>
+      <Color x:Key="SystemAccentColorLight1">#8B93A0</Color>
+      <Color x:Key="SystemAccentColorLight2">#A4ABB5</Color>
+      <Color x:Key="SystemAccentColorLight3">#C7CBD2</Color>
+      <Color x:Key="SystemAccentColorDark1">#626B78</Color>
+      <Color x:Key="SystemAccentColorDark2">#515965</Color>
+      <Color x:Key="SystemAccentColorDark3">#414852</Color>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <LinearGradientBrush x:Key="KssWindowSurfaceBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#FCFCFB" Offset="0" />
+            <GradientStop Color="#F2F3F1" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="KssPanelSurfaceBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#FFFFFF" Offset="0" />
+            <GradientStop Color="#FBFCFD" Offset="1" />
+          </LinearGradientBrush>
+          <SolidColorBrush x:Key="KssWindowBorderBrush">#DDE1E6</SolidColorBrush>
+          <SolidColorBrush x:Key="KssForegroundBrush">#15171B</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSecondaryBrush">#747C89</SolidColorBrush>
+          <SolidColorBrush x:Key="KssCardBrush">#F5F6F8</SolidColorBrush>
+          <SolidColorBrush x:Key="KssCardBorderBrush">#E2E5EA</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlBrush">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlHoverBrush">#F0F1F3</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlPressedBrush">#E6E8EB</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlBorderBrush">#D7DCE4</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlFocusBrush">#747D8B</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSelectedBrush">#E9ECF1</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSelectedForegroundBrush">#5E6674</SolidColorBrush>
+          <SolidColorBrush x:Key="KssDisabledBrush">#F0F1F3</SolidColorBrush>
+          <SolidColorBrush x:Key="KssToggleOffBrush">#C8CDD6</SolidColorBrush>
+          <SolidColorBrush x:Key="KssToggleOnBrush">#737D8B</SolidColorBrush>
+          <SolidColorBrush x:Key="KssDividerBrush">#E2E5EA</SolidColorBrush>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush">#D7DCE4</SolidColorBrush>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <LinearGradientBrush x:Key="KssWindowSurfaceBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#202226" Offset="0" />
+            <GradientStop Color="#181A1E" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="KssPanelSurfaceBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#26282D" Offset="0" />
+            <GradientStop Color="#222429" Offset="1" />
+          </LinearGradientBrush>
+          <SolidColorBrush x:Key="KssWindowBorderBrush">#383B42</SolidColorBrush>
+          <SolidColorBrush x:Key="KssForegroundBrush">#F3F4F6</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSecondaryBrush">#A4AAB4</SolidColorBrush>
+          <SolidColorBrush x:Key="KssCardBrush">#292C31</SolidColorBrush>
+          <SolidColorBrush x:Key="KssCardBorderBrush">#3A3E46</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlBrush">#30333A</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlHoverBrush">#393D45</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlPressedBrush">#42464F</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlBorderBrush">#484D57</SolidColorBrush>
+          <SolidColorBrush x:Key="KssControlFocusBrush">#A4ABB5</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSelectedBrush">#3A3E46</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSelectedForegroundBrush">#E4E7EC</SolidColorBrush>
+          <SolidColorBrush x:Key="KssDisabledBrush">#25282D</SolidColorBrush>
+          <SolidColorBrush x:Key="KssToggleOffBrush">#555B65</SolidColorBrush>
+          <SolidColorBrush x:Key="KssToggleOnBrush">#929AA7</SolidColorBrush>
+          <SolidColorBrush x:Key="KssDividerBrush">#3A3E46</SolidColorBrush>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground">#2C2F35</SolidColorBrush>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush">#484D57</SolidColorBrush>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon Icon="/Assets/TrayIcon.ico" ToolTipText="Keyboard Screen Studio" Command="{Binding ShowWindowCommand}">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="打开主窗口" Command="{Binding ShowWindowCommand}" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="退出" Command="{Binding ExitCommand}" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+    <StyleInclude Source="avares://KeyboardScreen.App.Avalonia/Styles/DesignSystem.axaml" />
+  </Application.Styles>
+</Application>

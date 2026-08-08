@@ -1,0 +1,774 @@
+<Window
+    x:Class="KeyboardScreen.App.Avalonia.MainWindow"
+    x:DataType="vm:MainWindowViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:KeyboardScreen.App.Avalonia.Controls"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure"
+    xmlns:vm="using:KeyboardScreen.App.Avalonia.ViewModels"
+    Title="Keyboard Screen Studio"
+    Width="1280"
+    Height="800"
+    MinWidth="1080"
+    MinHeight="680"
+    WindowStartupLocation="CenterScreen"
+    WindowDecorations="None"
+    ExtendClientAreaToDecorationsHint="True"
+    ExtendClientAreaTitleBarHeightHint="64"
+    TransparencyLevelHint="Transparent"
+    Background="Transparent">
+
+  <Window.Resources>
+    <infra:ConnectionBrushConverter x:Key="ConnectionBrushConverter" />
+    <infra:ImageTimePlacementLabelConverter x:Key="ImageTimePlacementLabelConverter" />
+    <infra:DotMatrixProgressPeriodLabelConverter x:Key="DotMatrixProgressPeriodLabelConverter" />
+    <infra:ImageClockStyleLabelConverter x:Key="ImageClockStyleLabelConverter" />
+    <infra:ImageTextColorLabelConverter x:Key="ImageTextColorLabelConverter" />
+    <infra:ImageTextAlignmentLabelConverter x:Key="ImageTextAlignmentLabelConverter" />
+    <infra:ImageDigitalOrderLabelConverter x:Key="ImageDigitalOrderLabelConverter" />
+    <infra:ImageAnalogOrderLabelConverter x:Key="ImageAnalogOrderLabelConverter" />
+    <infra:UiThemeModeLabelConverter x:Key="UiThemeModeLabelConverter" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="ListBox.order-picker"><Setter Property="Height" Value="144" /><Setter Property="Padding" Value="0" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="SelectionMode" Value="Single" /></Style>
+    <Style Selector="ListBox.order-picker ListBoxItem"><Setter Property="MinHeight" Value="0" /><Setter Property="Margin" Value="4" /><Setter Property="Padding" Value="14,0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Background" Value="{DynamicResource KssControlBrush}" /><Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="12" /></Style>
+    <Style Selector="ListBox.order-picker ListBoxItem:pointerover"><Setter Property="Background" Value="{DynamicResource KssControlHoverBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource KssControlFocusBrush}" /></Style>
+    <Style Selector="ListBox.order-picker ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource KssSelectedBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource KssControlFocusBrush}" /><Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" /></Style>    <Style Selector="NumericUpDown.compact-value"><Setter Property="Width" Value="72" /><Setter Property="Height" Value="40" /><Setter Property="MinHeight" Value="0" /><Setter Property="Padding" Value="8,0" /><Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="TextAlignment" Value="Center" /><Setter Property="CornerRadius" Value="12" /></Style>
+    <Style Selector="TextBox.segment">
+      <Setter Property="Height" Value="48" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="FocusAdorner" Value="{x:Null}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ScrollViewer
+              x:Name="PART_ScrollViewer"
+              HorizontalScrollBarVisibility="Hidden"
+              VerticalScrollBarVisibility="Hidden">
+            <TextPresenter
+                x:Name="PART_TextPresenter"
+                Margin="{TemplateBinding Padding}"
+                Text="{TemplateBinding Text, Mode=TwoWay}"
+                CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
+                CaretIndex="{TemplateBinding CaretIndex}"
+                SelectionStart="{TemplateBinding SelectionStart}"
+                SelectionEnd="{TemplateBinding SelectionEnd}"
+                TextAlignment="{TemplateBinding TextAlignment}"
+                TextWrapping="{TemplateBinding TextWrapping}"
+                PasswordChar="{TemplateBinding PasswordChar}"
+                RevealPassword="{TemplateBinding RevealPassword}"
+                SelectionBrush="{TemplateBinding SelectionBrush}"
+                SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                CaretBrush="{TemplateBinding CaretBrush}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </ScrollViewer>
+        </ControlTemplate>
+      </Setter>    </Style>
+    <Style Selector="TextBox.segment:focus">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.embedded">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="6,0,10,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="FocusAdorner" Value="{x:Null}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ScrollViewer
+              x:Name="PART_ScrollViewer"
+              HorizontalScrollBarVisibility="Hidden"
+              VerticalScrollBarVisibility="Hidden">
+            <TextPresenter
+                x:Name="PART_TextPresenter"
+                Margin="{TemplateBinding Padding}"
+                Text="{TemplateBinding Text, Mode=TwoWay}"
+                CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
+                CaretIndex="{TemplateBinding CaretIndex}"
+                SelectionStart="{TemplateBinding SelectionStart}"
+                SelectionEnd="{TemplateBinding SelectionEnd}"
+                TextAlignment="{TemplateBinding TextAlignment}"
+                TextWrapping="{TemplateBinding TextWrapping}"
+                PasswordChar="{TemplateBinding PasswordChar}"
+                RevealPassword="{TemplateBinding RevealPassword}"
+                SelectionBrush="{TemplateBinding SelectionBrush}"
+                SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                CaretBrush="{TemplateBinding CaretBrush}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </ScrollViewer>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="TextBox.embedded:focus">
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>  </Window.Styles>
+
+  <Border
+      Background="{DynamicResource KssWindowSurfaceBrush}"
+      BorderBrush="{DynamicResource KssWindowBorderBrush}"
+      BorderThickness="1"
+      CornerRadius="{DynamicResource KssWindowCornerRadius}"
+      ClipToBounds="True">
+    <Grid RowDefinitions="64,*">
+      <Grid
+          x:Name="TitleBar"
+          Grid.Row="0"
+          ColumnDefinitions="*,Auto"
+          Background="Transparent"
+          PointerPressed="TitleBar_OnPointerPressed">
+        <TextBlock
+            Margin="22,0,0,0"
+            VerticalAlignment="Center"
+            FontSize="14"
+            FontWeight="SemiBold"
+            Text="Keyboard Screen Studio" />
+        <StackPanel
+            Grid.Column="1"
+            Margin="0,0,8,0"
+            VerticalAlignment="Center"
+            Orientation="Horizontal">
+          <Button Classes="titlebar" Click="ThemeModeButton_OnClick" ToolTip.Tip="切换亮色 / 暗色模式">
+            <TextBlock VerticalAlignment="Center" FontSize="18" Foreground="{DynamicResource KssForegroundBrush}" Text="◐" />
+          </Button>
+          <Button Classes="titlebar" Click="MinimizeButton_OnClick">
+            <Border Width="12" Height="1" Background="{DynamicResource KssForegroundBrush}" />
+          </Button>
+          <Button Classes="titlebar" Click="MaximizeButton_OnClick">
+            <Border Width="10" Height="10" BorderBrush="{DynamicResource KssForegroundBrush}" BorderThickness="1.2" />
+          </Button>
+          <Button Classes="titlebar close" Click="CloseButton_OnClick">
+            <Canvas Width="12" Height="12">
+              <Border Canvas.Top="5.5" Width="12" Height="1" Background="{DynamicResource KssForegroundBrush}" RenderTransform="rotate(45deg)" RenderTransformOrigin="50%,50%" />
+              <Border Canvas.Top="5.5" Width="12" Height="1" Background="{DynamicResource KssForegroundBrush}" RenderTransform="rotate(-45deg)" RenderTransformOrigin="50%,50%" />
+            </Canvas>
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <Grid Grid.Row="1" Margin="22,0,22,22" ColumnDefinitions="280,16,*">
+        <Grid Grid.Column="0" Margin="0,10,0,0" RowDefinitions="Auto,*,Auto">
+          <StackPanel>
+            <TextBlock FontSize="25" FontWeight="SemiBold" Text="键盘显示屏" />
+            <StackPanel Margin="0,12,0,0" Orientation="Horizontal" Spacing="8">
+              <Ellipse
+                  Width="8"
+                  Height="8"
+                  VerticalAlignment="Center"
+                  Fill="{Binding DeviceConnected, Converter={StaticResource ConnectionBrushConverter}}" />
+              <TextBlock
+                  VerticalAlignment="Center"
+                  Classes="secondary"
+                  Foreground="{Binding DeviceConnected, Converter={StaticResource ConnectionBrushConverter}}"
+                  Text="{Binding DeviceStatus}" />
+            </StackPanel>
+          </StackPanel>
+
+          <Grid Grid.Row="1" Margin="0,24,0,0" RowDefinitions="Auto,*">
+            <TextBlock FontSize="13" FontWeight="SemiBold" Text="显示方案" />
+            <ScrollViewer
+                Classes="edge-fade"
+                Grid.Row="1"
+                Margin="0,12,-6,0"
+                Padding="0,0,6,0"
+                VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding ThemeGroups}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel>
+                      <TextBlock
+                          Margin="0,10,0,8"
+                          FontSize="11"
+                          FontWeight="SemiBold"
+                          Foreground="{DynamicResource KssSecondaryBrush}"
+                          Text="{Binding Name}" />
+                      <ItemsControl ItemsSource="{Binding Themes}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Button
+                                Classes="sidebar"
+                                Classes.selected="{Binding IsSelected}"
+                                Command="{Binding $parent[Window].DataContext.SelectThemeCommand}"
+                                CommandParameter="{Binding Id}"
+                                Content="{Binding Name}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+
+          <Border Grid.Row="2" Margin="0,16,0,0" Classes="card sidebar-surface" Padding="14">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="secondary" FontSize="11" Text="设备地址" />
+              <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding DeviceSummary}" />
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <Border
+            Grid.Column="2"
+            Margin="0,10,0,0"
+            Padding="28,22"
+            Classes="elevated"
+            CornerRadius="{DynamicResource KssCornerRadius}">
+          <Grid RowDefinitions="64,*">
+            <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+              <Button Classes="nav" Classes.selected="{Binding IsScreenPage}" Command="{Binding SelectNavigationCommand}" CommandParameter="screen" Content="屏幕配置" />
+              <Button Classes="nav" Classes.selected="{Binding IsThemePage}" Command="{Binding SelectNavigationCommand}" CommandParameter="theme" Content="主题设置" />
+              <Button Classes="nav" Classes.selected="{Binding IsAutomationPage}" Command="{Binding SelectNavigationCommand}" CommandParameter="automation" Content="自动化" />
+              <Button Classes="nav" Classes.selected="{Binding IsSettingsPage}" Command="{Binding SelectNavigationCommand}" CommandParameter="settings" Content="其他设置" />
+              <Button Classes="nav" Classes.selected="{Binding IsAboutPage}" Command="{Binding SelectNavigationCommand}" CommandParameter="about" Content="关于" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*,24,272">
+              <ScrollViewer Grid.Column="0" Classes="edge-fade" VerticalScrollBarVisibility="Auto">
+                <Grid>
+                  <StackPanel x:Name="ScreenPage" Classes="page-content" IsVisible="{Binding IsScreenPage}" Spacing="16">
+                    <Border Classes="card">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="secondary" Text="当前显示方案" />
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="{Binding CurrentThemeName}" />
+                        <TextBlock Classes="secondary" Text="{Binding CurrentThemeDescription}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                    <Border Classes="card">
+                      <StackPanel Spacing="9">
+                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="画面内容" />
+                        <TextBlock Classes="secondary" Text="{Binding CurrentThemeDetails}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                    <Border Classes="card">
+                      <StackPanel Spacing="9">
+                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="当前数据" />
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                        <TextBlock Classes="secondary" Text="{Binding LastUpdated}" />
+                      </StackPanel>
+                    </Border>
+                    <Button
+                        IsVisible="{Binding IsImageTheme}"
+                        HorizontalAlignment="Left"
+                        Click="ChooseImageButton_OnClick"
+                        Content="选择图片" />
+                  </StackPanel>
+
+                  <StackPanel x:Name="ThemePage" Classes="page-content" IsVisible="{Binding IsThemePage}" Spacing="16" x:CompileBindings="False">
+                    <Border Classes="card">
+                      <StackPanel Spacing="16">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="屏幕字体" />
+                        <Grid ColumnDefinitions="*,12,154">
+                          <ComboBox
+                              Grid.Column="0"
+                              ItemsSource="{Binding Fonts}"
+                              SelectedValue="{Binding SelectedFontId, Mode=TwoWay}"
+                              SelectedValueBinding="{Binding Id}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <Grid Margin="2,0" ColumnDefinitions="*,Auto">
+                                  <TextBlock VerticalAlignment="Center" Text="{Binding DisplayName}" />
+                                  <TextBlock
+                                      Grid.Column="1"
+                                      Margin="16,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Classes="secondary"
+                                      FontSize="10"
+                                      Text="{Binding FileName}" />
+                                </Grid>
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                          <Button Grid.Column="2" Command="{Binding OpenFontsFolderCommand}" Content="打开字体文件夹" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                                        <Grid ColumnDefinitions="*,16,*">
+                      <Border Grid.Column="0" Grid.ColumnSpan="{Binding ThemeAccentColumnSpan}" Height="126" Classes="card">
+                        <StackPanel Spacing="16">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="主题强调色" />
+                          <Grid HorizontalAlignment="Stretch" ColumnDefinitions="*,12,96">
+                            <Border Grid.Column="0" Height="44" Classes="inline">
+                              <Grid ColumnDefinitions="44,*">
+                                <Border Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Background="{Binding AccentColor}" BorderBrush="{DynamicResource KssControlBorderBrush}"
+                                        BorderThickness="1" CornerRadius="12" />
+                                <TextBox Grid.Column="1" Classes="embedded" Height="42" MinWidth="0" Padding="6,0,10,0"
+                                         Text="{Binding AccentColor, Mode=TwoWay}" TextAlignment="Center" />
+                              </Grid>
+                            </Border>
+                            <Button Grid.Column="2" HorizontalAlignment="Stretch" Padding="8,0"
+                                    Click="AccentColorButton_OnClick" Content="选择颜色" />
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+
+                      <Border Grid.Column="2" Height="126" Classes="card" IsVisible="{Binding IsImageTheme}">
+                        <StackPanel Spacing="16">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="图片时间位置" />
+                          <ComboBox ItemsSource="{Binding ImageTimePlacements}" SelectedItem="{Binding ImageTimePlacement, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource ImageTimePlacementLabelConverter}}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                      </Border>
+
+                      <Border Grid.Column="2" Height="126" Classes="card" IsVisible="{Binding IsDotMatrixProgressTheme}">
+                        <StackPanel Spacing="16">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="进度周期" />
+                          <ComboBox ItemsSource="{Binding DotMatrixProgressPeriods}" SelectedItem="{Binding DotMatrixProgressPeriod, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource DotMatrixProgressPeriodLabelConverter}}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+
+                    <Border IsVisible="{Binding IsDotMatrixProgressTheme}" Classes="card">
+                      <StackPanel Spacing="16">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="顶部信息" />
+                        <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="字号" />
+                          <Slider Grid.Column="1" Minimum="12" Maximum="20" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding DotMatrixProgressHeaderFontSize, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="12" Maximum="20" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding DotMatrixProgressHeaderFontSize, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsImageTheme}" Classes="card">
+                      <StackPanel Spacing="16">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="图片时钟" />
+                        <Grid ColumnDefinitions="*,16,*">
+                          <StackPanel Spacing="7">
+                            <TextBlock Classes="secondary" Text="时钟样式" />
+                            <ComboBox ItemsSource="{Binding ImageClockStyles}" SelectedItem="{Binding ImageClockStyle, Mode=TwoWay}">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                  <TextBlock Text="{Binding Converter={StaticResource ImageClockStyleLabelConverter}}" />
+                                </DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                          </StackPanel>
+                          <StackPanel Grid.Column="2" Spacing="7">
+                            <TextBlock Classes="secondary" Text="文字颜色" />
+                            <ComboBox ItemsSource="{Binding ImageTextColors}" SelectedItem="{Binding ImageTextColor, Mode=TwoWay}">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                  <TextBlock Text="{Binding Converter={StaticResource ImageTextColorLabelConverter}}" />
+                                </DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                          </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,16,*">
+                          <StackPanel Spacing="7">
+                            <TextBlock Classes="secondary" Text="信息对齐" />
+                            <ComboBox IsEnabled="{Binding IsImageTextAlignmentEnabled}" ItemsSource="{Binding ImageTextAlignments}" SelectedItem="{Binding ImageTextAlignment, Mode=TwoWay}">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                  <TextBlock Text="{Binding Converter={StaticResource ImageTextAlignmentLabelConverter}}" />
+                                </DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                          </StackPanel>
+                          <Grid Grid.Column="2" ColumnDefinitions="*,Auto" RowDefinitions="44,44">
+                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="时间背景" />
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ImageTimeBackground, Mode=TwoWay}" />
+                            <TextBlock Grid.Row="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="显示天气" />
+                            <ToggleSwitch Grid.Row="1" Grid.Column="1" IsChecked="{Binding ImageWeatherVisible, Mode=TwoWay}" />
+                          </Grid>
+                        </Grid>
+
+                        <StackPanel IsVisible="{Binding IsImageDigitalClockStyle}" Spacing="12">
+                          <TextBlock Margin="0,4,0,0" FontSize="15" FontWeight="SemiBold" Text="数字时钟排版" />
+                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="内容顺序" /><ListBox Grid.Column="1" Classes="order-picker" ItemsSource="{Binding ImageDigitalOrders}" SelectedItem="{Binding ImageDigitalOrder, Mode=TwoWay}"><ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ListBox.ItemsPanel><ListBox.ItemTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding Converter={StaticResource ImageDigitalOrderLabelConverter}}" /></DataTemplate></ListBox.ItemTemplate></ListBox></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="时间字号" /><Slider Grid.Column="1" Minimum="20" Maximum="38" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageTimeFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="20" Maximum="38" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageTimeFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="日期字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid IsVisible="{Binding ImageWeatherVisible}" ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="天气字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /></Grid>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsImageLargeDigitalClockStyle}" Spacing="12">
+                          <TextBlock Margin="0,4,0,0" FontSize="15" FontWeight="SemiBold" Text="大数字时间排版" />
+                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="内容顺序" /><ListBox Grid.Column="1" Classes="order-picker" ItemsSource="{Binding ImageDigitalOrders}" SelectedItem="{Binding ImageDigitalOrder, Mode=TwoWay}"><ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ListBox.ItemsPanel><ListBox.ItemTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding Converter={StaticResource ImageDigitalOrderLabelConverter}}" /></DataTemplate></ListBox.ItemTemplate></ListBox></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="时间字号" /><Slider Grid.Column="1" Minimum="32" Maximum="44" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageLargeTimeFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="32" Maximum="44" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageLargeTimeFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="日期字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid IsVisible="{Binding ImageWeatherVisible}" ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="天气字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /></Grid>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsImageAnalogClockStyle}" Spacing="12">
+                          <TextBlock Margin="0,4,0,0" FontSize="15" FontWeight="SemiBold" Text="模拟时钟排版" />
+                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="内容顺序" /><ListBox Grid.Column="1" Classes="order-picker" ItemsSource="{Binding ImageAnalogOrders}" SelectedItem="{Binding ImageAnalogOrder, Mode=TwoWay}"><ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ListBox.ItemsPanel><ListBox.ItemTemplate><DataTemplate><TextBlock VerticalAlignment="Center" Text="{Binding Converter={StaticResource ImageAnalogOrderLabelConverter}}" /></DataTemplate></ListBox.ItemTemplate></ListBox></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="时钟大小" /><Slider Grid.Column="1" Minimum="58" Maximum="104" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageAnalogClockSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="58" Maximum="104" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageAnalogClockSize, Mode=TwoWay}" /></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="日期字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid IsVisible="{Binding ImageWeatherVisible}" ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="天气字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /></Grid>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsImageFlipClockStyle}" Spacing="12">
+                          <TextBlock Margin="0,4,0,0" FontSize="15" FontWeight="SemiBold" Text="翻页时钟排版" />
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="时间字号" /><Slider Grid.Column="1" Minimum="20" Maximum="38" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageFlipTimeFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="20" Maximum="38" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageFlipTimeFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="日期字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageDateFontSize, Mode=TwoWay}" /></Grid>
+                          <Grid IsVisible="{Binding ImageWeatherVisible}" ColumnDefinitions="78,*,72" ColumnSpacing="12"><TextBlock VerticalAlignment="Center" Classes="secondary" Text="天气字号" /><Slider Grid.Column="1" Minimum="9" Maximum="18" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /><NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="9" Maximum="18" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding ImageWeatherFontSize, Mode=TwoWay}" /></Grid>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsWeatherSettingsVisible}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="天气" />
+                            <TextBlock Classes="secondary" Text="自动定位会显示当前识别到的城市。" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding WeatherAutomaticLocation, Mode=TwoWay}" Content="自动定位" />
+                        </Grid>
+                        <Grid ColumnDefinitions="92,*">
+                          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="城市" />
+                          <TextBox
+                              Grid.Column="1"
+                              IsEnabled="{Binding IsManualWeatherLocationEnabled}"
+                              Text="{Binding WeatherLocation, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsStockTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="股票 (Beta)" />
+                          <TextBlock
+                              Classes="secondary"
+                              Text="最多添加三项。支持 AAPL、0700.HK、600519.SS、000001.SZ、BTC-USD 等代码；数据可能延迟或不准确，不构成投资建议。"
+                              TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="24,*,12,*">
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="行情代码" />
+                          <TextBlock Grid.Column="3" Classes="secondary" Text="显示别名（可选）" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="24,*,12,*">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
+                          <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="AAPL" Text="{Binding StockSymbol1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Apple" Text="{Binding StockAlias1, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,*,12,*">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="2" />
+                          <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="0700.HK" Text="{Binding StockSymbol2, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="腾讯" Text="{Binding StockAlias2, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,*,12,*">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="3" />
+                          <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="BTC-USD" Text="{Binding StockSymbol3, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Bitcoin" Text="{Binding StockAlias3, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,220">
+                          <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="涨跌颜色" />
+                            <TextBlock Classes="secondary" Text="15 分钟缓存 · 行情仅供展示" />
+                          </StackPanel>
+                          <ComboBox
+                              Grid.Column="1"
+                              ItemsSource="{Binding StockColorPreferences}"
+                              SelectedItem="{Binding StockColorPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsAiTheme}" Classes="card">
+                      <StackPanel Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto,12,Auto">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="Tokscale 数据源" />
+                            <TextBlock Classes="secondary" Text="{Binding TokscaleStatusTitle}" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Command="{Binding OpenTokscaleDocsCommand}" Content="安装说明" />
+                          <Button Grid.Column="3" Command="{Binding RefreshTokscaleCommand}" Content="重新检测" />
+                        </Grid>
+
+                        <Border Background="{DynamicResource KssControlBrush}" BorderBrush="{DynamicResource KssControlBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="16">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontWeight="SemiBold" Text="只读取本机数据" />
+                            <TextBlock Classes="secondary" Text="KSS 仅调用本机 Tokscale 的 JSON 命令，不接管账号登录、不读取 API Key，也不会上传用量或凭据。" TextWrapping="Wrap" />
+                            <TextBlock Classes="secondary" Text="{Binding TokscaleStatusMessage}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Border>
+
+                        <StackPanel IsVisible="{Binding IsTokscaleUnavailable}" Spacing="12">
+                          <TextBlock FontWeight="SemiBold" Text="首次使用，只需完成下面三步" />
+                          <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="安装 Node.js 与 Tokscale" /><TextBlock Classes="secondary" Text="在终端执行：npm install -g tokscale@latest" /></StackPanel>
+                            <Border Grid.Row="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" /></Border>
+                            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="让 Tokscale 扫描本机记录" /><TextBlock Classes="secondary" Text="安装后在终端运行一次 tokscale" /></StackPanel>
+                            <Border Grid.Row="4" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" /></Border>
+                            <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="回到 KSS 重新检测" /><TextBlock Classes="secondary" Text="检测成功后即可选择订阅额度、模型 Token 或费用。" /></StackPanel>
+                          </Grid>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding IsTokscaleReady}" Spacing="14">
+                          <Grid ColumnDefinitions="*,16,*">
+                            <StackPanel Spacing="7">
+                              <TextBlock Classes="secondary" Text="显示指标" />
+                              <ComboBox ItemsSource="{Binding AiUsageModes}" SelectedItem="{Binding SelectedAiUsageMode, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+                              </ComboBox>
+                              <TextBlock Classes="secondary" FontSize="11" Text="{Binding SelectedAiUsageMode.Description}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="7">
+                              <TextBlock Classes="secondary" Text="数据项目" />
+                              <ComboBox ItemsSource="{Binding TokscaleOptions}" SelectedItem="{Binding SelectedTokscaleOption, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayText}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
+                              </ComboBox>
+                              <TextBlock Classes="secondary" FontSize="11" Text="下拉项来自 Tokscale 当前实际读取到的数据" />
+                            </StackPanel>
+                          </Grid>
+
+                          <Grid ColumnDefinitions="*,16,*">
+                            <StackPanel Spacing="7">
+                              <TextBlock Classes="secondary" Text="屏幕显示名称（可选）" />
+                              <TextBox MaxLength="18" PlaceholderText="留空则使用平台或模型名称" Text="{Binding AiDisplayName, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" IsVisible="{Binding IsAiProgressTargetVisible}" Spacing="7">
+                              <TextBlock Classes="secondary" Text="进度目标（可选）" />
+                              <NumericUpDown Minimum="0" Maximum="1000000000000" Increment="1000" FormatString="0.##" ShowButtonSpinner="False" Value="{Binding AiProgressTarget, Mode=TwoWay}" />
+                              <TextBlock Classes="secondary" FontSize="11" Text="留空或填 0 时只显示真实数值，不虚构百分比" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </Grid>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
+                  <StackPanel x:Name="AutomationPage" Classes="page-content" IsVisible="{Binding IsAutomationPage}" Spacing="16">
+                    <Border Classes="card">
+                      <Grid RowDefinitions="Auto,18,Auto" ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="7">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="定时刷新与推送" />
+                          <TextBlock Classes="secondary" Text="刷新间隔为 1–30 秒，设置变更会立即保存并推送。" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoPush, Mode=TwoWay}" Content="定时推送" />
+                        <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,16,72">
+                          <Slider Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding RefreshSeconds, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="1" Maximum="30" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding RefreshSeconds, Mode=TwoWay}" />
+                        </Grid>
+                      </Grid>
+                    </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="18">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="7">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="媒体主题自动切换" />
+                            <TextBlock Classes="secondary" Text="播放与停止时分别切换到指定主题。" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoMediaThemeSwitch, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,16,*">
+                          <StackPanel Spacing="8">
+                            <TextBlock Classes="secondary" Text="无媒体播放时" />
+                            <ComboBox IsEnabled="{Binding AutoMediaThemeSwitch}" ItemsSource="{Binding IdleThemeOptions}" SelectedValue="{Binding MediaIdleThemeId, Mode=TwoWay}" SelectedValueBinding="{Binding Id}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                          </StackPanel>
+                          <StackPanel Grid.Column="2" Spacing="8">
+                            <TextBlock Classes="secondary" Text="检测到播放时" />
+                            <ComboBox IsEnabled="{Binding AutoMediaThemeSwitch}" ItemsSource="{Binding MusicThemeOptions}" SelectedValue="{Binding MediaPlayingThemeId, Mode=TwoWay}" SelectedValueBinding="{Binding Id}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                          </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="5"><TextBlock FontWeight="SemiBold" Text="忽略浏览器媒体" /><TextBlock Classes="secondary" FontSize="11" Text="不将 Chrome、Edge 等浏览器中的直播或网页音频识别为当前媒体。" TextWrapping="Wrap" /></StackPanel><ToggleSwitch Grid.Column="1" IsChecked="{Binding IgnoreBrowserMediaSessions, Mode=TwoWay}" /></Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="7">
+                          <TextBlock FontSize="15" FontWeight="SemiBold" Text="播放音乐时自动切换" />
+                          <TextBlock Classes="secondary" Text="仅在当前为音乐类主题时显示。" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoSwitchToMusic, Mode=TwoWay}" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+
+                  <StackPanel x:Name="SettingsPage" Classes="page-content" IsVisible="{Binding IsSettingsPage}" Spacing="16">
+                                        <Border Classes="card" Padding="16">
+                      <Grid ColumnDefinitions="92,*">
+                        <StackPanel VerticalAlignment="Center" Spacing="4">
+                          <TextBlock FontSize="15" FontWeight="SemiBold" Text="界面外观" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding UiThemeModes}" SelectedItem="{Binding UiThemeMode, Mode=TwoWay}">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding Converter={StaticResource UiThemeModeLabelConverter}}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </Grid>
+                    </Border>
+<Border Classes="card" Padding="16">
+                      <Grid ColumnDefinitions="92,*">
+                        <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="设备地址" />
+                        <controls:IpAddressEditor Grid.Column="1" Value="{Binding DeviceIp, Mode=TwoWay}" />
+                      </Grid>
+                    </Border>
+
+                    <Border Classes="card" Padding="16">
+                      <Grid ColumnDefinitions="92,*">
+                        <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="内容安全区" />
+                        <Border Grid.Column="1" Height="50" Classes="inline" ClipToBounds="True">
+                          <Grid ColumnDefinitions="*,1,*,1,*,1,*">
+                            <Grid>
+                              <Grid ColumnDefinitions="28,*">
+                                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Classes="secondary" FontSize="11" Text="左" />
+                                <TextBox Grid.Column="1" Classes="segment" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Text="{Binding SafeLeft, Mode=TwoWay}" />
+                              </Grid>
+                            </Grid>
+                            <Border Grid.Column="1" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+                            <Grid Grid.Column="2" ColumnDefinitions="28,*">
+                              <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Classes="secondary" FontSize="11" Text="上" />
+                              <TextBox Grid.Column="1" Classes="segment" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Text="{Binding SafeTop, Mode=TwoWay}" />
+                            </Grid>
+                            <Border Grid.Column="3" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+                            <Grid Grid.Column="4" ColumnDefinitions="28,*">
+                              <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Classes="secondary" FontSize="11" Text="右" />
+                              <TextBox Grid.Column="1" Classes="segment" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Text="{Binding SafeRight, Mode=TwoWay}" />
+                            </Grid>
+                            <Border Grid.Column="5" Margin="0,12" Background="{DynamicResource KssDividerBrush}" />
+                            <Grid Grid.Column="6" ColumnDefinitions="28,*">
+                              <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Classes="secondary" FontSize="11" Text="下" />
+                              <TextBox Grid.Column="1" Classes="segment" BorderBrush="Transparent" BorderThickness="0" Background="Transparent" Text="{Binding SafeBottom, Mode=TwoWay}" />
+                            </Grid>
+                          </Grid>
+                        </Border>
+                      </Grid>
+                    </Border>
+
+                    <Border Classes="card">
+                      <Grid RowDefinitions="32,14,32,14,32,14,32" ColumnDefinitions="*,Auto">
+                        <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="最小化到系统托盘" />
+                        <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding MinimizeToTray, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="关闭后最小化" />
+                        <ToggleSwitch Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="4" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="开机自启动" />
+                        <ToggleSwitch Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding LaunchAtStartup, Mode=TwoWay}" />
+                        <TextBlock Grid.Row="6" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="启动后保持最小化" />
+                        <ToggleSwitch Grid.Row="6" Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding StartMinimized, Mode=TwoWay}" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+
+                  <StackPanel x:Name="AboutPage" Classes="page-content" IsVisible="{Binding IsAboutPage}" Spacing="16">
+                    <Border Classes="card">
+                      <StackPanel Spacing="8">
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="关于" />
+                        <TextBlock
+                            Classes="secondary"
+                            Text="Keyboard Screen Studio 源代码采用 MIT License。第三方组件、字体与数据服务仍遵循各自条款；应用图标与托盘图标采用单独的视觉资产许可。完整说明随程序提供。"
+                            TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="12">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="开源组件" />
+                        <Grid ColumnDefinitions="1.7*,1.2*,2*">
+                          <TextBlock FontWeight="SemiBold" Text="Avalonia UI 12" />
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="MIT License" />
+                          <TextBlock Grid.Column="2" Classes="secondary" Text="Copyright © The AvaloniaUI Project" />
+                        </Grid>
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+                        <Grid ColumnDefinitions="1.7*,1.2*,2*">
+                          <TextBlock FontWeight="SemiBold" Text="SkiaSharp" />
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="MIT License" />
+                          <TextBlock Grid.Column="2" Classes="secondary" Text="Copyright © Microsoft Corporation" />
+                        </Grid>
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+                        <Grid ColumnDefinitions="1.7*,1.2*,2*">
+                          <TextBlock FontWeight="SemiBold" Text="Doto" />
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="SIL OFL 1.1" />
+                          <TextBlock Grid.Column="2" Classes="secondary" Text="Copyright © 2024 The Doto Project Authors" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="8">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="数据来源与声明" />
+                        <TextBlock
+                            Classes="secondary"
+                            Text="天气数据由 Open-Meteo 提供，自动定位城市名由 BigDataCloud 解析。Yahoo Finance 行情与 Tokscale 本地用量均为非官方实验性集成，可能延迟、不准确或失效；股票信息不构成投资建议。Keyboard Screen Studio 是独立个人项目，与 Linx68 设备制造商及上述平台不存在隶属、授权、认可或赞助关系。应用与托盘图标为 AI 辅助创作的原创视觉资产，详见 ASSET_LICENSE.md。"
+                            TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <StackPanel Margin="0,2,0,6" HorizontalAlignment="Center" Spacing="2">
+                      <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="Keyboard Screen Studio 1.0" />
+                      <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Classes="secondary" Text="by " />
+                        <Button
+                            MinHeight="24"
+                            Padding="2,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Command="{Binding OpenAuthorCommand}"
+                            Content="ZCat95" />
+                      </StackPanel>
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+              </ScrollViewer>
+
+              <Border Grid.Column="2" Classes="card" Padding="24">
+                <Grid RowDefinitions="Auto,24,*">
+                  <TextBlock FontSize="18" FontWeight="SemiBold" Text="预览" />
+                  <Border
+                      Grid.Row="2"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Padding="8"
+                      Background="#D4D9DE"
+                      CornerRadius="32">
+                    <Border
+                        Width="142"
+                        Height="428"
+                        Background="#080B0F"
+                        CornerRadius="24"
+                        ClipToBounds="True">
+                      <Grid>
+                        <Image Source="{Binding PreviewImage}" Stretch="Fill" />
+
+                        <!-- Firmware status overlays are preview-only occlusion guides. -->
+                        <Border Width="36" Height="36" Margin="7,5,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Background="#F6060A10" CornerRadius="18" />
+                        <Border Width="77" Height="36" Margin="0,5,7,0" HorizontalAlignment="Right" VerticalAlignment="Top" Background="#F6060A10" CornerRadius="18" />
+                      </Grid>
+                    </Border>
+                  </Border>
+                </Grid>
+              </Border>
+            </Grid>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

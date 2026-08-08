@@ -6,7 +6,7 @@ namespace KeyboardScreen.Core;
 public sealed class AiQuotaTheme : IScreenTheme
 {
     public string Id => "ai-quota";
-    public string DisplayName => "AI用量 (Beta)";
+    public string DisplayName => "AI用量（开发中）";
     public string Description => "单平台剩余额度能量条";
     public string Details => "从下向上显示 AI 剩余额度，支持 API Key 与订阅制数据。";
 
@@ -87,7 +87,7 @@ public sealed class AiQuotaTheme : IScreenTheme
             24);
 
         canvas.Text(
-            quota.Available ? quota.RemainingDisplay : "--",
+            quota.Available ? quota.PrimaryDisplay : "--",
             quota.RemainingCount.HasValue ? 22 : 26,
             quota.Available ? canvas.AccentColor : Color.FromRgb(91, 103, 117),
             new Point(safe.Left, meter.Bottom + 51),
@@ -109,6 +109,11 @@ public sealed class AiQuotaTheme : IScreenTheme
 
     private static string FormatMetric(AiQuotaSnapshot quota)
     {
+        if (!string.IsNullOrWhiteSpace(quota.MetricDisplay))
+        {
+            return quota.MetricDisplay;
+        }
+
         if (quota.AccessType == AiAccessType.Subscription)
         {
             return quota.ResetPeriod == AiResetPeriod.None

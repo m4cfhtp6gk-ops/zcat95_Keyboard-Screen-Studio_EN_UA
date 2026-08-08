@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [ValidateSet('Release')]
     [string]$Configuration = 'Release',
@@ -21,7 +21,7 @@ if (-not $output.StartsWith($artifactsRoot, [StringComparison]::OrdinalIgnoreCas
 New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 
 try {
-    & dotnet publish (Join-Path $workspace 'src\KeyboardScreen.App\KeyboardScreen.App.csproj') `
+    & dotnet publish (Join-Path $workspace 'src\KeyboardScreen.App.Avalonia\KeyboardScreen.App.Avalonia.csproj') `
         -c $Configuration `
         -r $Runtime `
         --self-contained true `
@@ -32,12 +32,17 @@ try {
         throw "dotnet publish failed with exit code $LASTEXITCODE."
     }
 
-    $sourceExe = Join-Path $staging 'KeyboardScreen.App.exe'
+    $sourceExe = Join-Path $staging 'KeyboardScreen.App.Avalonia.exe'
     $targetExe = Join-Path $staging 'KeyboardScreenStudio.exe'
     if (-not (Test-Path -LiteralPath $sourceExe)) {
         throw 'Published executable was not produced.'
     }
     Rename-Item -LiteralPath $sourceExe -NewName 'KeyboardScreenStudio.exe'
+
+    $licenses = Join-Path $staging 'Licenses'
+    New-Item -ItemType Directory -Path $licenses -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.Core\Assets\Fonts\Doto-OFL.txt') -Destination $licenses -Force
+    Copy-Item -Path (Join-Path $workspace 'src\KeyboardScreen.App\Legal\*') -Destination $licenses -Force
 
     Get-ChildItem -LiteralPath $staging -Recurse -File |
         Where-Object { $_.Extension -in '.pdb', '.xml' } |
