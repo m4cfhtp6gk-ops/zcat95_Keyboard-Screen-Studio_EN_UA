@@ -9,11 +9,6 @@ namespace KeyboardScreen.App.Avalonia;
 
 public sealed partial class FirstRunGuideWindow : Window
 {
-    private Controls.IpAddressEditor IpEditor =>
-        this.FindControl<Controls.IpAddressEditor>("IpEditor")!;
-
-    private TextBlock ValidationText =>
-        this.FindControl<TextBlock>("ValidationText")!;
 
     public FirstRunGuideWindow() : this(string.Empty)
     {

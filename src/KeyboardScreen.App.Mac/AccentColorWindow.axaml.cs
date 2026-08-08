@@ -8,7 +8,6 @@ namespace KeyboardScreen.App.Avalonia;
 
 public sealed partial class AccentColorWindow : Window
 {
-    private ColorView Picker => this.FindControl<ColorView>("Picker")!;
 
     public AccentColorWindow()
     {
