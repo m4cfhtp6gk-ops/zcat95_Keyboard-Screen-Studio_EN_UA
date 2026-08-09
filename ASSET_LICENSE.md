@@ -1,7 +1,7 @@
 # Visual Asset License
 
 The application icon and system-tray icons in
-`src/KeyboardScreen.App/Assets`, together with the promotional artwork under
+`src/KeyboardScreen.App.Avalonia/Assets`, together with the promotional artwork under
 `docs/images`, are original, AI-assisted visual assets created for Keyboard
 Screen Studio.
 

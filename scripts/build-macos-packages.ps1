@@ -7,7 +7,7 @@ foreach ($rid in @("osx-x64", "osx-arm64")) {
   $macos = Join-Path $app "Contents/MacOS"; $resources = Join-Path $app "Contents/Resources"
   New-Item -ItemType Directory -Path $macos,$resources -Force | Out-Null
   Copy-Item -Path (Join-Path $publish "*") -Destination $macos -Recurse -Force
-  $icon = Join-Path $repo "src/KeyboardScreen.App/Assets/AppIcon.png"; if (Test-Path $icon) { Copy-Item $icon (Join-Path $resources "AppIcon.png") -Force }
+  $icon = Join-Path $repo "src/KeyboardScreen.App.Avalonia/Assets/AppIcon.png"; if (Test-Path $icon) { Copy-Item $icon (Join-Path $resources "AppIcon.png") -Force }
   $plist = @"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

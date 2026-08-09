@@ -42,8 +42,8 @@ try {
     $licenses = Join-Path $staging 'Licenses'
     New-Item -ItemType Directory -Path $licenses -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.Core\Assets\Fonts\Doto-OFL.txt') -Destination $licenses -Force
-    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.App\Legal\dotnet-LICENSE.txt') -Destination $licenses -Force
-    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.App\Legal\dotnet-ThirdPartyNotices.txt') -Destination $licenses -Force
+    Copy-Item -LiteralPath (Join-Path $workspace 'Licenses\dotnet-LICENSE.txt') -Destination $licenses -Force
+    Copy-Item -LiteralPath (Join-Path $workspace 'Licenses\dotnet-ThirdPartyNotices.txt') -Destination $licenses -Force
 
     Get-ChildItem -LiteralPath $staging -Recurse -File |
         Where-Object { $_.Extension -in '.pdb', '.xml' } |
