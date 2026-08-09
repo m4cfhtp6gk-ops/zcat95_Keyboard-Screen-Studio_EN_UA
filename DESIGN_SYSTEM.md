@@ -15,7 +15,7 @@
 
 ## 2. 设计令牌
 
-所有令牌集中在 `src/KeyboardScreen.App/DesignSystem.xaml`。页面不得新增语义重复的颜色、圆角或控件模板。
+所有令牌集中在 `src/KeyboardScreen.App.Avalonia/Styles/DesignSystem.axaml`。页面不得新增语义重复的颜色、圆角或控件模板。
 
 ### 2.1 字体
 
@@ -170,7 +170,7 @@
 - 新页面只能引用设计令牌和已命名样式。
 - 除图像内容、状态色和锁定设备组件外，页面 XAML 不得出现新的 HEX 颜色。
 - 不得在页面 XAML 新建 Button、TextBox、ComboBox、CheckBox、Slider、ScrollBar 模板。
-- 需要新组件时先在 `DesignSystem.xaml` 定义，再在页面引用。
+- 需要新组件时先在 `DesignSystem.axaml` 定义，再在页面引用。
 - 设备渲染字体与控制端 UI 字体必须使用不同的数据通道。
 
 ## 7. 交付检查表
@@ -203,5 +203,5 @@
 - 性能：不为动效新增大面积 Blur、DropShadow 或逐元素长列表动画；WebView、设备预览位图与大图内容不做持续动画。
 - 辅助功能：当 Windows 关闭客户端动画时，界面必须立即到达最终状态，不强制播放动画。
 - 高频交互覆盖：按钮、一级导航、方案列表、下拉菜单、开关、页面切换、上下文卡片、模态弹窗、最小化与恢复。
-- 实现入口：统一使用 `src/KeyboardScreen.App/InteractionMotion.cs`；页面代码不得自行复制时长、缓动或动画管理逻辑。
+- 交互动效统一使用 XAML `Transitions` 与 `src/KeyboardScreen.App.Avalonia/Behaviors/` 下的行为类（如 EdgeFadeBehavior、SmoothScrollBehavior）；页面代码不得自行复制时长、缓动或动画管理逻辑。
 - 新增界面：先复用全局控件样式；只有语义明确的页面/弹窗切换才调用 `InteractionMotion.Reveal` 或 `HideAsync`。

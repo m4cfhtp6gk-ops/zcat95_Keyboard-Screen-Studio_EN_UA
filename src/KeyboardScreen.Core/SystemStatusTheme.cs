@@ -24,11 +24,7 @@ public sealed class SystemStatusTheme : IScreenTheme
 		Color accent = canvas.AccentColor;
 		canvas.Fill(background);
 
-		canvas.Text("电脑状态", 12, Color.FromRgb(190, 201, 213),
-			new Point(safe.Left, safe.Top + 7), FontWeights.SemiBold);
-		canvas.Text(snapshot.Timestamp.ToString("HH:mm"), 14, Colors.White,
-			new Point(safe.Left, safe.Top + 5), FontWeights.SemiBold,
-			TextAlignment.Right, safe.Width);
+		ThemeHeader.Draw(canvas, snapshot, "电脑状态");
 
 		DrawMetric(canvas, new Rect(safe.Left, safe.Top + 40, safe.Width, 112),
 			"处理器占用", "CPU", snapshot.CpuPercent, accent, panel, border, muted);

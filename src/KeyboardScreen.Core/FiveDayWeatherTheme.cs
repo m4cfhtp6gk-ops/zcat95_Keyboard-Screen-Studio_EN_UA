@@ -20,10 +20,7 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
         var stroke = Color.FromRgb(29, 36, 45);
 
         canvas.Fill(Color.FromRgb(5, 9, 14));
-        canvas.AlignedText("五日天气", 11, secondary,
-            new Rect(safe.Left, safe.Top + 7, safe.Width, 18), FontWeights.SemiBold, TextAlignment.Left);
-        canvas.AlignedText(snapshot.Timestamp.ToString("HH:mm"), 13, Colors.White,
-            new Rect(safe.Left, safe.Top + 5, safe.Width, 20), FontWeights.SemiBold, TextAlignment.Right);
+        ThemeHeader.Draw(canvas, snapshot, "五日天气");
 
         var days = weather?.DailyForecast?.Take(5).ToArray() ?? [];
         if (weather is not { Available: true } || days.Length == 0)

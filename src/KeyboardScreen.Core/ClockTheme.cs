@@ -13,13 +13,11 @@ public sealed class ClockTheme : IScreenTheme
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
         var background = Color.FromRgb(7, 9, 12);
-        var muted = Color.FromRgb(154, 165, 177);
         var accent = canvas.AccentColor;
         var safe = canvas.SafeBounds;
         canvas.Fill(background);
 
-        canvas.Text("本地时间", 13, muted,
-            new Point(safe.Left, safe.Top + 8), FontWeights.SemiBold);
+        ThemeHeader.Draw(canvas, snapshot, "本地时间", showTime: false);
         canvas.Line(new Point(safe.Left, safe.Top + 38),
             new Point(safe.Left + 48, safe.Top + 38), Color.FromRgb(43, 50, 58), 2);
 

@@ -12,6 +12,7 @@ public sealed class JsonSettingsStore
 	{
 		WriteIndented = true
 	};
+	private readonly SemaphoreSlim _ioGate = new(1, 1);
 
 	public string Path { get; }
 
@@ -31,7 +32,7 @@ public sealed class JsonSettingsStore
 
 	public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default(CancellationToken))
 	{
-		_ = 1;
+		await _ioGate.WaitAsync(cancellationToken);
 		try
 		{
 			if (!File.Exists(Path))
@@ -57,26 +58,38 @@ public sealed class JsonSettingsStore
 		{
 			return new AppSettings();
 		}
+		finally
+		{
+			_ioGate.Release();
+		}
 	}
 
 	public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		string? directoryName = System.IO.Path.GetDirectoryName(Path);
-		if (!string.IsNullOrWhiteSpace(directoryName))
-		{
-			Directory.CreateDirectory(directoryName);
-		}
-		FileStream stream = File.Create(Path);
+		await _ioGate.WaitAsync(cancellationToken);
 		try
 		{
-			await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+			string? directoryName = System.IO.Path.GetDirectoryName(Path);
+			if (!string.IsNullOrWhiteSpace(directoryName))
+			{
+				Directory.CreateDirectory(directoryName);
+			}
+			FileStream stream = File.Create(Path);
+			try
+			{
+				await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+			}
+			finally
+			{
+				if (stream != null)
+				{
+					await stream.DisposeAsync();
+				}
+			}
 		}
 		finally
 		{
-			if (stream != null)
-			{
-				await stream.DisposeAsync();
-			}
+			_ioGate.Release();
 		}
 	}
 }

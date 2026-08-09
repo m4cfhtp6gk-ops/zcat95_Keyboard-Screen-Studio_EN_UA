@@ -1,0 +1,38 @@
+name: CI checks
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build and test
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore KeyboardScreenStudio.sln
+
+      - name: Build
+        run: dotnet build KeyboardScreenStudio.sln -c Release --no-restore
+
+      - name: Run renderer smoke tests
+        run: dotnet run --project tests/KeyboardScreen.SmokeTests/KeyboardScreen.SmokeTests.csproj -c Release --no-build
+
+      - name: Run Avalonia UI smoke tests
+        run: dotnet run --project tests/KeyboardScreen.AvaloniaSmokeTests/KeyboardScreen.AvaloniaSmokeTests.csproj -c Release --no-build

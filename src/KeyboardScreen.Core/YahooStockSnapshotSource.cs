@@ -23,10 +23,11 @@ public sealed class YahooStockSnapshotSource : IStockSnapshotSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
         var items = (settings.Items ?? [])
-            .Where(item => !string.IsNullOrWhiteSpace(item.Symbol))
-            .Take(3)
+            .Where(item => item.Enabled && !string.IsNullOrWhiteSpace(item.Symbol))
+            .Take(5)
             .Select(item => new StockItemSettings
             {
+                Enabled = true,
                 Symbol = item.Symbol.Trim().ToUpperInvariant(),
                 Alias = item.Alias?.Trim() ?? string.Empty
             })
@@ -103,8 +104,38 @@ public sealed class YahooStockSnapshotSource : IStockSnapshotSource, IDisposable
             ? DateTimeOffset.FromUnixTimeSeconds(marketTime.GetInt64()).ToLocalTime()
             : DateTimeOffset.Now;
         var displayName = string.IsNullOrWhiteSpace(item.Alias) ? item.Symbol : item.Alias;
-        return new StockQuoteSnapshot(item.Symbol, displayName, current,
-            (current - previous) / previous * 100.0, timestamp);
+        return new StockQuoteSnapshot(
+            item.Symbol,
+            displayName,
+            current,
+            (current - previous) / previous * 100.0,
+            timestamp,
+            ReadRecentCloses(result[0], 5));
+    }
+
+    private static IReadOnlyList<double>? ReadRecentCloses(JsonElement result, int count)
+    {
+        if (!result.TryGetProperty("indicators", out var indicators)
+            || !indicators.TryGetProperty("quote", out var quote)
+            || quote.GetArrayLength() == 0
+            || !quote[0].TryGetProperty("close", out var closes))
+        {
+            return null;
+        }
+
+        var values = new List<double>(count);
+        for (int index = closes.GetArrayLength() - 1; index >= 0 && values.Count < count; index--)
+        {
+            if (closes[index].ValueKind == JsonValueKind.Number
+                && closes[index].TryGetDouble(out double close)
+                && close > 0)
+            {
+                values.Add(close);
+            }
+        }
+
+        values.Reverse();
+        return values.Count >= 2 ? values : null;
     }
 
     private static double ReadNumber(JsonElement element, string propertyName)

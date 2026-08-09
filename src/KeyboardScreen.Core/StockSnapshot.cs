@@ -15,4 +15,5 @@ public sealed record StockQuoteSnapshot(
     string DisplayName,
     double CurrentPrice,
     double ChangePercent,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<double>? FiveDayCloses = null);

@@ -34,6 +34,7 @@ public static class BuiltInThemes
 			Make("performance", "性能条带", "纵向性能条与实时负载", "使用高对比度纵向进度条快速查看 CPU 与内存压力。", Performance),
 			Make("network", "网络监控", "突出显示实时上下行速度", "以大号数字展示下载和上传速度，并保留 CPU 与内存摘要。", Network),
 			Make("system-minimal", "状态极简", "仅保留关键系统信息", "无卡片极简排版，适合低干扰桌面。", MinimalSystem),
+			new PerformanceVisualTheme(),
 			new ClockTheme(),
 			Make("clock-neon", "霓虹时钟", "强调色大号数字时钟", "高对比度霓虹风格时间、秒钟和日期。", NeonClock),
 			Make("clock-flip", "翻页时钟", "小时与分钟分栏显示", "模拟翻页钟的双卡片布局，并显示秒钟与星期。", FlipClock),
@@ -56,23 +57,12 @@ public static class BuiltInThemes
 		return new DelegateTheme(id, name, description, details, draw);
 	}
 
-	private static void Header(ScreenCanvas c, SystemSnapshot s, string title)
-	{
-		Rect safeBounds = c.SafeBounds;
-		c.Text(title, 10.5, Color.FromRgb(154, 166, 179), new Point(safeBounds.Left, safeBounds.Top + 6.0), FontWeights.SemiBold);
-		c.Text(s.Timestamp.ToString("HH:mm"), 13.0, Colors.White, new Point(safeBounds.Left, safeBounds.Top + 4.0), FontWeights.SemiBold, TextAlignment.Right, safeBounds.Width);
-	}
-
 	private static void Dashboard(ScreenCanvas c, SystemSnapshot s)
 	{
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(8, 11, 15));
 
-		c.Text("状态概览", 12, Color.FromRgb(190, 201, 213),
-			new Point(safe.Left, safe.Top + 7), FontWeights.SemiBold);
-		c.Text(s.Timestamp.ToString("HH:mm"), 14, Colors.White,
-			new Point(safe.Left, safe.Top + 5), FontWeights.SemiBold,
-			TextAlignment.Right, safe.Width);
+		ThemeHeader.Draw(c, s, "状态概览");
 
 		double gap = 8;
 		double tileWidth = (safe.Width - gap) / 2;
@@ -108,11 +98,7 @@ public static class BuiltInThemes
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(6, 9, 13));
 
-		c.Text("性能条带", 12, Color.FromRgb(190, 201, 213),
-			new Point(safe.Left, safe.Top + 7), FontWeights.SemiBold);
-		c.Text(s.Timestamp.ToString("HH:mm"), 14, Colors.White,
-			new Point(safe.Left, safe.Top + 5), FontWeights.SemiBold,
-			TextAlignment.Right, safe.Width);
+		ThemeHeader.Draw(c, s, "性能条带");
 
 		double gap = 8;
 		double columnWidth = (safe.Width - gap) / 2;
@@ -159,11 +145,7 @@ public static class BuiltInThemes
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(7, 10, 14));
 
-		c.Text("网络监控", 12, Color.FromRgb(190, 201, 213),
-			new Point(safe.Left, safe.Top + 7), FontWeights.SemiBold);
-		c.Text(s.Timestamp.ToString("HH:mm"), 14, Colors.White,
-			new Point(safe.Left, safe.Top + 5), FontWeights.SemiBold,
-			TextAlignment.Right, safe.Width);
+		ThemeHeader.Draw(c, s, "网络监控");
 
 		NetworkMetricCard(c, new Rect(safe.Left, safe.Top + 40, safe.Width, 118),
 			"下载速度", s.DownloadMbps);
@@ -235,8 +217,7 @@ public static class BuiltInThemes
 		Color accent = c.AccentColor;
 		c.Gradient(Color.FromRgb(4, 6, 11), Darken(accent, 0.82), new Point(0, 0), new Point(1, 1));
 
-		c.AlignedText("霓虹时钟", 13, Color.FromRgb(213, 221, 230),
-			new Rect(safe.Left, safe.Top + 6, safe.Width, 24), FontWeights.SemiBold, TextAlignment.Left);
+		ThemeHeader.Draw(c, s, "霓虹时钟", showTime: false);
 
 		c.AlignedText(s.Timestamp.ToString("HH:mm"), 39, Colors.White,
 			new Rect(safe.Left, safe.Top + 72, safe.Width, 56), FontWeights.SemiBold, TextAlignment.Left);
@@ -257,8 +238,7 @@ public static class BuiltInThemes
 	{
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(8, 10, 13));
-		c.Text("翻页时钟", 13, Color.FromRgb(181, 192, 204),
-			new Point(safe.Left, safe.Top + 7), FontWeights.SemiBold);
+		ThemeHeader.Draw(c, s, "翻页时钟", showTime: false);
 
 		double gap = 6;
 		double width = (safe.Width - gap) / 2;
@@ -303,14 +283,26 @@ public static class BuiltInThemes
 		MusicSnapshot musicSnapshot = s.Music ?? MusicSnapshot.Unavailable;
 		Rect safeBounds = c.SafeBounds;
 		c.Fill(Color.FromRgb(7, 9, 13));
-		c.Text(musicSnapshot.IsPlaying ? "PLAYING" : "PAUSED", 9.0, c.AccentColor, new Point(safeBounds.Left, safeBounds.Top + 7.0), FontWeights.SemiBold);
+		bool musicPlaying = musicSnapshot.Available && musicSnapshot.IsPlaying;
+		bool musicPaused = musicSnapshot.Available && !musicSnapshot.IsPlaying;
+		ThemeHeader.Draw(
+			c,
+			s,
+			musicPlaying ? "正在播放" : musicPaused ? "已暂停" : "未在播放",
+			musicPlaying || musicPaused ? c.AccentColor : Color.FromRgb(126, 139, 153));
 		c.Text(musicSnapshot.Title, 22.0, Colors.White, new Point(safeBounds.Left, safeBounds.Top + 73.0), FontWeights.SemiBold, TextAlignment.Left, safeBounds.Width, 92.0);
-		c.Text(string.IsNullOrWhiteSpace(musicSnapshot.Artist) ? "Windows Media" : musicSnapshot.Artist, 11.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 181.0), FontWeights.Medium, TextAlignment.Left, safeBounds.Width, 24.0);
-		bool flag = musicSnapshot.Duration.TotalSeconds <= 0.0;
-		double percent = (flag ? ((double)(musicSnapshot.IsPlaying ? 100 : 0)) : (musicSnapshot.Position.TotalSeconds / musicSnapshot.Duration.TotalSeconds * 100.0));
+		if (musicPlaying && !string.IsNullOrWhiteSpace(musicSnapshot.Artist))
+		{
+			c.Text(musicSnapshot.Artist, 11.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 181.0), FontWeights.Medium, TextAlignment.Left, safeBounds.Width, 24.0);
+		}
+		bool musicLive = musicSnapshot.Duration.TotalSeconds <= 0.0;
+		double percent = musicLive ? (musicPlaying ? 100 : 0) : (musicSnapshot.Position.TotalSeconds / musicSnapshot.Duration.TotalSeconds * 100.0);
 		c.ProgressBar(new Rect(safeBounds.Left, safeBounds.Top + 247.0, safeBounds.Width, 8.0), percent, Color.FromRgb(35, 42, 51), c.AccentColor);
-		c.Text(flag ? "LIVE" : Time(musicSnapshot.Position), 10.0, c.AccentColor, new Point(safeBounds.Left, safeBounds.Top + 271.0), FontWeights.SemiBold);
-		c.Text(flag ? "ON AIR" : Time(musicSnapshot.Duration), 10.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 271.0), FontWeights.SemiBold, TextAlignment.Right, safeBounds.Width);
+		c.Text(Time(musicSnapshot.Position), 10.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 271.0), FontWeights.SemiBold);
+		if (!musicLive)
+		{
+			c.Text(Time(musicSnapshot.Duration), 10.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 271.0), FontWeights.SemiBold, TextAlignment.Right, safeBounds.Width);
+		}
 		c.Text(s.Timestamp.ToString("HH:mm"), 18.0, Colors.White, new Point(safeBounds.Left, safeBounds.Bottom - 45.0), FontWeights.SemiBold);
 	}
 
@@ -320,19 +312,26 @@ public static class BuiltInThemes
 		c.Fill(Color.FromRgb(9, 11, 15));
 		if (music.Artwork is { Length: > 0 }) c.Image(music.Artwork, new Rect(0, 0, c.Profile.Width, c.Profile.Height));
 		Rect safe = c.SafeBounds;
+		bool posterPlaying = music.Available && music.IsPlaying;
+		bool posterPaused = music.Available && !music.IsPlaying;
 		var card = new Rect(safe.Left, safe.Bottom - 151, safe.Width, 133);
 		c.RoundedRect(card, 12, Color.FromArgb(224, 5, 8, 12), Color.FromArgb(80, 255, 255, 255));
 		c.Text(music.Title, 14, Colors.White, new Point(card.Left + 12, card.Top + 14), FontWeights.SemiBold,
 			TextAlignment.Left, card.Width - 24, 42);
-		c.Text(string.IsNullOrWhiteSpace(music.Artist) ? "Windows Media" : music.Artist, 11.5,
-			Color.FromRgb(190, 199, 209), new Point(card.Left + 12, card.Top + 59), FontWeights.Medium,
-			TextAlignment.Left, card.Width - 24, 20);
-		bool live = music.Duration.TotalSeconds <= 0;
-		double percent = live ? (music.IsPlaying ? 100 : 0) : music.Position.TotalSeconds / music.Duration.TotalSeconds * 100;
+		if (posterPlaying && !string.IsNullOrWhiteSpace(music.Artist))
+		{
+			c.Text(music.Artist, 11.5, Color.FromRgb(190, 199, 209), new Point(card.Left + 12, card.Top + 59), FontWeights.Medium,
+				TextAlignment.Left, card.Width - 24, 20);
+		}
+		bool posterLive = music.Duration.TotalSeconds <= 0;
+		double percent = posterLive ? (posterPlaying ? 100 : 0) : music.Position.TotalSeconds / music.Duration.TotalSeconds * 100;
 		c.ProgressBar(new Rect(card.Left + 12, card.Bottom - 40, card.Width - 24, 6), percent, Color.FromRgb(45, 51, 60), c.AccentColor);
-		c.Text(live ? "LIVE" : Time(music.Position), 9.5, Colors.White, new Point(card.Left + 12, card.Bottom - 27), FontWeights.SemiBold);
-		c.Text(live ? "ON AIR" : Time(music.Duration), 9.5, Color.FromRgb(190, 199, 209),
-			new Point(card.Left + 12, card.Bottom - 27), FontWeights.SemiBold, TextAlignment.Right, card.Width - 24);
+		c.Text(Time(music.Position), 9.5, Colors.White, new Point(card.Left + 12, card.Bottom - 27), FontWeights.SemiBold);
+		if (!posterLive)
+		{
+			c.Text(Time(music.Duration), 9.5, Color.FromRgb(190, 199, 209),
+				new Point(card.Left + 12, card.Bottom - 27), FontWeights.SemiBold, TextAlignment.Right, card.Width - 24);
+		}
 	}
 
 		private static string ChineseDate(DateTimeOffset value) =>

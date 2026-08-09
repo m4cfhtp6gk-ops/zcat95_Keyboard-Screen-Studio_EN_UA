@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -7,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KeyboardScreen.Core;
 
-public sealed class WindowsSystemSnapshotSource : ISystemSnapshotSource
+public sealed class WindowsSystemSnapshotSource : ISystemSnapshotSource, IDisposable
 {
 	private readonly struct FileTime
 	{
@@ -56,6 +57,8 @@ public sealed class WindowsSystemSnapshotSource : ISystemSnapshotSource
 
 	private DateTimeOffset? _previousNetworkAt;
 
+	private PerformanceCounter[]? _gpuCounters;
+
 	public ValueTask<SystemSnapshot> ReadAsync(CancellationToken cancellationToken = default(CancellationToken))
 	{
 		cancellationToken.ThrowIfCancellationRequested();
@@ -63,7 +66,67 @@ public sealed class WindowsSystemSnapshotSource : ISystemSnapshotSource
 		double memoryPercent = ReadMemoryPercent();
 		DateTimeOffset now = DateTimeOffset.Now;
 		var (downloadMbps, uploadMbps) = ReadNetworkMbps(now);
-		return ValueTask.FromResult(new SystemSnapshot(now, cpuPercent, memoryPercent, downloadMbps, uploadMbps));
+		double? gpuPercent = ReadGpuPercent();
+		return ValueTask.FromResult(new SystemSnapshot(now, cpuPercent, memoryPercent, downloadMbps, uploadMbps, GpuPercent: gpuPercent));
+	}
+
+	private double? ReadGpuPercent()
+	{
+		if (!OperatingSystem.IsWindows())
+		{
+			return null;
+		}
+
+		try
+		{
+			if (_gpuCounters is null)
+			{
+				if (!PerformanceCounterCategory.Exists("GPU Engine"))
+				{
+					return null;
+				}
+
+				string[] instances = new PerformanceCounterCategory("GPU Engine").GetInstanceNames();
+				if (instances.Length == 0)
+				{
+					return null;
+				}
+
+				var counters = new PerformanceCounter[instances.Length];
+				for (int index = 0; index < instances.Length; index++)
+				{
+					counters[index] = new PerformanceCounter(
+						"GPU Engine",
+						"Utilization Percentage",
+						instances[index],
+						readOnly: true);
+				}
+				_gpuCounters = counters;
+			}
+
+			double total = 0.0;
+			foreach (PerformanceCounter counter in _gpuCounters)
+			{
+				total += counter.NextValue();
+			}
+			return Math.Clamp(total, 0.0, 100.0);
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	public void Dispose()
+	{
+		if (_gpuCounters is not null)
+		{
+			foreach (PerformanceCounter counter in _gpuCounters)
+			{
+				counter.Dispose();
+			}
+			_gpuCounters = null;
+		}
 	}
 
 	private (double Download, double Upload) ReadNetworkMbps(DateTimeOffset now)

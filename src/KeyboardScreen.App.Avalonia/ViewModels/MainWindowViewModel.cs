@@ -20,7 +20,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly ISystemSnapshotSource _systemSource = new WindowsSystemSnapshotSource();
     private readonly WindowsMusicSnapshotSource _musicSource = new();
     private readonly OpenMeteoWeatherSnapshotSource _weatherSource = new();
-    private readonly YahooStockSnapshotSource _stockSource = new();
+    private readonly YahooStockSnapshotSource _yahooStockSource = new();
+    private readonly TencentStockSnapshotSource _tencentStockSource = new();
     private readonly TokscaleDataSource _tokscaleSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
@@ -67,7 +68,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _stockAlias2 = string.Empty;
     private string _stockSymbol3 = string.Empty;
     private string _stockAlias3 = string.Empty;
+    private string _stockSymbol4 = string.Empty;
+    private string _stockAlias4 = string.Empty;
+    private string _stockSymbol5 = string.Empty;
+    private string _stockAlias5 = string.Empty;
     private string _stockColorPreference = "红涨绿跌";
+    private string _stockSourcePreference = "腾讯行情";
+    private bool _stockEnabled1 = true;
+    private bool _stockEnabled2 = true;
+    private bool _stockEnabled3 = true;
+    private bool _stockEnabled4 = true;
+    private bool _stockEnabled5 = true;
     private AiUsageModeOption? _selectedAiUsageMode;
     private TokscaleDataOption? _selectedTokscaleOption;
     private TokscaleCatalog? _tokscaleCatalog;
@@ -102,6 +113,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private ImageAnalogOrder _imageAnalogOrder = ImageAnalogOrder.ClockDateWeather;
     private int _imageFlipTimeFontSize = 29;
     private UiThemeMode _uiThemeMode = UiThemeMode.System;
+    private string _updateStatusText = string.Empty;
+    private bool _isUpdateAvailable;
+    private string? _latestReleaseUrl;
+    private byte[]? _lastPushedJpeg;
+    private bool _perfVisualCpuEnabled = true;
+    private bool _perfVisualMemoryEnabled = true;
+    private bool _perfVisualDownloadEnabled = true;
+    private bool _perfVisualUploadEnabled = true;
+    private bool _perfVisualGpuEnabled = true;
+    private PerformanceVisualTheme? _perfVisualTheme;
 
     public MainWindowViewModel(IWindowsDesktopServices desktopServices)
     {
@@ -112,11 +133,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SelectNavigationCommand = new ParameterizedCommand<string>(value =>
             SelectedNavigation = string.IsNullOrWhiteSpace(value) ? "screen" : value);
         SelectThemeCommand = new ParameterizedCommand<string>(SelectTheme);
-        RefreshCommand = new AsyncCommand(() => RefreshAndPushAsync(forcePush: true));
+        RefreshCommand = new AsyncCommand(() => RefreshAndPushAsync(shouldPush: true, forcePush: true));
         OpenFontsFolderCommand = new RelayCommand(() => _desktopServices.OpenFolder(_fontCatalog.FolderPath));
         OpenAuthorCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/zcat95"));
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
+        CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
+        OpenLatestReleaseCommand = new RelayCommand(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(LatestReleaseUrl))
+            {
+                _desktopServices.OpenUrl(LatestReleaseUrl);
+            }
+        });
     }
 
     public ObservableCollection<ThemeGroupViewModel> ThemeGroups { get; } = [];
@@ -137,6 +166,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenAuthorCommand { get; }
     public ICommand OpenTokscaleDocsCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
+    public ICommand CheckForUpdatesCommand { get; }
+    public ICommand OpenLatestReleaseCommand { get; }
 
     public Func<Task<string?>>? PickImageAsync { get; set; }
 
@@ -164,6 +195,162 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         Version? version = typeof(MainWindowViewModel).Assembly.GetName().Version;
         return version is null ? string.Empty : $"{version.Major}.{version.Minor}.{version.Build}";
+    }
+
+    public string UpdateStatusText
+    {
+        get => _updateStatusText;
+        set => SetProperty(ref _updateStatusText, value);
+    }
+
+    public bool IsUpdateAvailable
+    {
+        get => _isUpdateAvailable;
+        set => SetProperty(ref _isUpdateAvailable, value);
+    }
+
+    public string? LatestReleaseUrl
+    {
+        get => _latestReleaseUrl;
+        set => SetProperty(ref _latestReleaseUrl, value);
+    }
+
+    public bool PerfVisualCpuEnabled
+    {
+        get => _perfVisualCpuEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualCpuEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool PerfVisualMemoryEnabled
+    {
+        get => _perfVisualMemoryEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualMemoryEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool PerfVisualDownloadEnabled
+    {
+        get => _perfVisualDownloadEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualDownloadEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool PerfVisualUploadEnabled
+    {
+        get => _perfVisualUploadEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualUploadEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool PerfVisualGpuEnabled
+    {
+        get => _perfVisualGpuEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualGpuEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool IsPerformanceVisualTheme => SelectedTheme?.Id == "performance-visual";
+
+    public string RefreshSecondsInput
+    {
+        get => _refreshSeconds.ToString(CultureInfo.InvariantCulture);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                OnPropertyChanged(nameof(RefreshSecondsInput));
+                return;
+            }
+
+            if (int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
+            {
+                RefreshSeconds = Math.Clamp(parsed, 1, 3600);
+            }
+            else
+            {
+                OnPropertyChanged(nameof(RefreshSecondsInput));
+            }
+        }
+    }
+
+    private void ApplyPerfVisualModules() =>
+        _perfVisualTheme?.SetModulesEnabled(
+            PerfVisualCpuEnabled,
+            PerfVisualMemoryEnabled,
+            PerfVisualDownloadEnabled,
+            PerfVisualUploadEnabled,
+            PerfVisualGpuEnabled);
+
+    private bool CanDisableStockSlot(int slotIndex)
+    {
+        string[] symbols = [StockSymbol1, StockSymbol2, StockSymbol3, StockSymbol4, StockSymbol5];
+        bool[] enabled = [StockEnabled1, StockEnabled2, StockEnabled3, StockEnabled4, StockEnabled5];
+        if (string.IsNullOrWhiteSpace(symbols[slotIndex]))
+        {
+            return true;
+        }
+
+        int remaining = 0;
+        for (int index = 0; index < symbols.Length; index++)
+        {
+            if (index == slotIndex)
+            {
+                continue;
+            }
+
+            if (enabled[index] && !string.IsNullOrWhiteSpace(symbols[index]))
+            {
+                remaining++;
+            }
+        }
+
+        return remaining >= 2;
+    }
+
+    public bool StockSlot1CanDisable => CanDisableStockSlot(0);
+    public bool StockSlot2CanDisable => CanDisableStockSlot(1);
+    public bool StockSlot3CanDisable => CanDisableStockSlot(2);
+    public bool StockSlot4CanDisable => CanDisableStockSlot(3);
+    public bool StockSlot5CanDisable => CanDisableStockSlot(4);
+
+    private void NotifyStockSlotCanDisable()
+    {
+        OnPropertyChanged(nameof(StockSlot1CanDisable));
+        OnPropertyChanged(nameof(StockSlot2CanDisable));
+        OnPropertyChanged(nameof(StockSlot3CanDisable));
+        OnPropertyChanged(nameof(StockSlot4CanDisable));
+        OnPropertyChanged(nameof(StockSlot5CanDisable));
     }
 
     public ThemeItemViewModel? SelectedTheme
@@ -257,8 +444,32 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         get => _refreshSeconds;
         set
         {
-            value = Math.Clamp(value, 1, 30);
-            if (SetProperty(ref _refreshSeconds, value)) ScheduleCommit();
+            value = Math.Clamp(value, 1, 3600);
+            if (SetProperty(ref _refreshSeconds, value))
+            {
+                OnPropertyChanged(nameof(RefreshDurationText));
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string RefreshDurationText
+    {
+        get
+        {
+            if (_refreshSeconds < 60)
+            {
+                return $"{_refreshSeconds} 秒";
+            }
+            if (_refreshSeconds % 3600 == 0)
+            {
+                return $"{_refreshSeconds / 3600} 小时";
+            }
+            if (_refreshSeconds % 60 == 0)
+            {
+                return $"{_refreshSeconds / 60} 分钟";
+            }
+            return $"{_refreshSeconds} 秒";
         }
     }
 
@@ -352,7 +563,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public string StockSymbol1
     {
         get => _stockSymbol1;
-        set { if (SetProperty(ref _stockSymbol1, value)) ScheduleCommit(); }
+        set
+        {
+            if (SetProperty(ref _stockSymbol1, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
     }
 
     public string StockAlias1
@@ -364,7 +582,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public string StockSymbol2
     {
         get => _stockSymbol2;
-        set { if (SetProperty(ref _stockSymbol2, value)) ScheduleCommit(); }
+        set
+        {
+            if (SetProperty(ref _stockSymbol2, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
     }
 
     public string StockAlias2
@@ -376,7 +601,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public string StockSymbol3
     {
         get => _stockSymbol3;
-        set { if (SetProperty(ref _stockSymbol3, value)) ScheduleCommit(); }
+        set
+        {
+            if (SetProperty(ref _stockSymbol3, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
     }
 
     public string StockAlias3
@@ -392,6 +624,172 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     public IReadOnlyList<string> StockColorPreferences { get; } = ["红涨绿跌", "绿涨红跌"];
+
+    public string StockSourcePreference
+    {
+        get => _stockSourcePreference;
+        set { if (SetProperty(ref _stockSourcePreference, value)) ScheduleCommit(); }
+    }
+
+    public IReadOnlyList<string> StockSourceOptions { get; } = ["腾讯行情", "雅虎 Finance"];
+
+    public string StockSymbol4
+    {
+        get => _stockSymbol4;
+        set
+        {
+            if (SetProperty(ref _stockSymbol4, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string StockAlias4
+    {
+        get => _stockAlias4;
+        set { if (SetProperty(ref _stockAlias4, value)) ScheduleCommit(); }
+    }
+
+    public string StockSymbol5
+    {
+        get => _stockSymbol5;
+        set
+        {
+            if (SetProperty(ref _stockSymbol5, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string StockAlias5
+    {
+        get => _stockAlias5;
+        set { if (SetProperty(ref _stockAlias5, value)) ScheduleCommit(); }
+    }
+
+    public bool StockEnabled1
+    {
+        get => _stockEnabled1;
+        set
+        {
+            if (_stockEnabled1 == value)
+            {
+                return;
+            }
+
+            if (!value && !CanDisableStockSlot(0))
+            {
+                OnPropertyChanged(nameof(StockEnabled1));
+                return;
+            }
+
+            if (SetProperty(ref _stockEnabled1, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool StockEnabled2
+    {
+        get => _stockEnabled2;
+        set
+        {
+            if (_stockEnabled2 == value)
+            {
+                return;
+            }
+
+            if (!value && !CanDisableStockSlot(1))
+            {
+                OnPropertyChanged(nameof(StockEnabled2));
+                return;
+            }
+
+            if (SetProperty(ref _stockEnabled2, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool StockEnabled3
+    {
+        get => _stockEnabled3;
+        set
+        {
+            if (_stockEnabled3 == value)
+            {
+                return;
+            }
+
+            if (!value && !CanDisableStockSlot(2))
+            {
+                OnPropertyChanged(nameof(StockEnabled3));
+                return;
+            }
+
+            if (SetProperty(ref _stockEnabled3, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool StockEnabled4
+    {
+        get => _stockEnabled4;
+        set
+        {
+            if (_stockEnabled4 == value)
+            {
+                return;
+            }
+
+            if (!value && !CanDisableStockSlot(3))
+            {
+                OnPropertyChanged(nameof(StockEnabled4));
+                return;
+            }
+
+            if (SetProperty(ref _stockEnabled4, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool StockEnabled5
+    {
+        get => _stockEnabled5;
+        set
+        {
+            if (_stockEnabled5 == value)
+            {
+                return;
+            }
+
+            if (!value && !CanDisableStockSlot(4))
+            {
+                OnPropertyChanged(nameof(StockEnabled5));
+                return;
+            }
+
+            if (SetProperty(ref _stockEnabled5, value))
+            {
+                NotifyStockSlotCanDisable();
+                ScheduleCommit();
+            }
+        }
+    }
 
     public AiUsageModeOption? SelectedAiUsageMode
     {
@@ -687,6 +1085,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings = await _settingsStore.LoadAsync();
         _imageTheme.ImagePath = _settings.ImagePath;
         _themes = BuiltInThemes.Create(_imageTheme);
+        _perfVisualTheme = (PerformanceVisualTheme?)_themes.FirstOrDefault(theme => theme.Id == "performance-visual");
         BuildThemeGroups();
         ReloadFonts();
         ApplySettings();
@@ -717,6 +1116,34 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ScheduleCommit();
     }
 
+    private async Task CheckForUpdatesAsync()
+    {
+        UpdateStatusText = "正在检查更新…";
+        IsUpdateAvailable = false;
+        if (!Version.TryParse(AppVersion, out Version? currentVersion))
+        {
+            currentVersion = new Version(1, 0, 0);
+        }
+
+        UpdateCheckResult result = await new ReleaseUpdateChecker().CheckAsync(currentVersion);
+        if (result.Error is not null)
+        {
+            UpdateStatusText = $"检查失败（{result.Error}），请重试";
+            return;
+        }
+
+        if (result.Available)
+        {
+            LatestReleaseUrl = result.HtmlUrl;
+            IsUpdateAvailable = true;
+            UpdateStatusText = $"发现新版本 {result.TagName}";
+        }
+        else
+        {
+            UpdateStatusText = "已是最新版本";
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -729,9 +1156,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _commitDelay?.Cancel();
         _fontCatalog.FontsChanged -= FontCatalogOnFontsChanged;
         _fontCatalog.Dispose();
+        (_systemSource as IDisposable)?.Dispose();
         _transport.Dispose();
         _weatherSource.Dispose();
-        _stockSource.Dispose();
+        _yahooStockSource.Dispose();
+        _tencentStockSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -744,7 +1173,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
-        AddGroup("监控", ["system", "dashboard", "performance", "network", "system-minimal"], byId);
+        AddGroup("监控", ["system", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
         AddGroup("时间", ["clock", "clock-neon", "clock-flip", "image"], byId);
         AddGroup("资讯", ["weather-five-day", "stocks", "ai-quota"], byId);
         AddGroup("音乐", ["music", "music-minimal", "music-poster"], byId);
@@ -798,7 +1227,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockAlias2 = stockItems[1].Alias;
         StockSymbol3 = stockItems[2].Symbol;
         StockAlias3 = stockItems[2].Alias;
+        StockSymbol4 = stockItems[3].Symbol;
+        StockAlias4 = stockItems[3].Alias;
+        StockSymbol5 = stockItems[4].Symbol;
+        StockAlias5 = stockItems[4].Alias;
         StockColorPreference = (_settings.Stocks?.RedForGain ?? true) ? "红涨绿跌" : "绿涨红跌";
+        StockSourcePreference = (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent
+            ? "腾讯行情"
+            : "雅虎 Finance";
+        StockEnabled1 = stockItems[0].Enabled;
+        StockEnabled2 = stockItems[1].Enabled;
+        StockEnabled3 = stockItems[2].Enabled;
+        StockEnabled4 = stockItems[3].Enabled;
+        StockEnabled5 = stockItems[4].Enabled;
         SafeLeft = _settings.SafeArea.Left.ToString(CultureInfo.InvariantCulture);
         SafeTop = _settings.SafeArea.Top.ToString(CultureInfo.InvariantCulture);
         SafeRight = _settings.SafeArea.Right.ToString(CultureInfo.InvariantCulture);
@@ -820,6 +1261,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         UiThemeMode = _settings.UiThemeMode;
         DotMatrixProgressPeriod = _settings.DotMatrixProgressPeriod;
         DotMatrixProgressHeaderFontSize = _settings.DotMatrixProgressHeaderFontSize;
+        PerfVisualCpuEnabled = _settings.PerfVisualCpuEnabled;
+        PerfVisualMemoryEnabled = _settings.PerfVisualMemoryEnabled;
+        PerfVisualDownloadEnabled = _settings.PerfVisualDownloadEnabled;
+        PerfVisualUploadEnabled = _settings.PerfVisualUploadEnabled;
+        PerfVisualGpuEnabled = _settings.PerfVisualGpuEnabled;
         _settings.AiQuota ??= new AiQuotaSettings();
         SelectedAiUsageMode = AiUsageModes.First(option => option.Kind == _settings.AiQuota.DataKind);
         AiDisplayName = _settings.AiQuota.DisplayName ?? string.Empty;
@@ -856,6 +1302,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(ThemeAccentColumnSpan));
         OnPropertyChanged(nameof(IsStockTheme));
         OnPropertyChanged(nameof(IsAiTheme));
+        OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
     }
@@ -925,7 +1372,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             await Task.Delay(450, cancellationToken);
             await SaveSettingsAsync(cancellationToken);
-            await RefreshAndPushAsync(forcePush: true, cancellationToken);
+            await RefreshAndPushAsync(shouldPush: true, forcePush: true, cancellationToken: cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -953,6 +1400,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.CloseToTray = CloseToTray;
         _settings.StartMinimized = StartMinimized;
         _settings.LaunchAtStartup = LaunchAtStartup;
+        _settings.PerfVisualCpuEnabled = PerfVisualCpuEnabled;
+        _settings.PerfVisualMemoryEnabled = PerfVisualMemoryEnabled;
+        _settings.PerfVisualDownloadEnabled = PerfVisualDownloadEnabled;
+        _settings.PerfVisualUploadEnabled = PerfVisualUploadEnabled;
+        _settings.PerfVisualGpuEnabled = PerfVisualGpuEnabled;
         _settings.SafeArea = ReadSafeArea();
         _settings.ImagePath = _imageTheme.ImagePath;
         _settings.ImageTimePlacement = ImageTimePlacement;
@@ -985,12 +1437,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? "北京" : WeatherLocation.Trim();
         _settings.Stocks = new StockSettings
         {
+            SourceKind = StockSourcePreference == "腾讯行情" ? StockSourceKind.Tencent : StockSourceKind.Yahoo,
             RedForGain = StockColorPreference == "红涨绿跌",
             Items =
             [
-                new StockItemSettings { Symbol = StockSymbol1.Trim(), Alias = StockAlias1.Trim() },
-                new StockItemSettings { Symbol = StockSymbol2.Trim(), Alias = StockAlias2.Trim() },
-                new StockItemSettings { Symbol = StockSymbol3.Trim(), Alias = StockAlias3.Trim() }
+                new StockItemSettings { Enabled = StockEnabled1, Symbol = StockSymbol1.Trim(), Alias = StockAlias1.Trim() },
+                new StockItemSettings { Enabled = StockEnabled2, Symbol = StockSymbol2.Trim(), Alias = StockAlias2.Trim() },
+                new StockItemSettings { Enabled = StockEnabled3, Symbol = StockSymbol3.Trim(), Alias = StockAlias3.Trim() },
+                new StockItemSettings { Enabled = StockEnabled4, Symbol = StockSymbol4.Trim(), Alias = StockAlias4.Trim() },
+                new StockItemSettings { Enabled = StockEnabled5, Symbol = StockSymbol5.Trim(), Alias = StockAlias5.Trim() }
             ]
         };
         UpdateRenderer();
@@ -1007,7 +1462,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
                 if (!staticImage || AutoMediaThemeSwitch)
                 {
-                    await RefreshAndPushAsync(AutoPush, cancellationToken);
+                    await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
                 }
             }
             catch (OperationCanceledException)
@@ -1018,15 +1473,21 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private async Task RefreshAndPushAsync(
-        bool forcePush,
+        bool shouldPush,
+        bool forcePush = false,
         CancellationToken cancellationToken = default)
     {
         await RefreshPreviewAsync(cancellationToken);
-        if (forcePush)
+        if (shouldPush)
         {
-            await PushLatestAsync(cancellationToken);
+            await PushLatestAsync(cancellationToken, forcePush);
         }
     }
+
+    private IStockSnapshotSource GetStockSource() =>
+        (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent
+            ? _tencentStockSource
+            : _yahooStockSource;
 
     private async Task RefreshPreviewAsync(CancellationToken cancellationToken = default)
     {
@@ -1040,7 +1501,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         try
         {
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
-            SystemSnapshot system = await _systemSource.ReadAsync(cancellationToken);
+            SystemSnapshot system = await Task.Run(async () => await _systemSource.ReadAsync(cancellationToken));
             _musicSource.IgnoreBrowserSessions = IgnoreBrowserMediaSessions;
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
@@ -1064,7 +1525,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
             if (requestedTheme.Id == "stocks" || theme.Id == "stocks")
             {
-                stocks = await _stockSource.ReadAsync(
+                stocks = await GetStockSource().ReadAsync(
                     _settings.Stocks ?? new StockSettings(),
                     cancellationToken);
             }
@@ -1154,7 +1615,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private async Task PushLatestAsync(CancellationToken cancellationToken)
+    private async Task PushLatestAsync(CancellationToken cancellationToken, bool forcePush = false)
     {
         if (_latestFrame is null || !TryCreateEndpoint(DeviceIp, out Uri? endpoint))
         {
@@ -1162,7 +1623,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
+        if (!forcePush &&
+            _lastPushedJpeg is not null &&
+            _latestFrame.JpegBytes.AsSpan().SequenceEqual(_lastPushedJpeg))
+        {
+            return;
+        }
+
         DevicePushResult result = await _transport.PushAsync(endpoint, _latestFrame, cancellationToken);
+        _lastPushedJpeg = _latestFrame.JpegBytes;
         SetDeviceStatus(result.Success);
     }
 
@@ -1222,8 +1691,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     private static IReadOnlyList<StockItemSettings> NormalizeStockItems(StockSettings settings)
     {
-        var items = (settings.Items ?? []).Take(3).ToList();
-        while (items.Count < 3)
+        var items = (settings.Items ?? []).Take(5).ToList();
+        while (items.Count < 5)
         {
             items.Add(new StockItemSettings());
         }

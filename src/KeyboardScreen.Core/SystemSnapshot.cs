@@ -9,7 +9,8 @@ public sealed record SystemSnapshot(
     MusicSnapshot? Music = null,
     AiQuotaSnapshot? AiQuota = null,
     WeatherSnapshot? Weather = null,
-    StockSnapshot? Stocks = null)
+    StockSnapshot? Stocks = null,
+    double? GpuPercent = null)
 {
     public static SystemSnapshot DesignSample { get; } = new(
         DateTimeOffset.Now,
@@ -30,5 +31,6 @@ public sealed record SystemSnapshot(
             56,
             remainingCount: 1,
             resetPeriod: AiResetPeriod.Weekly),
-        new WeatherSnapshot(true, "北京", 26, 28, 61, 2, true, DateTimeOffset.Now));
+        new WeatherSnapshot(true, "北京", 26, 28, 61, 2, true, DateTimeOffset.Now),
+        GpuPercent: 45.0);
 }

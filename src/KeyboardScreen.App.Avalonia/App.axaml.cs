@@ -16,6 +16,7 @@ public sealed partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            Dispatcher.UnhandledException += (_, eventArgs) => CrashLog.Write(eventArgs.Exception);
             var window = new MainWindow();
             _singleInstanceListener = SingleInstance.StartShowWindowListener(
                 () => Dispatcher.UIThread.Post(window.RestoreFromTray));

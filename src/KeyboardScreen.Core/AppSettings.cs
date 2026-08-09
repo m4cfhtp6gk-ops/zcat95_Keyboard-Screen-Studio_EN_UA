@@ -94,4 +94,14 @@ public sealed class AppSettings
 	public DotMatrixProgressPeriod DotMatrixProgressPeriod { get; set; } = DotMatrixProgressPeriod.Today;
 
 	public int DotMatrixProgressHeaderFontSize { get; set; } = 15;
+
+	public bool PerfVisualCpuEnabled { get; set; } = true;
+
+	public bool PerfVisualMemoryEnabled { get; set; } = true;
+
+	public bool PerfVisualDownloadEnabled { get; set; } = true;
+
+	public bool PerfVisualUploadEnabled { get; set; } = true;
+
+	public bool PerfVisualGpuEnabled { get; set; } = true;
 }

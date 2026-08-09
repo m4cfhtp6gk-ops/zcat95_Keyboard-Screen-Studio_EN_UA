@@ -42,7 +42,8 @@ try {
     $licenses = Join-Path $staging 'Licenses'
     New-Item -ItemType Directory -Path $licenses -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.Core\Assets\Fonts\Doto-OFL.txt') -Destination $licenses -Force
-    Copy-Item -Path (Join-Path $workspace 'src\KeyboardScreen.App\Legal\*') -Destination $licenses -Force
+    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.App\Legal\dotnet-LICENSE.txt') -Destination $licenses -Force
+    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.App\Legal\dotnet-ThirdPartyNotices.txt') -Destination $licenses -Force
 
     Get-ChildItem -LiteralPath $staging -Recurse -File |
         Where-Object { $_.Extension -in '.pdb', '.xml' } |
@@ -79,8 +80,6 @@ try {
         'PRIVACY.md',
         'THIRD-PARTY-NOTICES.md',
         'Licenses\Doto-OFL.txt',
-        'Licenses\WebView2-LICENSE.txt',
-        'Licenses\WebView2-NOTICE.txt',
         'Licenses\dotnet-LICENSE.txt',
         'Licenses\dotnet-ThirdPartyNotices.txt'
     )) {

@@ -271,7 +271,7 @@
                     <Border Classes="card">
                       <StackPanel Spacing="16">
                         <TextBlock FontSize="16" FontWeight="SemiBold" Text="屏幕字体" />
-                        <Grid ColumnDefinitions="*,12,154">
+                        <Grid ColumnDefinitions="*,12,Auto">
                           <ComboBox
                               Grid.Column="0"
                               ItemsSource="{Binding Fonts}"
@@ -451,35 +451,65 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsPerformanceVisualTheme}" Classes="card">
+                      <StackPanel Spacing="12">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="性能可视化模块" />
+                          <TextBlock Classes="secondary" Text="关闭的模块会从画面中移除，其余模块自动重新排列。" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="CPU" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding PerfVisualCpuEnabled, Mode=TwoWay}" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="内存" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding PerfVisualMemoryEnabled, Mode=TwoWay}" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="下载" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding PerfVisualDownloadEnabled, Mode=TwoWay}" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="上传" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding PerfVisualUploadEnabled, Mode=TwoWay}" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="GPU" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding PerfVisualGpuEnabled, Mode=TwoWay}" /></Grid>
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsStockTheme}" Classes="card">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
                           <TextBlock FontSize="16" FontWeight="SemiBold" Text="股票 (Beta)" />
                           <TextBlock
                               Classes="secondary"
-                              Text="最多添加三项。支持 AAPL、0700.HK、600519.SS、000001.SZ、BTC-USD 等代码；数据可能延迟或不准确，不构成投资建议。"
+                              Text="最多添加五项，每项可单独开关显示（最少保留两只）。支持 A股（600519.SS）、港股（0700.HK）、美股（AAPL）；加密货币（BTC-USD）仅雅虎源支持；恰好启用两只时显示 5 日走势对比。数据可能延迟或不准确，不构成投资建议。"
                               TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <Grid ColumnDefinitions="24,*,12,*">
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
                           <TextBlock Grid.Column="1" Classes="secondary" Text="行情代码" />
                           <TextBlock Grid.Column="3" Classes="secondary" Text="显示别名（可选）" />
+                          <TextBlock Grid.Column="4" Margin="16,0,0,0" Classes="secondary" Text="显示" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="24,*,12,*">
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="AAPL" Text="{Binding StockSymbol1, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Apple" Text="{Binding StockAlias1, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot1CanDisable}" IsChecked="{Binding StockEnabled1, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,*,12,*">
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="2" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="0700.HK" Text="{Binding StockSymbol2, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="腾讯" Text="{Binding StockAlias2, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot2CanDisable}" IsChecked="{Binding StockEnabled2, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,*,12,*">
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="3" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="BTC-USD" Text="{Binding StockSymbol3, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Bitcoin" Text="{Binding StockAlias3, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot3CanDisable}" IsChecked="{Binding StockEnabled3, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="4" />
+                          <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="600519.SS" Text="{Binding StockSymbol4, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="贵州茅台" Text="{Binding StockAlias4, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot4CanDisable}" IsChecked="{Binding StockEnabled4, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="5" />
+                          <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="000001.SZ" Text="{Binding StockSymbol5, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="平安银行" Text="{Binding StockAlias5, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot5CanDisable}" IsChecked="{Binding StockEnabled5, Mode=TwoWay}" />
                         </Grid>
 
                         <Grid ColumnDefinitions="*,220">
@@ -491,6 +521,16 @@
                               Grid.Column="1"
                               ItemsSource="{Binding StockColorPreferences}"
                               SelectedItem="{Binding StockColorPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,220">
+                          <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="行情数据源" />
+                            <TextBlock Classes="secondary" Text="腾讯行情国内直连；雅虎 Finance 需可访问外网" />
+                          </StackPanel>
+                          <ComboBox
+                              Grid.Column="1"
+                              ItemsSource="{Binding StockSourceOptions}"
+                              SelectedItem="{Binding StockSourcePreference, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
                       </StackPanel>
@@ -563,15 +603,17 @@
 
                   <StackPanel x:Name="AutomationPage" Classes="page-content" IsVisible="{Binding IsAutomationPage}" Spacing="16">
                     <Border Classes="card">
-                      <Grid RowDefinitions="Auto,18,Auto" ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="7">
+                      <Grid RowDefinitions="Auto,8,Auto">
+                        <StackPanel Spacing="4">
                           <TextBlock FontSize="16" FontWeight="SemiBold" Text="定时刷新与推送" />
-                          <TextBlock Classes="secondary" Text="刷新间隔为 1–30 秒，设置变更会立即保存并推送。" TextWrapping="Wrap" />
+                          <TextBlock Classes="secondary" Text="1 秒 – 1 小时，可自由输入，设置变更立即保存并推送。" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoPush, Mode=TwoWay}" Content="定时推送" />
-                        <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,16,72">
-                          <Slider Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding RefreshSeconds, Mode=TwoWay}" />
-                          <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="1" Maximum="30" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding RefreshSeconds, Mode=TwoWay}" />
+                        <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBox Width="72" Text="{Binding RefreshSecondsInput, Mode=TwoWay}" />
+                            <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{Binding RefreshDurationText}" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding AutoPush, Mode=TwoWay}" Content="定时推送" />
                         </Grid>
                       </Grid>
                     </Border>
@@ -682,6 +724,11 @@
                       <StackPanel Spacing="8">
                         <TextBlock FontSize="22" FontWeight="SemiBold" Text="关于" />
                         <TextBlock Classes="secondary" Text="{Binding AppVersion, StringFormat='版本 {0}'}" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Button Content="检查更新" Command="{Binding CheckForUpdatesCommand}" />
+                          <Button Content="前往下载" Command="{Binding OpenLatestReleaseCommand}" IsVisible="{Binding IsUpdateAvailable}" />
+                          <TextBlock Classes="secondary" VerticalAlignment="Center" Text="{Binding UpdateStatusText}" />
+                        </StackPanel>
                         <TextBlock
                             Classes="secondary"
                             Text="Keyboard Screen Studio 源代码采用 MIT License。第三方组件、字体与数据服务仍遵循各自条款；应用图标与托盘图标采用单独的视觉资产许可。完整说明随程序提供。"
@@ -717,7 +764,7 @@
                         <TextBlock FontSize="16" FontWeight="SemiBold" Text="数据来源与声明" />
                         <TextBlock
                             Classes="secondary"
-                            Text="天气数据由 Open-Meteo 提供，自动定位城市名由 BigDataCloud 解析。Yahoo Finance 行情与 Tokscale 本地用量均为非官方实验性集成，可能延迟、不准确或失效；股票信息不构成投资建议。Keyboard Screen Studio 是独立个人项目，与 Linx68 设备制造商及上述平台不存在隶属、授权、认可或赞助关系。应用与托盘图标为 AI 辅助创作的原创视觉资产，详见 ASSET_LICENSE.md。"
+                            Text="天气数据由 Open-Meteo 提供，自动定位城市名由 BigDataCloud 解析。腾讯/雅虎行情与 Tokscale 本地用量均为非官方实验性集成，可能延迟、不准确或失效；股票信息不构成投资建议。Keyboard Screen Studio 是独立个人项目，与 Linx68 设备制造商及上述平台不存在隶属、授权、认可或赞助关系。应用与托盘图标为 AI 辅助创作的原创视觉资产，详见 ASSET_LICENSE.md。"
                             TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
