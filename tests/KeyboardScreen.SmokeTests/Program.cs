@@ -15,6 +15,7 @@ Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe ar
 Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
 Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");
 Assert(ScreenFontOption.Default.IsBuiltIn, "default font must be flagged built-in");
+Assert(IsStaticFont(Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf")), "bundled Doto must be a static font (no fvar table)");
 
 var profile = ScreenProfile.KeyboardDisplay;
 Assert(profile.SafeArea.Top == 52, "keyboard firmware safe area must reserve the top status pills");
@@ -643,6 +644,23 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static bool IsStaticFont(string path)
+{
+    byte[] bytes = File.ReadAllBytes(path);
+    int numTables = (bytes[4] << 8) | bytes[5];
+    for (int index = 0; index < numTables; index++)
+    {
+        int offset = 12 + index * 16;
+        string tag = Encoding.ASCII.GetString(bytes, offset, 4);
+        if (tag == "fvar")
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static byte FindStartOfFrame(byte[] jpeg)
