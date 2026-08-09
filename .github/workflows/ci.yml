@@ -31,6 +31,9 @@ jobs:
       - name: Build
         run: dotnet build KeyboardScreenStudio.sln -c Release --no-restore
 
+      - name: Build macOS app (reference check)
+        run: dotnet build src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj -c Release --no-restore
+
       - name: Run renderer smoke tests
         run: dotnet run --project tests/KeyboardScreen.SmokeTests/KeyboardScreen.SmokeTests.csproj -c Release --no-build
 
