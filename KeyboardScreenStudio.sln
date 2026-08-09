@@ -11,6 +11,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{952E5398-6AB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeyboardScreen.App.Avalonia", "src\KeyboardScreen.App.Avalonia\KeyboardScreen.App.Avalonia.csproj", "{57FB3BEC-34C9-4DF6-B4E9-0CFEEBC508B3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{DBA563E2-A2BE-452F-AB37-0BAD1B4F8BEE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeyboardScreen.AvaloniaSmokeTests", "tests\KeyboardScreen.AvaloniaSmokeTests\KeyboardScreen.AvaloniaSmokeTests.csproj", "{24DEE119-248C-43FD-A8A0-C2E3B7A260A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,8 +33,13 @@ Global
 		{57FB3BEC-34C9-4DF6-B4E9-0CFEEBC508B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57FB3BEC-34C9-4DF6-B4E9-0CFEEBC508B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57FB3BEC-34C9-4DF6-B4E9-0CFEEBC508B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24DEE119-248C-43FD-A8A0-C2E3B7A260A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24DEE119-248C-43FD-A8A0-C2E3B7A260A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24DEE119-248C-43FD-A8A0-C2E3B7A260A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24DEE119-248C-43FD-A8A0-C2E3B7A260A8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{57FB3BEC-34C9-4DF6-B4E9-0CFEEBC508B3} = {952E5398-6ABD-4EB7-B2C6-DCF8B7E85B18}
+		{24DEE119-248C-43FD-A8A0-C2E3B7A260A8} = {DBA563E2-A2BE-452F-AB37-0BAD1B4F8BEE}
 	EndGlobalSection
 EndGlobal

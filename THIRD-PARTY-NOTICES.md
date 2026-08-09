@@ -5,7 +5,6 @@ Keyboard Screen Studio source code is licensed under the MIT License. Third-part
 ## Bundled components
 
 - **.NET 8 self-contained runtime** — Microsoft .NET Library License. The applicable runtime license and third-party notices are distributed in `Licenses/dotnet-LICENSE.txt` and `Licenses/dotnet-ThirdPartyNotices.txt`.
-- **Microsoft Edge WebView2 SDK** — Copyright Microsoft Corporation. Its license and notices are distributed in `Licenses/WebView2-LICENSE.txt` and `Licenses/WebView2-NOTICE.txt`.
 - **Doto** — Copyright 2024 The Doto Project Authors. Licensed under the SIL Open Font License 1.1. The license is distributed in `Licenses/Doto-OFL.txt`.
 
 The project's MIT license does not relicense these components.
@@ -16,7 +15,7 @@ The project's MIT license does not relicense these components.
 - Weather data is provided by Open-Meteo under CC BY 4.0 and requires attribution: https://open-meteo.com/en/license
 - This personal project uses Open-Meteo's non-commercial free endpoint. Commercial redistributors and users must obtain an applicable Open-Meteo licence or configure another compliant service endpoint.
 - The experimental stock integration retrieves display data from an unofficial Yahoo Finance web endpoint. It is not a stable or endorsed API and may become unavailable.
-- The experimental Xiaomi MiMo integration reads quota information from the user's signed-in Xiaomi console session. It is not an official Xiaomi integration and may stop working when the platform changes.
+- The experimental AI-usage integration reads local usage data exposed by the user-installed open-source Tokscale tool (https://github.com/junhoyeo/tokscale). KSS does not bundle or sign in to it, and it may stop working when the tool or the underlying platforms change.
 
 ## Visual assets
 

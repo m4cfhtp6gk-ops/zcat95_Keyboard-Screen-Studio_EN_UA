@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Windows.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -156,6 +157,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsAutomationPage => SelectedNavigation == "automation";
     public bool IsSettingsPage => SelectedNavigation == "settings";
     public bool IsAboutPage => SelectedNavigation == "about";
+
+    public string AppVersion { get; } = ResolveAppVersion();
+
+    private static string ResolveAppVersion()
+    {
+        Version? version = typeof(MainWindowViewModel).Assembly.GetName().Version;
+        return version is null ? string.Empty : $"{version.Major}.{version.Minor}.{version.Build}";
+    }
 
     public ThemeItemViewModel? SelectedTheme
     {

@@ -681,6 +681,7 @@
                     <Border Classes="card">
                       <StackPanel Spacing="8">
                         <TextBlock FontSize="22" FontWeight="SemiBold" Text="关于" />
+                        <TextBlock Classes="secondary" Text="{Binding AppVersion, StringFormat='版本 {0}'}" />
                         <TextBlock
                             Classes="secondary"
                             Text="Keyboard Screen Studio 源代码采用 MIT License。第三方组件、字体与数据服务仍遵循各自条款；应用图标与托盘图标采用单独的视觉资产许可。完整说明随程序提供。"
@@ -722,7 +723,7 @@
                     </Border>
 
                     <StackPanel Margin="0,2,0,6" HorizontalAlignment="Center" Spacing="2">
-                      <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="Keyboard Screen Studio 1.0" />
+                      <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="{Binding AppVersion, StringFormat='Keyboard Screen Studio {0}'}" />
                       <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
                         <TextBlock VerticalAlignment="Center" Classes="secondary" Text="by " />
                         <Button

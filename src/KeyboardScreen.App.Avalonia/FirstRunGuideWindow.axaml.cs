@@ -17,12 +17,20 @@ public sealed partial class FirstRunGuideWindow : Window
     public FirstRunGuideWindow(string initialIp)
     {
         AvaloniaXamlLoader.Load(this);
-        IpEditor.Value = initialIp;
+        Controls.IpAddressEditor? editor = this.FindControl<Controls.IpAddressEditor>("IpEditor");
+        if (editor is not null)
+        {
+            editor.Value = initialIp;
+        }
+
         Opened += (_, _) =>
         {
-            Border root = this.FindControl<Border>("GuideRoot")!;
-            root.Opacity = 1;
-            root.RenderTransform = TransformOperations.Parse("translate(0px, 0px)");
+            Border? root = this.FindControl<Border>("GuideRoot");
+            if (root is not null)
+            {
+                root.Opacity = 1;
+                root.RenderTransform = TransformOperations.Parse("translate(0px, 0px)");
+            }
         };
     }
 
@@ -34,15 +42,26 @@ public sealed partial class FirstRunGuideWindow : Window
 
     private void ContinueButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        string candidate = IpEditor.Value.Trim();
-        if (!IPAddress.TryParse(candidate, out IPAddress? address) ||
-            address.AddressFamily != AddressFamily.InterNetwork)
+        Controls.IpAddressEditor? editor = this.FindControl<Controls.IpAddressEditor>("IpEditor");
+        if (editor is null)
         {
-            IpEditor.Focus();
+            Close(string.Empty);
             return;
         }
 
-        ValidationText.Text = string.Empty;
+        string candidate = editor.Value.Trim();
+        if (!IPAddress.TryParse(candidate, out IPAddress? address) ||
+            address.AddressFamily != AddressFamily.InterNetwork)
+        {
+            editor.Focus();
+            return;
+        }
+
+        TextBlock? validation = this.FindControl<TextBlock>("ValidationText");
+        if (validation is not null)
+        {
+            validation.Text = string.Empty;
+        }
         Close(address.ToString());
     }
 }

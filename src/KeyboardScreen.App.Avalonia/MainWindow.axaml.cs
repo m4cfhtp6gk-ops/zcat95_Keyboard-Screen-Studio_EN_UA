@@ -16,6 +16,7 @@ namespace KeyboardScreen.App.Avalonia;
 public sealed partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
+    private readonly StartupGate _startupGate = new();
     private bool _noticeOpen;
 
     public MainWindow()
@@ -32,9 +33,52 @@ public sealed partial class MainWindow : Window
 
     private async void MainWindow_OnOpened(object? sender, EventArgs e)
     {
-        var settingsStore = new JsonSettingsStore();
-        AppSettings settings = await settingsStore.LoadAsync();
-        if (!settings.HasCompletedOnboarding)
+        bool startupMinimize = await InitializeOnceAsync();
+        ApplyUiTheme();
+        AnimateCurrentPage();
+        if (startupMinimize)
+        {
+            WindowState = WindowState.Minimized;
+        }
+    }
+
+    /// <summary>
+    /// Runs the one-time startup initialization without requiring the window
+    /// to be shown. Used when the app starts hidden (auto-start minimized).
+    /// </summary>
+    internal async Task InitializeHiddenStartupAsync() => await InitializeOnceAsync();
+
+    private async Task<bool> InitializeOnceAsync()
+    {
+        if (!_startupGate.TryBeginInitialization())
+        {
+            return false;
+        }
+
+        try
+        {
+            var settingsStore = new JsonSettingsStore();
+            AppSettings settings = await settingsStore.LoadAsync();
+            if (!settings.HasCompletedOnboarding)
+            {
+                await RunOnboardingAsync(settingsStore, settings);
+            }
+
+            await _viewModel.InitializeAsync();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"KSS startup initialization failed: {exception}");
+        }
+
+        bool hasStartupArgument = Environment.GetCommandLineArgs().Any(argument =>
+            string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase));
+        return _startupGate.ConsumeStartupMinimize(_viewModel.StartMinimized, hasStartupArgument);
+    }
+
+    private async Task RunOnboardingAsync(JsonSettingsStore settingsStore, AppSettings settings)
+    {
+        try
         {
             var guide = new FirstRunGuideWindow(ExtractDeviceIp(settings.DeviceEndpoint));
             string? selectedIp = await guide.ShowDialog<string?>(this);
@@ -45,15 +89,10 @@ public sealed partial class MainWindow : Window
             }
             await settingsStore.SaveAsync(settings);
         }
-
-        await _viewModel.InitializeAsync();
-        ApplyUiTheme();
-        AnimateCurrentPage();
-        if (_viewModel.StartMinimized ||
-            Environment.GetCommandLineArgs().Any(argument =>
-                string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase)))
+        catch (Exception exception)
         {
-            WindowState = WindowState.Minimized;
+            settings.HasCompletedOnboarding = true;
+            System.Diagnostics.Debug.WriteLine($"KSS onboarding failed: {exception}");
         }
     }
 

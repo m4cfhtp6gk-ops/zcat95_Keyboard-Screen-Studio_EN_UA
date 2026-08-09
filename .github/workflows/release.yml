@@ -16,11 +16,11 @@ concurrency:
 
 jobs:
   release:
-    if: startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release v1.0.1]')
+    if: startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release v1.0.2]')
     name: Build Windows portable package
     runs-on: windows-latest
     env:
-      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.1' }}
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.2' }}
 
     steps:
       - name: Check out source
@@ -39,6 +39,9 @@ jobs:
 
       - name: Run renderer smoke tests
         run: dotnet run --project tests/KeyboardScreen.SmokeTests/KeyboardScreen.SmokeTests.csproj -c Release --no-build
+
+      - name: Run Avalonia UI smoke tests
+        run: dotnet run --project tests/KeyboardScreen.AvaloniaSmokeTests/KeyboardScreen.AvaloniaSmokeTests.csproj -c Release --no-build
 
       - name: Build clean portable package
         shell: pwsh
