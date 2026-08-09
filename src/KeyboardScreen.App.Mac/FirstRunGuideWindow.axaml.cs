@@ -19,12 +19,20 @@ public sealed partial class FirstRunGuideWindow : Window
     {
         AvaloniaXamlLoader.Load(this);
         WindowsRoundedWindow.Attach(this);
-        IpEditor.Value = initialIp;
+        Controls.IpAddressEditor? editor = this.FindControl<Controls.IpAddressEditor>("IpEditor");
+        if (editor is not null)
+        {
+            editor.Value = initialIp;
+        }
+
         Opened += (_, _) =>
         {
-            Border root = this.FindControl<Border>("GuideRoot")!;
-            root.Opacity = 1;
-            root.RenderTransform = TransformOperations.Parse("translate(0px, 0px)");
+            Border? root = this.FindControl<Border>("GuideRoot");
+            if (root is not null)
+            {
+                root.Opacity = 1;
+                root.RenderTransform = TransformOperations.Parse("translate(0px, 0px)");
+            }
         };
     }
 
@@ -36,11 +44,18 @@ public sealed partial class FirstRunGuideWindow : Window
 
     private void ContinueButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        string candidate = IpEditor.Value.Trim();
+        Controls.IpAddressEditor? editor = this.FindControl<Controls.IpAddressEditor>("IpEditor");
+        if (editor is null)
+        {
+            Close(string.Empty);
+            return;
+        }
+
+        string candidate = editor.Value.Trim();
         if (!IPAddress.TryParse(candidate, out IPAddress? address) ||
             address.AddressFamily != AddressFamily.InterNetwork)
         {
-            IpEditor.Focus();
+            editor.Focus();
             return;
         }
 

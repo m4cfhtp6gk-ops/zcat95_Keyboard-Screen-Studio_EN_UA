@@ -9,9 +9,8 @@ using Avalonia.Threading;
 using KeyboardScreen.App.Avalonia.Infrastructure;
 using KeyboardScreen.App.Avalonia.Platform;
 using KeyboardScreen.Core;
-using WpfColor = System.Windows.Media.Color;
-using WpfColorConverter = System.Windows.Media.ColorConverter;
-using WpfFontFamily = System.Windows.Media.FontFamily;
+using WpfColor = KeyboardScreen.Core.Color;
+using WpfFontFamily = KeyboardScreen.Core.FontFamily;
 
 namespace KeyboardScreen.App.Avalonia.ViewModels;
 
@@ -1669,20 +1668,24 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     private static bool TryParseAccentColor(string? value, out WpfColor color)
     {
-        try
+        if (!string.IsNullOrWhiteSpace(value))
         {
-            object? parsed = WpfColorConverter.ConvertFromString(value?.Trim());
-            if (parsed is WpfColor result)
+            string hex = value.Trim().TrimStart('#');
+            if (hex.Length == 6
+                && int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int rgb))
             {
-                color = result;
+                color = WpfColor.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+                return true;
+            }
+            if (hex.Length == 8
+                && int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int argb))
+            {
+                color = WpfColor.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
                 return true;
             }
         }
-        catch
-        {
-        }
 
-        color = default;
+        color = WpfColor.FromRgb(228, 105, 76);
         return false;
     }
 

@@ -1,16 +1,10 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
 
 namespace KeyboardScreen.Core;
 
 public sealed class DotMatrixAnalogClockTheme : IScreenTheme
 {
-    private static readonly FontFamily Doto = new(
-        new Uri(
-            Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts") + Path.DirectorySeparatorChar,
-            UriKind.Absolute),
-        "./#Doto");
+    private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-dot-analog";
     public string DisplayName => "点阵模拟时钟";

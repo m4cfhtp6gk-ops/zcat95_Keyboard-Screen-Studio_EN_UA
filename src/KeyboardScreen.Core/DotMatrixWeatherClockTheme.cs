@@ -1,14 +1,10 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
 
 namespace KeyboardScreen.Core;
 
 public sealed class DotMatrixWeatherClockTheme : IScreenTheme
 {
-    private static readonly FontFamily Doto = new(
-        new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts") + Path.DirectorySeparatorChar, UriKind.Absolute),
-        "./#Doto");
+    private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-weather-dot";
     public string DisplayName => "点阵时钟天气";

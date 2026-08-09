@@ -1,2 +1,0 @@
-namespace KeyboardScreen.Core;
-public sealed record ScreenFontOption(string Id,string DisplayName,string FamilyName,string? FileName,FontFamily FontFamily,bool IsBuiltIn=false){public const string DefaultId="builtin:system-ui";public static ScreenFontOption Default{get;}=new(DefaultId,"系统默认字体","Arial",null,new FontFamily("Arial"),true);}

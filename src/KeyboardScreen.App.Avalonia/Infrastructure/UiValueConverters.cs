@@ -8,7 +8,9 @@ namespace KeyboardScreen.App.Avalonia.Infrastructure;
 public sealed class ConnectionBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is true ? new SolidColorBrush(Color.Parse("#27BE7B")) : new SolidColorBrush(Color.Parse("#A2A8B1"));
+        value is true
+            ? new SolidColorBrush(global::Avalonia.Media.Color.Parse("#27BE7B"))
+            : new SolidColorBrush(global::Avalonia.Media.Color.Parse("#A2A8B1"));
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();

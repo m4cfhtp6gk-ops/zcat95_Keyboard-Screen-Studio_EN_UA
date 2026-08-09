@@ -1,131 +1,19 @@
-using System;
-using System.Globalization;
-using System.IO;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-
+using SkiaSharp;
 namespace KeyboardScreen.Core;
-
-public sealed class ScreenCanvas
-{
-	private readonly DrawingContext _drawing;
-
-	public ScreenProfile Profile { get; }
-
-	public Color AccentColor { get; }
-
-	public FontFamily FontFamily { get; }
-
-	public ScreenDisplayOptions DisplayOptions { get; }
-
-	public Rect SafeBounds => new Rect(Profile.SafeArea.Left, Profile.SafeArea.Top, Profile.Width - Profile.SafeArea.Left - Profile.SafeArea.Right, Profile.Height - Profile.SafeArea.Top - Profile.SafeArea.Bottom);
-
-	internal ScreenCanvas(DrawingContext drawing, ScreenProfile profile, Color accentColor, FontFamily fontFamily, ScreenDisplayOptions displayOptions)
-	{
-		_drawing = drawing;
-		Profile = profile;
-		AccentColor = accentColor;
-		FontFamily = fontFamily;
-		DisplayOptions = displayOptions;
-	}
-
-	public void Fill(Color color)
-	{
-		_drawing.DrawRectangle(new SolidColorBrush(color), null, new Rect(0.0, 0.0, Profile.Width, Profile.Height));
-	}
-
-	public void Gradient(Color start, Color end, Point startPoint, Point endPoint)
-	{
-		LinearGradientBrush brush = new LinearGradientBrush(start, end, startPoint, endPoint);
-		_drawing.DrawRectangle(brush, null, new Rect(0.0, 0.0, Profile.Width, Profile.Height));
-	}
-
-	public void RoundedRect(Rect rect, double radius, Color fill, Color? stroke = null, double strokeWidth = 1.0)
-	{
-		Pen? pen = stroke.HasValue ? new Pen(new SolidColorBrush(stroke.Value), strokeWidth) : null;
-		_drawing.DrawRoundedRectangle(new SolidColorBrush(fill), pen, rect, radius, radius);
-	}
-
-	public void Ellipse(Rect rect, Color fill, Color? stroke = null, double strokeWidth = 1.0)
-	{
-		Pen? pen = stroke.HasValue ? new Pen(new SolidColorBrush(stroke.Value), strokeWidth) : null;
-		_drawing.DrawEllipse(new SolidColorBrush(fill), pen, new Point(rect.X + rect.Width / 2.0, rect.Y + rect.Height / 2.0), rect.Width / 2.0, rect.Height / 2.0);
-	}
-
-	public void Text(string value, double size, Color color, Point origin, FontWeight? weight = null, TextAlignment alignment = TextAlignment.Left, double maxWidth = double.PositiveInfinity, double maxHeight = double.PositiveInfinity)
-	{
-		FormattedText formattedText = new FormattedText(value, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily, FontStyles.Normal, weight ?? FontWeights.Normal, FontStretches.Normal), size, new SolidColorBrush(color), 1.0);
-		formattedText.TextAlignment = alignment;
-		if (!double.IsPositiveInfinity(maxWidth))
-		{
-			formattedText.MaxTextWidth = maxWidth;
-		}
-		if (!double.IsPositiveInfinity(maxHeight))
-		{
-			formattedText.MaxTextHeight = maxHeight;
-			formattedText.Trimming = TextTrimming.CharacterEllipsis;
-		}
-		_drawing.DrawText(formattedText, origin);
-	}
-
-	public void CenteredText(string value, double size, Color color, Rect bounds, FontWeight? weight = null)
-	{
-		AlignedText(value, size, color, bounds, weight, TextAlignment.Center);
-	}
-
-	public void AlignedText(string value, double size, Color color, Rect bounds, FontWeight? weight = null, TextAlignment alignment = TextAlignment.Left, FontFamily? fontFamily = null)
-	{
-		FormattedText formattedText = new FormattedText(value, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(fontFamily ?? FontFamily, FontStyles.Normal, weight ?? FontWeights.Normal, FontStretches.Normal), size, new SolidColorBrush(color), 1.0);
-		Geometry glyphs = formattedText.BuildGeometry(new Point());
-		Rect inkBounds = glyphs.Bounds;
-		if (inkBounds.IsEmpty)
-		{
-			return;
-		}
-
-		double x = alignment switch
-		{
-			TextAlignment.Right => bounds.Right - inkBounds.Right,
-			TextAlignment.Center => bounds.Left + (bounds.Width - inkBounds.Width) / 2.0 - inkBounds.Left,
-			_ => bounds.Left - inkBounds.Left
-		};
-		double y = bounds.Top + (bounds.Height - inkBounds.Height) / 2.0 - inkBounds.Top;
-		_drawing.DrawText(formattedText, new Point(x, y));
-	}
-	public void Line(Point start, Point end, Color color, double thickness = 1.0)
-	{
-		_drawing.DrawLine(new Pen(new SolidColorBrush(color), thickness), start, end);
-	}
-
-	public void Path(Geometry geometry, Color stroke, double thickness = 1.0, Color? fill = null)
-	{
-		ArgumentNullException.ThrowIfNull(geometry);
-		Brush? fillBrush = fill.HasValue ? new SolidColorBrush(fill.Value) : null;
-		_drawing.DrawGeometry(fillBrush, new Pen(new SolidColorBrush(stroke), thickness), geometry);
-	}
-	public void ProgressBar(Rect rect, double percent, Color track, Color fill)
-	{
-		RoundedRect(rect, rect.Height / 2.0, track);
-		double width = Math.Max(rect.Height, rect.Width * Math.Clamp(percent, 0.0, 100.0) / 100.0);
-		RoundedRect(new Rect(rect.X, rect.Y, width, rect.Height), rect.Height / 2.0, fill);
-	}
-
-	public void Image(byte[] bytes, Rect rect, double radius = 0.0)
-	{
-		using MemoryStream streamSource = new MemoryStream(bytes);
-		BitmapImage bitmapImage = new BitmapImage();
-		bitmapImage.BeginInit();
-		bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-		bitmapImage.StreamSource = streamSource;
-		bitmapImage.EndInit();
-		bitmapImage.Freeze();
-		ImageBrush brush = new ImageBrush(bitmapImage)
-		{
-			Stretch = Stretch.UniformToFill,
-			AlignmentX = AlignmentX.Center,
-			AlignmentY = AlignmentY.Center
-		};
-		_drawing.DrawRoundedRectangle(brush, null, rect, radius, radius);
-	}
-}
+public sealed class ScreenCanvas{
+private readonly SKCanvas _canvas;public ScreenProfile Profile{get;}public Color AccentColor{get;}public FontFamily FontFamily{get;}public ScreenDisplayOptions DisplayOptions{get;}public Rect SafeBounds=>new(Profile.SafeArea.Left,Profile.SafeArea.Top,Profile.Width-Profile.SafeArea.Left-Profile.SafeArea.Right,Profile.Height-Profile.SafeArea.Top-Profile.SafeArea.Bottom);
+internal ScreenCanvas(SKCanvas canvas,ScreenProfile profile,Color accent,FontFamily font,ScreenDisplayOptions options){_canvas=canvas;Profile=profile;AccentColor=accent;FontFamily=font;DisplayOptions=options;}
+public void Fill(Color c)=>_canvas.Clear(c.Skia);
+public void Gradient(Color a,Color b,Point p1,Point p2){using var paint=new SKPaint{Shader=SKShader.CreateLinearGradient(new((float)(p1.X*Profile.Width),(float)(p1.Y*Profile.Height)),new((float)(p2.X*Profile.Width),(float)(p2.Y*Profile.Height)),new SKColor[]{a.Skia,b.Skia},null,SKShaderTileMode.Clamp)};_canvas.DrawRect(0,0,Profile.Width,Profile.Height,paint);}
+public void RoundedRect(Rect r,double radius,Color fill,Color? stroke=null,double strokeWidth=1){using var p=Paint(fill,SKPaintStyle.Fill);_canvas.DrawRoundRect(ToSk(r),(float)radius,(float)radius,p);if(stroke is{}s){using var o=Paint(s,SKPaintStyle.Stroke,strokeWidth);_canvas.DrawRoundRect(ToSk(r),(float)radius,(float)radius,o);}}
+public void Ellipse(Rect r,Color fill,Color? stroke=null,double strokeWidth=1){using var p=Paint(fill,SKPaintStyle.Fill);_canvas.DrawOval(ToSk(r),p);if(stroke is{}s){using var o=Paint(s,SKPaintStyle.Stroke,strokeWidth);_canvas.DrawOval(ToSk(r),o);}}
+public void Text(string value,double size,Color color,Point origin,FontWeight? weight=null,TextAlignment alignment=TextAlignment.Left,double maxWidth=double.PositiveInfinity,double maxHeight=double.PositiveInfinity){using var font=CreateFont(value,size,weight??FontWeights.Normal,FontFamily);using var paint=Paint(color,SKPaintStyle.Fill);var text=Fit(value,font,maxWidth);var width=font.MeasureText(text,paint);var x=(float)origin.X+(alignment switch{TextAlignment.Center=>(float)((maxWidth-width)/2),TextAlignment.Right=>(float)(maxWidth-width),_=>0});_canvas.DrawText(text,x,(float)origin.Y-font.Metrics.Ascent,font,paint);}
+public void CenteredText(string value,double size,Color color,Rect bounds,FontWeight? weight=null)=>AlignedText(value,size,color,bounds,weight,TextAlignment.Center);
+public void AlignedText(string value,double size,Color color,Rect bounds,FontWeight? weight=null,TextAlignment alignment=TextAlignment.Left,FontFamily? fontFamily=null){using var font=CreateFont(value,size,weight??FontWeights.Normal,fontFamily??FontFamily);using var paint=Paint(color,SKPaintStyle.Fill);var text=Fit(value,font,bounds.Width);var width=font.MeasureText(text,paint);var m=font.Metrics;var x=alignment switch{TextAlignment.Right=>(float)(bounds.Right-width),TextAlignment.Center=>(float)(bounds.Left+(bounds.Width-width)/2),_=>(float)bounds.Left};var baseline=(float)(bounds.Top+(bounds.Height-(m.Descent-m.Ascent))/2)-m.Ascent;_canvas.DrawText(text,x,baseline,font,paint);}
+public void Line(Point a,Point b,Color c,double thickness=1){using var p=Paint(c,SKPaintStyle.Stroke,thickness);p.StrokeCap=SKStrokeCap.Round;_canvas.DrawLine((float)a.X,(float)a.Y,(float)b.X,(float)b.Y,p);}
+public void Path(Geometry g,Color stroke,double thickness=1,Color? fill=null){if(fill is{}f){using var fp=Paint(f,SKPaintStyle.Fill);_canvas.DrawPath(g.Path,fp);}using var sp=Paint(stroke,SKPaintStyle.Stroke,thickness);sp.StrokeCap=SKStrokeCap.Round;sp.StrokeJoin=SKStrokeJoin.Round;_canvas.DrawPath(g.Path,sp);}
+public void ProgressBar(Rect r,double percent,Color track,Color fill){RoundedRect(r,r.Height/2,track);var w=Math.Max(r.Height,r.Width*Math.Clamp(percent,0,100)/100);RoundedRect(new(r.X,r.Y,w,r.Height),r.Height/2,fill);}
+public void Image(byte[] bytes,Rect rect,double radius=0){using var bitmap=SKBitmap.Decode(bytes);if(bitmap is null)return;var scale=Math.Max((float)rect.Width/bitmap.Width,(float)rect.Height/bitmap.Height);var w=bitmap.Width*scale;var h=bitmap.Height*scale;var dest=new SKRect((float)(rect.Left+(rect.Width-w)/2),(float)(rect.Top+(rect.Height-h)/2),(float)(rect.Left+(rect.Width+w)/2),(float)(rect.Top+(rect.Height+h)/2));_canvas.Save();_canvas.ClipRoundRect(new SKRoundRect(ToSk(rect),(float)radius));using var p=new SKPaint{IsAntialias=true};_canvas.DrawBitmap(bitmap,dest,p);_canvas.Restore();}
+private static SKPaint Paint(Color c,SKPaintStyle style,double width=1)=>new(){Color=c.Skia,Style=style,StrokeWidth=(float)width,IsAntialias=true};private static SKRect ToSk(Rect r)=>new((float)r.Left,(float)r.Top,(float)r.Right,(float)r.Bottom);
+private static string Fit(string value,SKFont font,double max){if(double.IsPositiveInfinity(max)||font.MeasureText(value)<=max)return value;const string e="…";var n=value.Length;while(n>0&&font.MeasureText(value[..n]+e)>max)n--;return n==0?string.Empty:value[..n]+e;}
+private static SKFont CreateFont(string text,double size,FontWeight weight,FontFamily family){SKTypeface? face=family.FilePath is{Length:>0}&&File.Exists(family.FilePath)?SKTypeface.FromFile(family.FilePath):SKTypeface.FromFamilyName(family.Name,new SKFontStyle(weight.Value,5,SKFontStyleSlant.Upright));var cp=text.EnumerateRunes().Select(r=>r.Value).FirstOrDefault(v=>v>127);if(cp>0&&(face is null||!face.ContainsGlyph(cp))){face?.Dispose();face=SKFontManager.Default.MatchCharacter(family.Name,weight.Value,5,SKFontStyleSlant.Upright,null,cp);}return new SKFont(face??SKTypeface.Default,(float)size){Edging=SKFontEdging.Antialias,Subpixel=true};}}
