@@ -515,7 +515,7 @@ finally
     if (File.Exists(concurrentSettingsPath)) File.Delete(concurrentSettingsPath);
 }
 
-Assert(ReleaseUpdateChecker.TryParseTagVersion("v1.1.0") == new Version(1, 1, 0), "tag version parsing failed");
+Assert(ReleaseUpdateChecker.TryParseTagVersion("v1.2.0") == new Version(1, 2, 0), "tag version parsing failed");
 Assert(ReleaseUpdateChecker.TryParseTagVersion("not-a-version") is null, "invalid tag must not parse");
 Assert(ReleaseUpdateChecker.IsNewerThan("v1.0.3", new Version(1, 0, 2)), "newer tag must be detected");
 Assert(!ReleaseUpdateChecker.IsNewerThan("v1.0.2", new Version(1, 0, 2)), "same tag must not be newer");
