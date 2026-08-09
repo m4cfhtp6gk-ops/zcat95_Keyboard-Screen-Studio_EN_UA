@@ -12,6 +12,9 @@ Assert(defaults.AutoPush && defaults.RefreshSeconds == 1, "first-run automation 
 Assert(defaults.MinimizeToTray && defaults.CloseToTray, "first-run tray defaults are incorrect");
 Assert(defaults.Weather.UseAutomaticLocation, "first-run weather must use automatic location");
 Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe area is incorrect");
+Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
+Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");
+Assert(ScreenFontOption.Default.IsBuiltIn, "default font must be flagged built-in");
 
 var profile = ScreenProfile.KeyboardDisplay;
 Assert(profile.SafeArea.Top == 52, "keyboard firmware safe area must reserve the top status pills");

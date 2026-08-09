@@ -42,6 +42,7 @@ try {
     $licenses = Join-Path $staging 'Licenses'
     New-Item -ItemType Directory -Path $licenses -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.Core\Assets\Fonts\Doto-OFL.txt') -Destination $licenses -Force
+    Copy-Item -LiteralPath (Join-Path $workspace 'src\KeyboardScreen.Core\Assets\Fonts\MiSans-LICENSE.pdf') -Destination $licenses -Force
     Copy-Item -LiteralPath (Join-Path $workspace 'Licenses\dotnet-LICENSE.txt') -Destination $licenses -Force
     Copy-Item -LiteralPath (Join-Path $workspace 'Licenses\dotnet-ThirdPartyNotices.txt') -Destination $licenses -Force
 
@@ -80,6 +81,7 @@ try {
         'PRIVACY.md',
         'THIRD-PARTY-NOTICES.md',
         'Licenses\Doto-OFL.txt',
+        'Licenses\MiSans-LICENSE.pdf',
         'Licenses\dotnet-LICENSE.txt',
         'Licenses\dotnet-ThirdPartyNotices.txt'
     )) {

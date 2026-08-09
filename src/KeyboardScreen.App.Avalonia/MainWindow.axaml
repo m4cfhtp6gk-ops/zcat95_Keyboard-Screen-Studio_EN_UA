@@ -733,6 +733,10 @@
                             Classes="secondary"
                             Text="Keyboard Screen Studio 源代码采用 MIT License。第三方组件、字体与数据服务仍遵循各自条款；应用图标与托盘图标采用单独的视觉资产许可。完整说明随程序提供。"
                             TextWrapping="Wrap" />
+                        <TextBlock
+                            Classes="secondary"
+                            Text="默认字体使用 MiSans，版权归小米科技有限责任公司所有，依据《MiSans 字体知识产权许可协议》使用。"
+                            TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
 
@@ -755,6 +759,12 @@
                           <TextBlock FontWeight="SemiBold" Text="Doto" />
                           <TextBlock Grid.Column="1" Classes="secondary" Text="SIL OFL 1.1" />
                           <TextBlock Grid.Column="2" Classes="secondary" Text="Copyright © 2024 The Doto Project Authors" />
+                        </Grid>
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+                        <Grid ColumnDefinitions="1.7*,1.2*,2*">
+                          <TextBlock FontWeight="SemiBold" Text="MiSans" />
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="MiSans 许可协议" />
+                          <TextBlock Grid.Column="2" Classes="secondary" Text="Copyright © 小米科技有限责任公司" />
                         </Grid>
                       </StackPanel>
                     </Border>
