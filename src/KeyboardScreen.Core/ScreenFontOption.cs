@@ -3,7 +3,7 @@ public sealed record ScreenFontOption(string Id,string DisplayName,string Family
     public const string DefaultId="builtin:misans";
     public static ScreenFontOption Default{get;}=new(
         DefaultId,
-        "MiSans（内置默认）",
+        "默认 MiSans",
         "MiSans",
         "MiSans-Medium.ttf",
         new FontFamily("MiSans",Path.Combine(AppContext.BaseDirectory,"Assets","Fonts","MiSans-Medium.ttf")),

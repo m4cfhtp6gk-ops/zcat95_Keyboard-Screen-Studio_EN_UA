@@ -287,6 +287,7 @@
                                       VerticalAlignment="Center"
                                       Classes="secondary"
                                       FontSize="10"
+                                      IsVisible="{Binding !IsBuiltIn}"
                                       Text="{Binding FileName}" />
                                 </Grid>
                               </DataTemplate>
