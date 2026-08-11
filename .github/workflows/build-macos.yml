@@ -1,0 +1,51 @@
+name: Build macOS (ARM64)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+    branches:
+      - "main"
+    paths:
+      - "src/**"
+      - ".github/workflows/build-macos.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-arm64:
+    name: Build macOS App (ARM64)
+    runs-on: macos-latest
+    
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "9.0.x"
+
+      - run: dotnet restore KeyboardScreenStudio.sln
+
+      - run: |
+          dotnet build src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj \
+            -c Release --no-restore -p:RuntimeIdentifier=osx-arm64
+
+      - run: |
+          dotnet publish src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj \
+            -c Release -r osx-arm64 --self-contained \
+            -o ./publish/osx-arm64
+
+      - run: |
+          mkdir -p ./artifacts
+          cd ./publish/osx-arm64 && zip -r ../../artifacts/KeyboardScreenStudio-arm64.zip . && cd ../../
+
+      - run: |
+          cd ./artifacts && shasum -a 256 *.zip > checksums.txt && cat checksums.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeyboardScreenStudio-macOS-ARM64
+          path: ./artifacts/
+          retention-days: 30
