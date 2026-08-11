@@ -32,12 +32,14 @@ jobs:
           dotnet build src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj \
             -c Release --no-restore -p:RuntimeIdentifier=osx-arm64
             -p:TargetFramework=net8.0
+            -p:EnableWindowsTargeting=true
 
       - run: |
           dotnet publish src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj \
             -c Release -r osx-arm64 --self-contained \
             -o ./publish/osx-arm64
             -p:TargetFramework=net8.0
+            -p:EnableWindowsTargeting=true
 
       - run: |
           mkdir -p ./artifacts
