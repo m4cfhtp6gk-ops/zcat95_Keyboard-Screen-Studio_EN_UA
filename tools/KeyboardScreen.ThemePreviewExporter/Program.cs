@@ -16,8 +16,8 @@ if (args.Length < 3)
 var outputRoot = Path.GetFullPath(args[0]);
 var settingsPath = Path.GetFullPath(args[1]);
 var fontsFolder = Path.GetFullPath(args[2]);
-var rawFolder = Path.Combine(outputRoot, "01-原始屏幕-JPEG");
-var cardsFolder = Path.Combine(outputRoot, "02-展示卡-PNG");
+var rawFolder = Path.Combine(outputRoot, "01-raw-screens-jpeg");
+var cardsFolder = Path.Combine(outputRoot, "02-showcase-cards-png");
 Directory.CreateDirectory(rawFolder);
 Directory.CreateDirectory(cardsFolder);
 
@@ -50,11 +50,11 @@ var sample = SystemSnapshot.DesignSample with
 
 var cards = new List<(IScreenTheme Theme, BitmapSource Image)>();
 var manifest = new StringBuilder();
-manifest.AppendLine("Keyboard Screen Studio 全主题预览");
-manifest.AppendLine($"生成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
-manifest.AppendLine($"主题数量：{themes.Count}");
-manifest.AppendLine($"强调色：{settings.AccentColor}");
-manifest.AppendLine($"字体：{selectedFont.DisplayName}");
+manifest.AppendLine("Keyboard Screen Studio - all theme previews");
+manifest.AppendLine($"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+manifest.AppendLine($"Themes:    {themes.Count}");
+manifest.AppendLine($"Accent:    {settings.AccentColor}");
+manifest.AppendLine($"Font:      {selectedFont.DisplayName}");
 manifest.AppendLine();
 
 for (var index = 0; index < themes.Count; index++)
@@ -80,9 +80,9 @@ for (var index = 0; index < themes.Count; index++)
     Console.WriteLine($"EXPORTED {prefix} {theme.DisplayName}");
 }
 
-var contactSheetPath = Path.Combine(outputRoot, "KeyboardScreenStudio-全主题总览.png");
+var contactSheetPath = Path.Combine(outputRoot, "KeyboardScreenStudio-all-themes.png");
 SavePng(RenderContactSheet(cards), contactSheetPath);
-await File.WriteAllTextAsync(Path.Combine(outputRoot, "主题清单.txt"), manifest.ToString(), new UTF8Encoding(false));
+await File.WriteAllTextAsync(Path.Combine(outputRoot, "theme-list.txt"), manifest.ToString(), new UTF8Encoding(false));
 
 var zipPath = outputRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + ".zip";
 if (File.Exists(zipPath)) File.Delete(zipPath);
@@ -253,5 +253,5 @@ static string SanitizeFileName(string name)
 {
     var invalid = Path.GetInvalidFileNameChars();
     var sanitized = new string(name.Select(character => invalid.Contains(character) ? '-' : character).ToArray());
-    return string.IsNullOrWhiteSpace(sanitized) ? "未命名主题" : sanitized;
+    return string.IsNullOrWhiteSpace(sanitized) ? "unnamed-theme" : sanitized;
 }

@@ -12,9 +12,9 @@ public sealed class DotMatrixClockTheme : IScreenTheme
     private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-dot-matrix";
-    public string DisplayName => "点阵时钟";
-    public string Description => "小时、分钟、秒钟纵向点阵显示";
-    public string Details => "使用三段式纵向层级，在小屏上清晰区分小时、分钟与秒钟。";
+    public string DisplayName => Loc.T("ThemeClockDotMatrixName");
+    public string Description => Loc.T("ThemeClockDotMatrixDescription");
+    public string Details => Loc.T("ThemeClockDotMatrixDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -24,10 +24,10 @@ public sealed class DotMatrixClockTheme : IScreenTheme
 
         canvas.Fill(Colors.Black);
 
-        DrawTimeSection(canvas, safe, safe.Top + 10, "小时", snapshot.Timestamp.ToString("HH"), 67, Colors.White, divider);
-        DrawTimeSection(canvas, safe, safe.Top + 128, "分钟", snapshot.Timestamp.ToString("mm"), 67, Colors.White, divider);
+        DrawTimeSection(canvas, safe, safe.Top + 10, Loc.T("ScreenLabelHours"), snapshot.Timestamp.ToString("HH"), 67, Colors.White, divider);
+        DrawTimeSection(canvas, safe, safe.Top + 128, Loc.T("ScreenLabelMinutes"), snapshot.Timestamp.ToString("mm"), 67, Colors.White, divider);
 
-        canvas.AlignedText("秒", 10, label,
+        canvas.AlignedText(Loc.T("ScreenLabelSecondsShort"), 10, label,
             new Rect(safe.Left, safe.Top + 250, safe.Width, 16),
             FontWeights.Medium, TextAlignment.Left);
         canvas.AlignedText(snapshot.Timestamp.ToString("ss"), 59, canvas.AccentColor,

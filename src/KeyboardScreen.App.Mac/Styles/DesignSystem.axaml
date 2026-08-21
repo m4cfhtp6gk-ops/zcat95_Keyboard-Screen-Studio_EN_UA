@@ -1,6 +1,7 @@
 <Styles
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure"
     xmlns:behaviors="using:KeyboardScreen.App.Avalonia.Behaviors">
 
   <Styles.Resources>
@@ -289,7 +290,7 @@
               x:Name="SwitchState"
               Grid.Column="2"
               VerticalAlignment="Center"
-              Text="关闭" />
+              Text="{infra:Localize ToggleOff}" />
         </Grid>
       </ControlTemplate>
     </Setter>
@@ -301,7 +302,7 @@
     <Setter Property="RenderTransform" Value="translate(22px, 0px)" />
   </Style>
   <Style Selector="ToggleSwitch:checked /template/ TextBlock#SwitchState">
-    <Setter Property="Text" Value="启用" />
+    <Setter Property="Text" Value="{infra:Localize ToggleOn}" />
   </Style>
   <Style Selector="ToggleSwitch:disabled">
     <Setter Property="Opacity" Value="0.55" />

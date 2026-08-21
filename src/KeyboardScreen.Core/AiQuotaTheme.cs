@@ -4,9 +4,9 @@ namespace KeyboardScreen.Core;
 public sealed class AiQuotaTheme : IScreenTheme
 {
     public string Id => "ai-quota";
-    public string DisplayName => "AI用量（开发中）";
-    public string Description => "单平台剩余额度能量条";
-    public string Details => "从下向上显示 AI 剩余额度，支持 API Key 与订阅制数据。";
+    public string DisplayName => Loc.T("ThemeAiQuotaName");
+    public string Description => Loc.T("ThemeAiQuotaDescription");
+    public string Details => Loc.T("ThemeAiQuotaDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -95,7 +95,7 @@ public sealed class AiQuotaTheme : IScreenTheme
             38);
 
         canvas.Text(
-            quota.Available ? FormatMetric(quota) : "等待数据源",
+            quota.Available ? FormatMetric(quota) : Loc.T("ScreenAiWaitingSource"),
             7.5,
             Color.FromRgb(91, 103, 117),
             new Point(safe.Left, safe.Bottom - 13),
@@ -143,12 +143,12 @@ public sealed class AiQuotaTheme : IScreenTheme
 
     private static string ResetLabel(AiResetPeriod period) => period switch
     {
-        AiResetPeriod.Hourly => "每小时",
-        AiResetPeriod.Daily => "每日",
-        AiResetPeriod.Weekly => "每周",
-        AiResetPeriod.Monthly => "每月",
-        AiResetPeriod.BillingCycle => "账期",
-        AiResetPeriod.Custom => "自定义",
+        AiResetPeriod.Hourly => Loc.T("AiResetHourly"),
+        AiResetPeriod.Daily => Loc.T("AiResetDaily"),
+        AiResetPeriod.Weekly => Loc.T("AiResetWeekly"),
+        AiResetPeriod.Monthly => Loc.T("AiResetMonthly"),
+        AiResetPeriod.BillingCycle => Loc.T("AiResetBillingCycle"),
+        AiResetPeriod.Custom => Loc.T("AiResetCustom"),
         _ => string.Empty
     };
 

@@ -6,11 +6,11 @@ public sealed class MusicTheme : IScreenTheme
 {
 	public string Id => "music";
 
-	public string DisplayName => "音乐";
+	public string DisplayName => Loc.T("ThemeMusicName");
 
-	public string Description => "封面、曲名、歌手与播放进度";
+	public string Description => Loc.T("ThemeMusicDescription");
 
-	public string Details => "读取 Windows 媒体会话；直播内容自动显示播放状态。";
+	public string Details => Loc.T("ThemeMusicDetails");
 
 	public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
 	{
@@ -23,7 +23,7 @@ public sealed class MusicTheme : IScreenTheme
 		canvas.Fill(color);
 		bool playing = music.Available && music.IsPlaying;
 		bool paused = music.Available && !music.IsPlaying;
-		string status = playing ? "正在播放" : paused ? "已暂停" : "未在播放";
+		string status = Loc.T(playing ? "ScreenMusicPlaying" : paused ? "ScreenMusicPaused" : "ScreenMusicStopped");
 		ThemeHeader.Draw(canvas, snapshot, status, playing || paused ? accentColor : color2);
 		Rect rect = new Rect(safeBounds.Left, safeBounds.Top + 30.0, safeBounds.Width, 150.0);
 		byte[]? artwork = music.Artwork;

@@ -9,6 +9,9 @@ public sealed class AppSettings
 
 	public UiThemeMode UiThemeMode { get; set; } = UiThemeMode.System;
 
+	/// <summary>Language identifier ("en", "uk", "zh-Hans"); empty means "ask the OS".</summary>
+	public string Language { get; set; } = string.Empty;
+
 
 	public bool AutoPush { get; set; } = true;
 

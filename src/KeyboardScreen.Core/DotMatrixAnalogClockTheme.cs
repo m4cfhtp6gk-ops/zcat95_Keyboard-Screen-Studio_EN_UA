@@ -7,9 +7,9 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
     private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-dot-analog";
-    public string DisplayName => "点阵模拟时钟";
-    public string Description => "点阵指针表盘与高密度状态信息";
-    public string Details => "上方使用正方形点阵模拟指针时钟，下方集中显示数字时间、日期和电脑状态摘要。";
+    public string DisplayName => Loc.T("ThemeClockDotAnalogName");
+    public string Description => Loc.T("ThemeClockDotAnalogDescription");
+    public string Details => Loc.T("ThemeClockDotAnalogDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -34,7 +34,7 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
         double dateTop = timeTop + 53;
         canvas.AlignedText(snapshot.Timestamp.ToString("dddd"), 11, canvas.AccentColor,
             new Rect(safe.Left, dateTop, safe.Width * 0.42, 18), FontWeights.SemiBold, TextAlignment.Left);
-        canvas.AlignedText($"{snapshot.Timestamp.Month}月{snapshot.Timestamp.Day}日", 11, primary,
+        canvas.AlignedText(Loc.ShortDate(snapshot.Timestamp), 11, primary,
             new Rect(safe.Left + safe.Width * 0.42, dateTop, safe.Width * 0.58, 18), FontWeights.SemiBold, TextAlignment.Right);
 
         DrawDottedRule(canvas, safe.Left, safe.Right, dateTop + 28, idleDot);

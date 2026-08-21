@@ -7,9 +7,9 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
     private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-weather-dot";
-    public string DisplayName => "点阵时钟天气";
-    public string Description => "点阵时间与当前天气信息";
-    public string Details => "纵向展示时间、温度、天气状态、体感温度和湿度。";
+    public string DisplayName => Loc.T("ThemeClockWeatherDotName");
+    public string Description => Loc.T("ThemeClockWeatherDotDescription");
+    public string Details => Loc.T("ThemeClockWeatherDotDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -21,7 +21,7 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
         var border = Color.FromRgb(34, 34, 34);
 
         canvas.Fill(Colors.Black);
-        canvas.AlignedText(weather?.LocationName ?? "天气", 11, secondary,
+        canvas.AlignedText(weather?.LocationName ?? Loc.T("WeatherUnknown"), 11, secondary,
             new Rect(safe.Left, safe.Top + 7, safe.Width, 18), FontWeights.Medium, TextAlignment.Left);
         DrawDotMatrixTime(canvas, new Rect(safe.Left, safe.Top + 33, safe.Width, 54),
             snapshot.Timestamp, primary);
@@ -30,9 +30,9 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
         {
             canvas.AlignedText("--°", 43, primary,
                 new Rect(safe.Left, safe.Top + 123, safe.Width, 58), FontWeights.Medium, TextAlignment.Left);
-            canvas.AlignedText("等待天气数据", 12, secondary,
+            canvas.AlignedText(Loc.T("ScreenWeatherWaiting"), 12, secondary,
                 new Rect(safe.Left, safe.Top + 190, safe.Width, 20), FontWeights.Medium, TextAlignment.Left);
-            canvas.AlignedText("请在屏幕配置中填写城市", 10, disabled,
+            canvas.AlignedText(Loc.T("ScreenWeatherSetCity"), 10, disabled,
                 new Rect(safe.Left, safe.Bottom - 42, safe.Width, 18), FontWeights.Normal, TextAlignment.Left);
             return;
         }
@@ -45,10 +45,10 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
             new Rect(safe.Left, safe.Top + 182, safe.Width, 24), FontWeights.SemiBold, TextAlignment.Left);
 
         canvas.Line(new Point(safe.Left, safe.Top + 228), new Point(safe.Right, safe.Top + 228), border);
-        DrawStatRow(canvas, safe, safe.Top + 248, "体感", $"{weather.ApparentTemperatureC:0}°", secondary, primary);
-        DrawStatRow(canvas, safe, safe.Top + 291, "湿度", $"{weather.RelativeHumidityPercent}%", secondary, primary);
+        DrawStatRow(canvas, safe, safe.Top + 248, Loc.T("ScreenLabelFeelsLike"), $"{weather.ApparentTemperatureC:0}°", secondary, primary);
+        DrawStatRow(canvas, safe, safe.Top + 291, Loc.T("ScreenLabelHumidity"), $"{weather.RelativeHumidityPercent}%", secondary, primary);
 
-        var updateText = weather.IsStale ? "上次天气数据" : $"更新 {weather.UpdatedAt:HH:mm}";
+        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", weather.UpdatedAt.ToString("HH:mm"));
         canvas.AlignedText(updateText, 9, disabled,
             new Rect(safe.Left, safe.Bottom - 24, safe.Width, 15), FontWeights.Normal, TextAlignment.Left);
     }

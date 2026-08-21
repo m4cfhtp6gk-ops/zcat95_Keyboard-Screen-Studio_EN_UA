@@ -2,7 +2,9 @@ namespace KeyboardScreen.Core;
 
 public sealed class WeatherSettings
 {
-    public string LocationQuery { get; set; } = "北京";
+    public const string DefaultLocationQuery = "Kyiv";
+
+    public string LocationQuery { get; set; } = DefaultLocationQuery;
 
     public bool UseAutomaticLocation { get; set; } = true;
 

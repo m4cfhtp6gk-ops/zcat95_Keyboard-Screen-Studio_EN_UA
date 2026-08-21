@@ -31,6 +31,6 @@ public sealed record SystemSnapshot(
             56,
             remainingCount: 1,
             resetPeriod: AiResetPeriod.Weekly),
-        new WeatherSnapshot(true, "北京", 26, 28, 61, 2, true, DateTimeOffset.Now),
+        new WeatherSnapshot(true, WeatherSettings.DefaultLocationQuery, 26, 28, 61, 2, true, DateTimeOffset.Now),
         GpuPercent: 45.0);
 }

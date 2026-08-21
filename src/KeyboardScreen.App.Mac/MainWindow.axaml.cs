@@ -132,11 +132,11 @@ public sealed partial class MainWindow : Window
         IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(
             new FilePickerOpenOptions
             {
-                Title = "选择屏幕图片",
+                Title = Loc.T("PickImageTitle"),
                 AllowMultiple = false,
                 FileTypeFilter =
                 [
-                    new FilePickerFileType("图片")
+                    new FilePickerFileType(Loc.T("PickImageFileType"))
                     {
                         Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"]
                     }

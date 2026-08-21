@@ -5,9 +5,9 @@ namespace KeyboardScreen.Core;
 public sealed class ImageTheme : IScreenTheme
 {
     public string Id => "image";
-    public string DisplayName => "图片时间";
-    public string Description => "图片背景叠加可定制的时间、日期与天气";
-    public string Details => "支持数字、大数字、方形模拟与翻页时钟，可调整位置、字号、顺序和天气信息。";
+    public string DisplayName => Loc.T("ThemeImageName");
+    public string Description => Loc.T("ThemeImageDescription");
+    public string Details => Loc.T("ThemeImageDetails");
     public string? ImagePath { get; set; }
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
@@ -55,9 +55,9 @@ public sealed class ImageTheme : IScreenTheme
         Rect safe = canvas.SafeBounds;
         var card = new Rect(safe.Left, 126, safe.Width, 162);
         canvas.RoundedRect(card, 12, Color.FromRgb(17, 21, 27), Color.FromRgb(48, 57, 67));
-        canvas.Text("图片时间", 15, canvas.AccentColor, new Point(card.Left, card.Top + 48),
+        canvas.Text(Loc.T("ScreenTitleImage"), 15, canvas.AccentColor, new Point(card.Left, card.Top + 48),
             FontWeights.SemiBold, TextAlignment.Center, card.Width);
-        canvas.Text("请选择一张图片", 14, Colors.White, new Point(card.Left, card.Top + 88),
+        canvas.Text(Loc.T("ScreenImagePickPicture"), 14, Colors.White, new Point(card.Left, card.Top + 88),
             FontWeights.SemiBold, TextAlignment.Center, card.Width);
     }
 
@@ -307,9 +307,9 @@ public sealed class ImageTheme : IScreenTheme
             _ => weatherSize
         }) + 6;
 
-    private static string DateLabel(DateTimeOffset timestamp) => $"{timestamp.Month}月{timestamp.Day}日  {timestamp:dddd}";
-    private static string DateOnlyLabel(DateTimeOffset timestamp) => $"{timestamp.Month}月{timestamp.Day}日";
-    private static string WeekdayLabel(DateTimeOffset timestamp) => timestamp.ToString("dddd");
+    private static string DateLabel(DateTimeOffset timestamp) => $"{Loc.ShortDate(timestamp)}  {Loc.DayName(timestamp)}";
+    private static string DateOnlyLabel(DateTimeOffset timestamp) => Loc.ShortDate(timestamp);
+    private static string WeekdayLabel(DateTimeOffset timestamp) => Loc.DayName(timestamp);
     private static string WeatherLabel(WeatherSnapshot weather) => $"{weather.ConditionText} {weather.TemperatureC:0}°C";
 
     private enum DigitalRow { Time, Date, Weather }

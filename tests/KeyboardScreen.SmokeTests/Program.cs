@@ -5,12 +5,16 @@ using System.Net.Sockets;
 using System.Text;
 using KeyboardScreen.Core;
 
+Loc.Instance.Initialize(AppLanguage.English);
+
 var defaults = new AppSettings();
 Assert(defaults.SelectedThemeId == "clock-dot-matrix", "first-run theme must default to dot-matrix clock");
 Assert(defaults.AccentColor == "#E4694C", "first-run accent color is incorrect");
 Assert(defaults.AutoPush && defaults.RefreshSeconds == 1, "first-run automation defaults are incorrect");
 Assert(defaults.MinimizeToTray && defaults.CloseToTray, "first-run tray defaults are incorrect");
 Assert(defaults.Weather.UseAutomaticLocation, "first-run weather must use automatic location");
+Assert(defaults.Weather.LocationQuery == WeatherSettings.DefaultLocationQuery, "first-run weather city is incorrect");
+Assert(defaults.Language.Length == 0, "first-run language must defer to the operating system");
 Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe area is incorrect");
 Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
 Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");
@@ -28,12 +32,12 @@ Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "remov
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
 Assert(themes.Any(theme => theme.Id == "performance-visual"), "performance-visual theme must be registered");
-Assert(themes.Single(theme => theme.Id == "clock-dot-matrix").DisplayName == "点阵时钟", "dot-matrix clock theme must be registered");
-Assert(themes.Single(theme => theme.Id == "clock-weather-dot").DisplayName == "点阵时钟天气", "dot-matrix weather clock theme must be registered");
-Assert(themes.Single(theme => theme.Id == "clock-dot-analog").DisplayName == "点阵模拟时钟", "dot-matrix analog clock theme must be registered");
-Assert(themes.Single(theme => theme.Id == "clock-dot-progress").DisplayName == "点阵进度", "dot-matrix progress theme must be registered");
-Assert(themes.Single(theme => theme.Id == "image").DisplayName == "图片时间", "image theme must be named 图片时间");
-Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI用量（开发中）", "AI quota theme must carry the development label");
+Assert(themes.Single(theme => theme.Id == "clock-dot-matrix").DisplayName == "Dot-Matrix Clock", "dot-matrix clock theme must be registered");
+Assert(themes.Single(theme => theme.Id == "clock-weather-dot").DisplayName == "Dot-Matrix Weather Clock", "dot-matrix weather clock theme must be registered");
+Assert(themes.Single(theme => theme.Id == "clock-dot-analog").DisplayName == "Dot-Matrix Analog Clock", "dot-matrix analog clock theme must be registered");
+Assert(themes.Single(theme => theme.Id == "clock-dot-progress").DisplayName == "Dot-Matrix Progress", "dot-matrix progress theme must be registered");
+Assert(themes.Single(theme => theme.Id == "image").DisplayName == "Image Clock", "image theme must be named Image Clock");
+Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI Usage (Preview)", "AI quota theme must carry the development label");
 Assert(themes.Any(theme => theme.Id == "weather-five-day"), "five-day weather theme must be registered");
 Assert(themes.Any(theme => theme.Id == "stocks"), "stock theme must be registered");
 Assert(themes.Select(theme => theme.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == themes.Count, "theme ids should be unique");
@@ -44,7 +48,7 @@ var subscriptionQuota = AiQuotaSnapshot.ForSubscription(
     56,
     remainingCount: 1,
     resetPeriod: AiResetPeriod.Weekly);
-Assert(subscriptionQuota.RemainingDisplay == "56% / 1次", "subscription quota display is incorrect");
+Assert(subscriptionQuota.RemainingDisplay == "56% / 1 left", "subscription quota display is incorrect");
 Assert(subscriptionQuota.ResetPeriod == AiResetPeriod.Weekly, "subscription reset period was not retained");
 
 var tokenBalance = new AiQuotaBalance(
@@ -96,9 +100,9 @@ using (var weatherSource = new OpenMeteoWeatherSnapshotSource(weatherClient))
     Assert(weatherSnapshot.LocationName == "北京", "weather location was not parsed");
     Assert(Math.Abs(weatherSnapshot.TemperatureC - 31.4) < 0.001, "weather temperature was not parsed");
     Assert(weatherSnapshot.RelativeHumidityPercent == 58, "weather humidity was not parsed");
-    Assert(weatherSnapshot.ConditionText == "多云", "WMO weather condition mapping failed");
+    Assert(weatherSnapshot.ConditionText == "Partly cloudy", "WMO weather condition mapping failed");
     Assert(weatherSnapshot.DailyForecast?.Count == 5, "five-day weather forecast was not parsed");
-    Assert(weatherSnapshot.DailyForecast![2].ConditionText == "雨", "daily WMO weather condition mapping failed");
+    Assert(weatherSnapshot.DailyForecast![2].ConditionText == "Rain", "daily WMO weather condition mapping failed");
     var cachedWeather = await weatherSource.ReadAsync(new WeatherSettings { LocationQuery = "北京" });
     Assert(ReferenceEquals(weatherSnapshot, cachedWeather), "weather snapshot should use the ten-minute cache");
     Assert(weatherHandler.RequestCount == 2, "cached weather read must not call the APIs again");
@@ -162,7 +166,7 @@ using (var stockSource = new YahooStockSnapshotSource(stockClient))
     Assert(Math.Abs(stockSnapshot.Quotes[0].ChangePercent - 5.0) < 0.001, "stock change percent is incorrect");
     Assert(stockSnapshot.Quotes[0].FiveDayCloses is { Count: 5 } closes
         && Math.Abs(closes[0] - 101.5) < 0.001
-        && Math.Abs(closes[^1] - 105.0) < 0.001, "Yahoo 5日收盘价未解析");
+        && Math.Abs(closes[^1] - 105.0) < 0.001, "Yahoo five-day closes were not parsed");
     Assert(!stockSnapshot.RedForGain, "stock color preference was not preserved");
     var cachedStocks = await stockSource.ReadAsync(stockSettings);
     Assert(ReferenceEquals(stockSnapshot, cachedStocks), "stock snapshot should use the fifteen-minute cache");
@@ -173,11 +177,11 @@ using (var stockSource = new YahooStockSnapshotSource(stockClient))
 Console.WriteLine("PASS Yahoo chart parser, aliases, color preference and cache");
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-Assert(TencentStockSnapshotSource.MapSymbol("600519.SS") == "sh600519", "A股沪市代码映射错误");
-Assert(TencentStockSnapshotSource.MapSymbol("000001.SZ") == "sz000001", "A股深市代码映射错误");
-Assert(TencentStockSnapshotSource.MapSymbol("0700.HK") == "hk00700", "港股代码映射错误");
-Assert(TencentStockSnapshotSource.MapSymbol("AAPL") == "usAAPL", "美股代码映射错误");
-Assert(TencentStockSnapshotSource.MapSymbol("BTC-USD") is null, "加密货币应判为不支持");
+Assert(TencentStockSnapshotSource.MapSymbol("600519.SS") == "sh600519", "Shanghai A-share symbol mapping is wrong");
+Assert(TencentStockSnapshotSource.MapSymbol("000001.SZ") == "sz000001", "Shenzhen A-share symbol mapping is wrong");
+Assert(TencentStockSnapshotSource.MapSymbol("0700.HK") == "hk00700", "Hong Kong symbol mapping is wrong");
+Assert(TencentStockSnapshotSource.MapSymbol("AAPL") == "usAAPL", "US symbol mapping is wrong");
+Assert(TencentStockSnapshotSource.MapSymbol("BTC-USD") is null, "crypto symbols must be reported as unsupported");
 
 string tencentSample = """
 v_sh600519="1~贵州茅台~600519~1420.00~1410.00~1405.00~12345~0~0~1420.00~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~~20260807161431~10.00~0.71~1425.00~1390.00";
@@ -201,22 +205,22 @@ using (var tencentSource = new TencentStockSnapshotSource(tencentClient))
         ]
     };
     var tencentSnapshot = await tencentSource.ReadAsync(tencentSettings);
-    Assert(tencentHandler.LastRequestUri?.AbsoluteUri == "https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL", "腾讯请求应使用映射后的代码");
-    Assert(tencentSnapshot.Quotes.Count == 3, "腾讯行情应解析出三项");
-    Assert(tencentSnapshot.Quotes[0].DisplayName == "茅台", "A股别名未生效");
-    Assert(Math.Abs(tencentSnapshot.Quotes[0].CurrentPrice - 1420.00) < 0.001, "A股现价解析错误");
-    Assert(Math.Abs(tencentSnapshot.Quotes[0].ChangePercent - 0.71) < 0.001, "A股涨跌幅（字段32）解析错误");
-    Assert(tencentSnapshot.Quotes[0].UpdatedAt.ToString("yyyyMMddHHmmss") == "20260807161431", "A股时间戳解析错误");
-    Assert(Math.Abs(tencentSnapshot.Quotes[1].ChangePercent - (-0.08)) < 0.001, "港股涨跌幅解析错误");
-    Assert(tencentSnapshot.Quotes[1].UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss") == "2026-08-07 16:08:23", "港股时间戳解析错误");
-    Assert(tencentSnapshot.Quotes[2].DisplayName == "苹果", "美股别名未生效");
-    Assert(Math.Abs(tencentSnapshot.Quotes[2].ChangePercent - 0.29) < 0.001, "美股涨跌幅解析错误");
-    Assert(!tencentSnapshot.RedForGain, "腾讯行情颜色偏好未保留");
+    Assert(tencentHandler.LastRequestUri?.AbsoluteUri == "https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL", "the Tencent request must use the mapped codes");
+    Assert(tencentSnapshot.Quotes.Count == 3, "the Tencent feed should yield three quotes");
+    Assert(tencentSnapshot.Quotes[0].DisplayName == "茅台", "the A-share alias was not applied");
+    Assert(Math.Abs(tencentSnapshot.Quotes[0].CurrentPrice - 1420.00) < 0.001, "the A-share last price was parsed incorrectly");
+    Assert(Math.Abs(tencentSnapshot.Quotes[0].ChangePercent - 0.71) < 0.001, "the A-share change percent (field 32) was parsed incorrectly");
+    Assert(tencentSnapshot.Quotes[0].UpdatedAt.ToString("yyyyMMddHHmmss") == "20260807161431", "the A-share timestamp was parsed incorrectly");
+    Assert(Math.Abs(tencentSnapshot.Quotes[1].ChangePercent - (-0.08)) < 0.001, "the Hong Kong change percent was parsed incorrectly");
+    Assert(tencentSnapshot.Quotes[1].UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss") == "2026-08-07 16:08:23", "the Hong Kong timestamp was parsed incorrectly");
+    Assert(tencentSnapshot.Quotes[2].DisplayName == "苹果", "the US alias was not applied");
+    Assert(Math.Abs(tencentSnapshot.Quotes[2].ChangePercent - 0.29) < 0.001, "the US change percent was parsed incorrectly");
+    Assert(!tencentSnapshot.RedForGain, "the Tencent color preference was not preserved");
     var tencentCached = await tencentSource.ReadAsync(tencentSettings);
-    Assert(ReferenceEquals(tencentSnapshot, tencentCached), "腾讯行情应使用十五分钟缓存");
-    Assert(tencentHandler.RequestCount == 1, "缓存的腾讯行情读取不应再次请求");
+    Assert(ReferenceEquals(tencentSnapshot, tencentCached), "Tencent quotes should use the fifteen-minute cache");
+    Assert(tencentHandler.RequestCount == 1, "a cached Tencent read must not call the API again");
     var tencentFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with { Stocks = tencentSnapshot });
-    Assert(tencentFrame.JpegBytes is [0xFF, 0xD8, ..], "腾讯行情数据视图未渲染");
+    Assert(tencentFrame.JpegBytes is [0xFF, 0xD8, ..], "the Tencent quote view did not render");
 }
 
 string tencentKline = """
@@ -235,13 +239,13 @@ using (var trendSource = new TencentStockSnapshotSource(trendClient))
         ]
     };
     var trendSnapshot = await trendSource.ReadAsync(trendSettings);
-    Assert(trendHandler.KlineRequests == 2, "恰好两只 A/港股时应请求两次日K");
-    Assert(trendHandler.KlineQueries.All(uri => uri.Contains("fqkline") && uri.Contains("param=")), "日K请求参数错误");
-    Assert(trendSnapshot.Quotes.Count == 2, "双股行情应解析");
+    Assert(trendHandler.KlineRequests == 2, "exactly two A/HK symbols should trigger two daily-candle requests");
+    Assert(trendHandler.KlineQueries.All(uri => uri.Contains("fqkline") && uri.Contains("param=")), "the daily-candle request parameters are wrong");
+    Assert(trendSnapshot.Quotes.Count == 2, "both quotes should be parsed");
     var aCloses = trendSnapshot.Quotes[0].FiveDayCloses;
     var hkCloses = trendSnapshot.Quotes[1].FiveDayCloses;
-    Assert(aCloses is { Count: 5 } && Math.Abs(aCloses[^1] - 1309.22) < 0.001, "A股 qfqday 走势未解析");
-    Assert(hkCloses is { Count: 5 } && Math.Abs(hkCloses[^1] - 478.8) < 0.001, "港股 day 走势未解析");
+    Assert(aCloses is { Count: 5 } && Math.Abs(aCloses[^1] - 1309.22) < 0.001, "the A-share qfqday trend was not parsed");
+    Assert(hkCloses is { Count: 5 } && Math.Abs(hkCloses[^1] - 478.8) < 0.001, "the Hong Kong day trend was not parsed");
 }
 
 var usTrendHandler = new TencentStockHandler(tencentSample, tencentKline);
@@ -256,9 +260,9 @@ using (var usTrendSource = new TencentStockSnapshotSource(usTrendClient))
             new StockItemSettings { Symbol = "AAPL" }
         ]
     });
-    Assert(usTrendHandler.KlineRequests == 2, "含美股的两只股票应请求两次日K");
-    Assert(usTrendHandler.KlineQueries.Any(uri => uri.Contains("usAAPL.OQ")), "美股日K应使用 .OQ 格式");
-    Assert(usTrendSnapshot.Quotes[1].FiveDayCloses is { Count: 5 } usCloses && Math.Abs(usCloses[^1] - 313.33) < 0.001, "美股 .OQ 走势未解析");
+    Assert(usTrendHandler.KlineRequests == 2, "two symbols including a US one should trigger two daily-candle requests");
+    Assert(usTrendHandler.KlineQueries.Any(uri => uri.Contains("usAAPL.OQ")), "US daily candles must use the .OQ form");
+    Assert(usTrendSnapshot.Quotes[1].FiveDayCloses is { Count: 5 } usCloses && Math.Abs(usCloses[^1] - 313.33) < 0.001, "the US .OQ trend was not parsed");
 }
 
 var newStockHandler = new TencentStockHandler(tencentSample, tencentKline);
@@ -273,13 +277,13 @@ using (var newStockSource = new TencentStockSnapshotSource(newStockClient))
             new StockItemSettings { Symbol = "301707.SZ" }
         ]
     });
-    Assert(newStockHandler.KlineRequests == 2, "双 A 股应请求两次日K");
-    Assert(newStockSnapshot.Quotes.Count == 2, "双 A 股行情应解析");
-    Assert(newStockSnapshot.Quotes[0].FiveDayCloses is { Count: 5 }, "老股 5 日走势未解析");
-    Assert(newStockSnapshot.Quotes[1].FiveDayCloses is { Count: 1 }, "首日新股应保留 1 个收盘价样本");
+    Assert(newStockHandler.KlineRequests == 2, "two A-shares should trigger two daily-candle requests");
+    Assert(newStockSnapshot.Quotes.Count == 2, "both A-share quotes should be parsed");
+    Assert(newStockSnapshot.Quotes[0].FiveDayCloses is { Count: 5 }, "the established symbol's five-day trend was not parsed");
+    Assert(newStockSnapshot.Quotes[1].FiveDayCloses is { Count: 1 }, "a first-day listing should keep a single close sample");
     var newStockFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"),
         SystemSnapshot.DesignSample with { Stocks = newStockSnapshot });
-    Assert(newStockFrame.JpegBytes is [0xFF, 0xD8, ..], "含首日新股的双股视图未渲染");
+    Assert(newStockFrame.JpegBytes is [0xFF, 0xD8, ..], "the two-symbol view with a first-day listing did not render");
 }
 
 var twoTrendStocks = new StockSnapshot(
@@ -290,7 +294,7 @@ var twoTrendStocks = new StockSnapshot(
     DateTimeOffset.Now,
     RedForGain: true);
 var twoTrendFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with { Stocks = twoTrendStocks });
-Assert(twoTrendFrame.JpegBytes is [0xFF, 0xD8, ..], "双股走势可视化视图未渲染");
+Assert(twoTrendFrame.JpegBytes is [0xFF, 0xD8, ..], "the two-symbol trend view did not render");
 
 var fiveStocks = new StockSnapshot(
     [
@@ -303,14 +307,14 @@ var fiveStocks = new StockSnapshot(
     DateTimeOffset.Now,
     RedForGain: true);
 var fiveStocksFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with { Stocks = fiveStocks });
-Assert(fiveStocksFrame.JpegBytes is [0xFF, 0xD8, ..], "五只股票视图未渲染");
+Assert(fiveStocksFrame.JpegBytes is [0xFF, 0xD8, ..], "the five-symbol view did not render");
 
 var extremeStocks = new StockSnapshot(
     [new StockQuoteSnapshot("X", "极端涨幅", 49.69, 396.89, DateTimeOffset.Now)],
     DateTimeOffset.Now,
     RedForGain: true);
 var extremeFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with { Stocks = extremeStocks });
-Assert(extremeFrame.JpegBytes is [0xFF, 0xD8, ..] && extremeFrame.JpegBytes.Length <= profile.MaxJpegBytes, "极端涨幅 396.89% 视图未渲染或超限");
+Assert(extremeFrame.JpegBytes is [0xFF, 0xD8, ..] && extremeFrame.JpegBytes.Length <= profile.MaxJpegBytes, "the extreme 396.89% view did not render or exceeded the size limit");
 
 using (var partialClient = new HttpClient(new GbkHandler("v_usAAPL=\"200~苹果~AAPL.OQ~313.33~312.41~311.45~0~0~0~313.13~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~~2026-08-07 16:00:01~0.92~0.29~314.81~310.74\";")))
 using (var partialSource = new TencentStockSnapshotSource(partialClient))
@@ -323,7 +327,7 @@ using (var partialSource = new TencentStockSnapshotSource(partialClient))
             new StockItemSettings { Symbol = "AAPL" }
         ]
     });
-    Assert(partialSnapshot.Quotes.Count == 1 && partialSnapshot.Quotes[0].Symbol == "AAPL", "不支持的代码应被跳过，其余正常解析");
+    Assert(partialSnapshot.Quotes.Count == 1 && partialSnapshot.Quotes[0].Symbol == "AAPL", "unsupported symbols must be skipped while the rest still parse");
 }
 
 using (var emptyClient = new HttpClient(new GbkHandler("v_sz000001=\"51~平安银行~000001~11.19~11.27~11.23\";")))
@@ -333,7 +337,7 @@ using (var emptySource = new TencentStockSnapshotSource(emptyClient))
     {
         Items = [new StockItemSettings { Symbol = "600519.SS" }]
     });
-    Assert(failedSnapshot.Quotes.Count == 0 && !string.IsNullOrWhiteSpace(failedSnapshot.ErrorMessage), "全部失败时应返回错误快照");
+    Assert(failedSnapshot.Quotes.Count == 0 && !string.IsNullOrWhiteSpace(failedSnapshot.ErrorMessage), "an all-failed read must return an error snapshot");
 }
 Console.WriteLine("PASS Tencent GBK parser, symbol mapping, skip/fallback and cache");
 
@@ -461,7 +465,7 @@ var settingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-settings-{
 try
 {
     var settingsStore = new JsonSettingsStore(settingsPath);
-    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
+    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
     await settingsStore.SaveAsync(settings);
     var loadedSettings = await settingsStore.LoadAsync();
     Assert(loadedSettings.SelectedThemeId == "music", "settings theme did not persist");
@@ -486,6 +490,7 @@ try
     Assert(loadedSettings.ImageAnalogOrder == ImageAnalogOrder.DateWeatherClock, "image analog order did not persist");
     Assert(!loadedSettings.IgnoreBrowserMediaSessions, "browser media filter setting did not persist");
     Assert(loadedSettings.UiThemeMode == UiThemeMode.Dark, "control UI theme mode did not persist");
+    Assert(loadedSettings.Language == "uk" && AppLanguageInfo.Parse(loadedSettings.Language) == AppLanguage.Ukrainian, "language setting did not persist");
     Assert(loadedSettings.DotMatrixProgressPeriod == DotMatrixProgressPeriod.Quarter, "dot-matrix progress period did not persist");
     Assert(loadedSettings.DotMatrixProgressHeaderFontSize == 18, "dot-matrix progress header font size did not persist");
     Assert(loadedSettings.AutoMediaThemeSwitch, "media theme automation flag did not persist");
@@ -635,8 +640,81 @@ if (OperatingSystem.IsWindows())
     Console.WriteLine($"PASS system source CPU={snapshot.CpuPercent:0.0}% MEM={snapshot.MemoryPercent:0.0}%");
 }
 
+// ---- localization ---------------------------------------------------------
+AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
+Assert(shippedLanguages.Length == 3, "three languages should ship");
+Assert(AppLanguageInfo.All.Select(info => info.Id).SequenceEqual(new[] { "en", "uk", "zh-Hans" }),
+    "language identifiers changed; settings written by older builds would stop resolving");
+
+Loc.Instance.Initialize(AppLanguage.English);
+var englishKeys = Loc.Instance.Keys(AppLanguage.English).ToHashSet(StringComparer.Ordinal);
+Assert(englishKeys.Count > 300, "the English catalogue did not load from the embedded resource");
+var englishPlaceholders = englishKeys.ToDictionary(key => key, key => PlaceholderIndexes(Loc.T(key)), StringComparer.Ordinal);
+
+foreach (AppLanguage language in shippedLanguages)
+{
+    var keys = Loc.Instance.Keys(language).ToHashSet(StringComparer.Ordinal);
+    string[] missing = [.. englishKeys.Except(keys).Order()];
+    string[] extra = [.. keys.Except(englishKeys).Order()];
+    Assert(missing.Length == 0, $"{language}: catalogue is missing {missing.Length} key(s), first: {missing.FirstOrDefault()}");
+    Assert(extra.Length == 0, $"{language}: catalogue has {extra.Length} unknown key(s), first: {extra.FirstOrDefault()}");
+}
+
+foreach (AppLanguage language in shippedLanguages)
+{
+    Loc.Instance.Initialize(language);
+    foreach (string key in englishKeys)
+    {
+        string value = Loc.T(key);
+        Assert(value.Length > 0, $"{language}: '{key}' is empty");
+        Assert(value != key, $"{language}: '{key}' fell through to the key itself");
+        Assert(PlaceholderIndexes(value).SequenceEqual(englishPlaceholders[key]),
+            $"{language}: '{key}' does not take the same {{0}}..{{n}} placeholders as English");
+    }
+}
+
+// Every theme must render in every language: this catches a missing key, a bad
+// format string, or text that overflows the 142x428 JPEG budget.
+foreach (AppLanguage language in shippedLanguages)
+{
+    Loc.Instance.Initialize(language);
+    foreach (var theme in BuiltInThemes.Create(new ImageTheme()))
+    {
+        var localizedFrame = renderer.Render(theme, SystemSnapshot.DesignSample);
+        Assert(localizedFrame.JpegBytes is [0xFF, 0xD8, ..], $"{language}/{theme.Id}: did not render");
+        Assert(localizedFrame.JpegBytes.Length <= profile.MaxJpegBytes, $"{language}/{theme.Id}: JPEG exceeds device limit");
+        Assert(theme.DisplayName.Length > 0 && theme.Description.Length > 0 && theme.Details.Length > 0,
+            $"{language}/{theme.Id}: theme catalogue text is incomplete");
+    }
+}
+
+Loc.Instance.Initialize(AppLanguage.English);
+Assert(Loc.T("AboutVersion", "1.2.3") == "Version 1.2.3", "formatted lookup is broken");
+Assert(Loc.T("ThisKeyDoesNotExist") == "ThisKeyDoesNotExist", "an unknown key should fall back to itself");
+Loc.Instance.Initialize(AppLanguage.Ukrainian);
+Assert(Loc.T("ThemeMusicName") == "Музика", "Ukrainian catalogue did not load");
+Assert(Loc.LongDate(new DateTimeOffset(2026, 8, 21, 0, 0, 0, TimeSpan.Zero)).Contains("2026"),
+    "Ukrainian long date lost the year");
+Loc.Instance.Initialize(AppLanguage.ChineseSimplified);
+Assert(Loc.T("ThemeMusicName") == "音乐", "Simplified Chinese catalogue did not load");
+Loc.Instance.Initialize(AppLanguage.English);
+Console.WriteLine($"PASS localization catalogues: {englishKeys.Count} keys x {shippedLanguages.Length} languages");
+
 Console.WriteLine("All smoke tests passed.");
 return;
+
+static int[] PlaceholderIndexes(string value)
+{
+    var found = new SortedSet<int>();
+    for (int index = 0; index + 2 < value.Length; index++)
+    {
+        if (value[index] == '{' && char.IsDigit(value[index + 1]) && value[index + 2] == '}')
+        {
+            found.Add(value[index + 1] - '0');
+        }
+    }
+    return [.. found];
+}
 
 static void Assert(bool condition, string message)
 {

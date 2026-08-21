@@ -72,7 +72,7 @@ public sealed class TokscaleDataSource
             if (executable is null)
             {
                 return Cache(TokscaleCatalog.NotInstalled(
-                    "未检测到 Tokscale。请先完成安装，并在终端运行一次 tokscale。"));
+                    Loc.T("TokscaleNotDetected")));
             }
 
             CommandResult usage = await RunAsync(executable, "usage --json", cancellationToken);
@@ -97,7 +97,7 @@ public sealed class TokscaleDataSource
                 catalog = new TokscaleCatalog(
                     TokscaleStatus.Ready,
                     options,
-                    $"已读取 {options.Count} 项本地用量数据。",
+                    Loc.T("TokscaleReadCount", options.Count),
                     DateTimeOffset.Now,
                     executable);
             }
@@ -106,7 +106,7 @@ public sealed class TokscaleDataSource
                 catalog = new TokscaleCatalog(
                     TokscaleStatus.NoData,
                     [],
-                    "Tokscale 可以运行，但暂时没有可用数据。请先使用受支持的 AI 客户端，再重新检测。",
+                    Loc.T("TokscaleNoData"),
                     DateTimeOffset.Now,
                     executable);
             }
@@ -117,8 +117,8 @@ public sealed class TokscaleDataSource
                     TokscaleStatus.Error,
                     [],
                     string.IsNullOrWhiteSpace(detail)
-                        ? "Tokscale 读取失败，请在终端确认 tokscale 可以正常运行。"
-                        : $"Tokscale 读取失败：{detail}",
+                        ? Loc.T("TokscaleReadFailed")
+                        : Loc.T("TokscaleReadFailedDetail", detail),
                     DateTimeOffset.Now,
                     executable);
             }
@@ -362,7 +362,7 @@ public sealed class TokscaleDataSource
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new CommandResult(false, string.Empty, "命令执行超时");
+            return new CommandResult(false, string.Empty, Loc.T("CommandTimedOut"));
         }
         catch (Exception ex)
         {

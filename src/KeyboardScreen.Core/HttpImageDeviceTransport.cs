@@ -33,17 +33,17 @@ public sealed class HttpImageDeviceTransport : IDeviceTransport, IDisposable
 			content.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
 			using HttpResponseMessage httpResponseMessage = await _client.PostAsync(endpoint, content, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
 			timer.Stop();
-			return new DevicePushResult(httpResponseMessage.IsSuccessStatusCode, (int)httpResponseMessage.StatusCode, httpResponseMessage.IsSuccessStatusCode ? "推送成功" : $"设备返回 {httpResponseMessage.StatusCode} {httpResponseMessage.ReasonPhrase}", timer.Elapsed);
+			return new DevicePushResult(httpResponseMessage.IsSuccessStatusCode, (int)httpResponseMessage.StatusCode, httpResponseMessage.IsSuccessStatusCode ? Loc.T("DevicePushSucceeded") : Loc.T("DevicePushDeviceReturned", httpResponseMessage.StatusCode, httpResponseMessage.ReasonPhrase), timer.Elapsed);
 		}
 		catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
 		{
 			timer.Stop();
-			return new DevicePushResult(Success: false, null, "连接设备超时", timer.Elapsed);
+			return new DevicePushResult(Success: false, null, Loc.T("DeviceConnectTimeout"), timer.Elapsed);
 		}
 		catch (HttpRequestException ex2)
 		{
 			timer.Stop();
-			return new DevicePushResult(Success: false, null, "无法连接设备：" + ex2.Message, timer.Elapsed);
+			return new DevicePushResult(Success: false, null, Loc.T("DeviceConnectFailed", ex2.Message), timer.Elapsed);
 		}
 	}
 

@@ -39,13 +39,13 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
                 && settings.Longitude is double longitude
                     ? new LocationResult(
                         string.IsNullOrWhiteSpace(settings.AutomaticLocationName)
-                            ? "当前位置"
+                            ? Loc.T("WeatherCurrentLocation")
                             : settings.AutomaticLocationName,
                         latitude,
                         longitude)
                     : await ResolveLocationAsync(
                         string.IsNullOrWhiteSpace(settings.LocationQuery)
-                            ? "北京"
+                            ? WeatherSettings.DefaultLocationQuery
                             : settings.LocationQuery.Trim(),
                         cancellationToken);
             var snapshot = await ReadCurrentAsync(location, cancellationToken);
@@ -74,14 +74,14 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
         }
 
         return string.IsNullOrWhiteSpace(settings.LocationQuery)
-            ? "北京"
+            ? WeatherSettings.DefaultLocationQuery
             : settings.LocationQuery.Trim();
     }
     private async Task<LocationResult> ResolveLocationAsync(string query, CancellationToken cancellationToken)
     {
         var uri = "https://geocoding-api.open-meteo.com/v1/search?name="
             + Uri.EscapeDataString(query)
-            + "&count=1&language=zh&format=json";
+            + "&count=1&language=" + Loc.T("GeocodingLanguageCode") + "&format=json";
         using var response = await _client.GetAsync(uri, cancellationToken);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -90,7 +90,7 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
             || results.ValueKind != JsonValueKind.Array
             || results.GetArrayLength() == 0)
         {
-            throw new InvalidOperationException($"没有找到城市：{query}");
+            throw new InvalidOperationException(Loc.T("WeatherCityNotFound", query));
         }
 
         var first = results[0];
@@ -113,7 +113,7 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         if (!document.RootElement.TryGetProperty("current", out var current))
         {
-            throw new InvalidOperationException("天气接口没有返回当前天气");
+            throw new InvalidOperationException(Loc.T("WeatherNoCurrentData"));
         }
 
         return new WeatherSnapshot(

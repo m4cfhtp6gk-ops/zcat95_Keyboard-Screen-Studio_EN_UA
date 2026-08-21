@@ -169,13 +169,13 @@ public sealed partial class MainWindow : Window
             (string title, string subtitle, string body) = _viewModel.SelectedTheme?.Id switch
             {
                 "stocks" => (
-                    "股票行情风险提示",
-                    "实验性数据功能",
-                    "股票、基金与数字资产行情来自第三方公开接口，可能存在延迟、不准确、中断或代码映射错误。所展示的信息仅用于屏幕信息展示，不构成任何投资建议或交易依据。"),
+                    Loc.T("RiskStocksTitle"),
+                    Loc.T("RiskStocksHeading"),
+                    Loc.T("RiskStocksBody")),
                 "ai-quota" => (
-                    "AI 用量功能提示",
-                    "Tokscale 本地数据源",
-                    "此功能依赖用户自行安装的开源工具 Tokscale。KSS 只在本机调用 Tokscale 的 JSON 命令，不接管账号登录、不读取 API Key，也不会上传用量或凭据。不同客户端与平台的统计完整度可能不同，数据仅供个人信息展示。"),
+                    Loc.T("RiskAiTitle"),
+                    Loc.T("RiskAiHeading"),
+                    Loc.T("RiskAiBody")),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
 
@@ -250,11 +250,11 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
         IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(
             new FilePickerOpenOptions
             {
-                Title = "选择屏幕图片",
+                Title = Loc.T("PickImageTitle"),
                 AllowMultiple = false,
                 FileTypeFilter =
                 [
-                    new FilePickerFileType("图片")
+                    new FilePickerFileType(Loc.T("PickImageFileType"))
                     {
                         Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"]
                     }

@@ -75,7 +75,7 @@ public sealed class ReleaseUpdateChecker
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new UpdateCheckResult(false, null, null, null, "超时");
+            return new UpdateCheckResult(false, null, null, null, Loc.T("UpdateCheckTimeout"));
         }
         catch (Exception exception)
         {

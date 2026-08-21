@@ -5,9 +5,9 @@ namespace KeyboardScreen.Core;
 public sealed class FiveDayWeatherTheme : IScreenTheme
 {
     public string Id => "weather-five-day";
-    public string DisplayName => "五日天气";
-    public string Description => "未来五日天气与高低温";
-    public string Details => "显示未来五天的日期、天气状态和最高最低温度。";
+    public string DisplayName => Loc.T("ThemeWeatherFiveDayName");
+    public string Description => Loc.T("ThemeWeatherFiveDayDescription");
+    public string Details => Loc.T("ThemeWeatherFiveDayDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -18,14 +18,14 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
         var stroke = Color.FromRgb(29, 36, 45);
 
         canvas.Fill(Color.FromRgb(5, 9, 14));
-        ThemeHeader.Draw(canvas, snapshot, "五日天气");
+        ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitleFiveDay"));
 
         var days = weather?.DailyForecast?.Take(5).ToArray() ?? [];
         if (weather is not { Available: true } || days.Length == 0)
         {
-            canvas.AlignedText("等待天气数据", 15, Colors.White,
+            canvas.AlignedText(Loc.T("ScreenWeatherWaiting"), 15, Colors.White,
                 new Rect(safe.Left, safe.Top + 145, safe.Width, 24), FontWeights.SemiBold, TextAlignment.Center);
-            canvas.AlignedText("请在屏幕配置中填写城市", 10, secondary,
+            canvas.AlignedText(Loc.T("ScreenWeatherSetCity"), 10, secondary,
                 new Rect(safe.Left, safe.Top + 178, safe.Width, 18), FontWeights.Normal, TextAlignment.Center);
             return;
         }
@@ -42,8 +42,8 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
             var row = new Rect(safe.Left, top + index * (rowHeight + gap), safe.Width, rowHeight);
             canvas.RoundedRect(row, 10, card, stroke);
             var dayLabel = index == 0
-                ? "今天"
-                : day.Date.ToDateTime(TimeOnly.MinValue).ToString("ddd", CultureInfo.GetCultureInfo("zh-CN"));
+                ? Loc.T("ScreenToday")
+                : day.Date.ToDateTime(TimeOnly.MinValue).ToString("ddd", Loc.Culture);
             var content = new Rect(row.Left + 11, row.Top + 6, row.Width - 22, row.Height - 12);
             var textWidth = content.Width - 42;
             canvas.AlignedText(dayLabel, 10.5,
@@ -62,7 +62,7 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
                 canvas.AccentColor);
         }
 
-        var updateText = weather.IsStale ? "上次天气数据" : $"更新 {weather.UpdatedAt:HH:mm}";
+        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", weather.UpdatedAt.ToString("HH:mm"));
         canvas.AlignedText(updateText, 9, secondary,
             new Rect(safe.Left, safe.Bottom - 18, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

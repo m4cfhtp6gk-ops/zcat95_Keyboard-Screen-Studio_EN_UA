@@ -50,7 +50,7 @@ public sealed class WindowsDesktopServices : IWindowsDesktopServices
             if (enabled)
             {
                 string executable = Environment.ProcessPath
-                    ?? throw new InvalidOperationException("无法确定程序路径。");
+                    ?? throw new InvalidOperationException(Loc.T("ErrorCannotResolveAppPath"));
                 key.SetValue(StartupValueName, $"\"{executable}\" --startup");
             }
             else
@@ -115,7 +115,7 @@ public sealed class WindowsDesktopServices : IWindowsDesktopServices
             string displayName = await _reverseGeocoder.ResolveCityAsync(
                 point.Latitude,
                 point.Longitude,
-                cancellationToken) ?? "当前位置";
+                cancellationToken) ?? Loc.T("WeatherCurrentLocation");
             _cachedLocation = new AutomaticWeatherLocation(
                 point.Latitude,
                 point.Longitude,

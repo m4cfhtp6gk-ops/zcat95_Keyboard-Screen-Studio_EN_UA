@@ -6,11 +6,11 @@ public sealed class SystemStatusTheme : IScreenTheme
 {
 	public string Id => "system";
 
-	public string DisplayName => "电脑状态";
+	public string DisplayName => Loc.T("ThemeSystemName");
 
-	public string Description => "CPU、内存与网络状态";
+	public string Description => Loc.T("ThemeSystemDescription");
 
-	public string Details => "双卡片展示 CPU 和内存占用，并在底部显示实时上下行速度。";
+	public string Details => Loc.T("ThemeSystemDetails");
 
 	public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
 	{
@@ -22,23 +22,23 @@ public sealed class SystemStatusTheme : IScreenTheme
 		Color accent = canvas.AccentColor;
 		canvas.Fill(background);
 
-		ThemeHeader.Draw(canvas, snapshot, "电脑状态");
+		ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitleSystem"));
 
 		DrawMetric(canvas, new Rect(safe.Left, safe.Top + 40, safe.Width, 112),
-			"处理器占用", "CPU", snapshot.CpuPercent, accent, panel, border, muted);
+			Loc.T("ScreenLabelCpuUsage"), Loc.T("ScreenLabelCpu"), snapshot.CpuPercent, accent, panel, border, muted);
 		DrawMetric(canvas, new Rect(safe.Left, safe.Top + 164, safe.Width, 112),
-			"内存占用", "MEM", snapshot.MemoryPercent, accent, panel, border, muted);
+			Loc.T("ScreenLabelMemoryUsage"), Loc.T("ScreenLabelMemoryShort"), snapshot.MemoryPercent, accent, panel, border, muted);
 
 		var network = new Rect(safe.Left, safe.Bottom - 59, safe.Width, 51);
 		canvas.RoundedRect(network, 10, Color.FromRgb(17, 22, 28), Color.FromRgb(29, 36, 44));
 		double half = network.Width / 2;
-		canvas.CenteredText("下载", 9, muted,
+		canvas.CenteredText(Loc.T("ScreenLabelDownload"), 9, muted,
 			new Rect(network.Left, network.Top + 5, half, 15), FontWeights.SemiBold);
 		canvas.CenteredText($"{snapshot.DownloadMbps:0.0}M", 14, Colors.White,
 			new Rect(network.Left, network.Top + 22, half, 23), FontWeights.SemiBold);
 		canvas.Line(new Point(network.Left + half, network.Top + 9),
 			new Point(network.Left + half, network.Bottom - 9), Color.FromRgb(43, 51, 61));
-		canvas.CenteredText("上传", 9, muted,
+		canvas.CenteredText(Loc.T("ScreenLabelUpload"), 9, muted,
 			new Rect(network.Left + half, network.Top + 5, half, 15), FontWeights.SemiBold);
 		canvas.CenteredText($"{snapshot.UploadMbps:0.0}M", 14, Colors.White,
 			new Rect(network.Left + half, network.Top + 22, half, 23), FontWeights.SemiBold);

@@ -28,22 +28,22 @@ public static class BuiltInThemes
 		return new IScreenTheme[]
 		{
 			new SystemStatusTheme(),
-			Make("dashboard", "状态概览", "四项系统指标集中展示", "紧凑展示 CPU、内存、下载和上传速度。", Dashboard),
-			Make("performance", "性能条带", "纵向性能条与实时负载", "使用高对比度纵向进度条快速查看 CPU 与内存压力。", Performance),
-			Make("network", "网络监控", "突出显示实时上下行速度", "以大号数字展示下载和上传速度，并保留 CPU 与内存摘要。", Network),
-			Make("system-minimal", "状态极简", "仅保留关键系统信息", "无卡片极简排版，适合低干扰桌面。", MinimalSystem),
+			Make("dashboard", Loc.T("ThemeDashboardName"), Loc.T("ThemeDashboardDescription"), Loc.T("ThemeDashboardDetails"), Dashboard),
+			Make("performance", Loc.T("ThemePerformanceName"), Loc.T("ThemePerformanceDescription"), Loc.T("ThemePerformanceDetails"), Performance),
+			Make("network", Loc.T("ThemeNetworkName"), Loc.T("ThemeNetworkDescription"), Loc.T("ThemeNetworkDetails"), Network),
+			Make("system-minimal", Loc.T("ThemeSystemMinimalName"), Loc.T("ThemeSystemMinimalDescription"), Loc.T("ThemeSystemMinimalDetails"), MinimalSystem),
 			new PerformanceVisualTheme(),
 			new ClockTheme(),
-			Make("clock-neon", "霓虹时钟", "强调色大号数字时钟", "高对比度霓虹风格时间、秒钟和日期。", NeonClock),
-			Make("clock-flip", "翻页时钟", "小时与分钟分栏显示", "模拟翻页钟的双卡片布局，并显示秒钟与星期。", FlipClock),
+			Make("clock-neon", Loc.T("ThemeClockNeonName"), Loc.T("ThemeClockNeonDescription"), Loc.T("ThemeClockNeonDetails"), NeonClock),
+			Make("clock-flip", Loc.T("ThemeClockFlipName"), Loc.T("ThemeClockFlipDescription"), Loc.T("ThemeClockFlipDetails"), FlipClock),
 			new FiveDayWeatherTheme(),
 			new DotMatrixClockTheme(),
 			new DotMatrixWeatherClockTheme(),
 			new DotMatrixAnalogClockTheme(),
 			new DotMatrixProgressTheme(),
 			new MusicTheme(),
-			Make("music-minimal", "音乐极简", "无封面的纯文字音乐页", "使用大号曲名、歌手和播放进度，适合封面质量不稳定时。", MusicMinimal),
-			Make("music-poster", "音乐海报", "全屏封面音乐页", "全屏封面、曲名、歌手、进度与两端时间。", MusicPoster),
+			Make("music-minimal", Loc.T("ThemeMusicMinimalName"), Loc.T("ThemeMusicMinimalDescription"), Loc.T("ThemeMusicMinimalDetails"), MusicMinimal),
+			Make("music-poster", Loc.T("ThemeMusicPosterName"), Loc.T("ThemeMusicPosterDescription"), Loc.T("ThemeMusicPosterDetails"), MusicPoster),
 			new AiQuotaTheme(),
 			new StockTheme(),
 			imageTheme
@@ -60,7 +60,7 @@ public static class BuiltInThemes
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(8, 11, 15));
 
-		ThemeHeader.Draw(c, s, "状态概览");
+		ThemeHeader.Draw(c, s, Loc.T("ScreenTitleDashboard"));
 
 		double gap = 8;
 		double tileWidth = (safe.Width - gap) / 2;
@@ -69,13 +69,13 @@ public static class BuiltInThemes
 		double secondRow = safe.Top + 190;
 
 		DashboardTile(c, new Rect(safe.Left, firstRow, tileWidth, tileHeight),
-			"CPU", $"{s.CpuPercent:0}%", "占用率", s.CpuPercent);
+			Loc.T("ScreenLabelCpu"), $"{s.CpuPercent:0}%", Loc.T("ScreenLabelUsage"), s.CpuPercent);
 		DashboardTile(c, new Rect(safe.Left + tileWidth + gap, firstRow, tileWidth, tileHeight),
-			"内存", $"{s.MemoryPercent:0}%", "占用率", s.MemoryPercent);
+			Loc.T("ScreenLabelMemory"), $"{s.MemoryPercent:0}%", Loc.T("ScreenLabelUsage"), s.MemoryPercent);
 		DashboardTile(c, new Rect(safe.Left, secondRow, tileWidth, tileHeight),
-			"下载", $"{s.DownloadMbps:0.0}", "Mbps", Math.Min(100.0, s.DownloadMbps * 4.0));
+			Loc.T("ScreenLabelDownload"), $"{s.DownloadMbps:0.0}", "Mbps", Math.Min(100.0, s.DownloadMbps * 4.0));
 		DashboardTile(c, new Rect(safe.Left + tileWidth + gap, secondRow, tileWidth, tileHeight),
-			"上传", $"{s.UploadMbps:0.0}", "Mbps", Math.Min(100.0, s.UploadMbps * 8.0));
+			Loc.T("ScreenLabelUpload"), $"{s.UploadMbps:0.0}", "Mbps", Math.Min(100.0, s.UploadMbps * 8.0));
 	}
 
 	private static void DashboardTile(ScreenCanvas c, Rect card, string label, string value, string unit, double percent)
@@ -96,25 +96,25 @@ public static class BuiltInThemes
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(6, 9, 13));
 
-		ThemeHeader.Draw(c, s, "性能条带");
+		ThemeHeader.Draw(c, s, Loc.T("ScreenTitlePerformance"));
 
 		double gap = 8;
 		double columnWidth = (safe.Width - gap) / 2;
 		PerformanceVerticalCard(c, new Rect(safe.Left, safe.Top + 40, columnWidth, 248),
-			"CPU", s.CpuPercent);
+			Loc.T("ScreenLabelCpu"), s.CpuPercent);
 		PerformanceVerticalCard(c, new Rect(safe.Left + columnWidth + gap, safe.Top + 40, columnWidth, 248),
-			"内存", s.MemoryPercent);
+			Loc.T("ScreenLabelMemory"), s.MemoryPercent);
 
 		var network = new Rect(safe.Left, safe.Bottom - 59, safe.Width, 51);
 		c.RoundedRect(network, 10, Color.FromRgb(17, 22, 28), Color.FromRgb(29, 36, 44));
 		double half = network.Width / 2;
-		c.CenteredText("下载", 9, Color.FromRgb(148, 160, 173),
+		c.CenteredText(Loc.T("ScreenLabelDownload"), 9, Color.FromRgb(148, 160, 173),
 			new Rect(network.Left, network.Top + 5, half, 15), FontWeights.SemiBold);
 		c.CenteredText($"{s.DownloadMbps:0.0}M", 14, Colors.White,
 			new Rect(network.Left, network.Top + 22, half, 23), FontWeights.SemiBold);
 		c.Line(new Point(network.Left + half, network.Top + 9),
 			new Point(network.Left + half, network.Bottom - 9), Color.FromRgb(43, 51, 61));
-		c.CenteredText("上传", 9, Color.FromRgb(148, 160, 173),
+		c.CenteredText(Loc.T("ScreenLabelUpload"), 9, Color.FromRgb(148, 160, 173),
 			new Rect(network.Left + half, network.Top + 5, half, 15), FontWeights.SemiBold);
 		c.CenteredText($"{s.UploadMbps:0.0}M", 14, Colors.White,
 			new Rect(network.Left + half, network.Top + 22, half, 23), FontWeights.SemiBold);
@@ -143,23 +143,23 @@ public static class BuiltInThemes
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(7, 10, 14));
 
-		ThemeHeader.Draw(c, s, "网络监控");
+		ThemeHeader.Draw(c, s, Loc.T("ScreenTitleNetwork"));
 
 		NetworkMetricCard(c, new Rect(safe.Left, safe.Top + 40, safe.Width, 118),
-			"下载速度", s.DownloadMbps);
+			Loc.T("ScreenLabelDownloadLong"), s.DownloadMbps);
 		NetworkMetricCard(c, new Rect(safe.Left, safe.Top + 169, safe.Width, 118),
-			"上传速度", s.UploadMbps);
+			Loc.T("ScreenLabelUploadLong"), s.UploadMbps);
 
 		var summary = new Rect(safe.Left, safe.Bottom - 59, safe.Width, 51);
 		c.RoundedRect(summary, 10, Color.FromRgb(17, 22, 28), Color.FromRgb(29, 36, 44));
 		double half = summary.Width / 2;
-		c.CenteredText("CPU", 10, Color.FromRgb(148, 160, 173),
+		c.CenteredText(Loc.T("ScreenLabelCpu"), 10, Color.FromRgb(148, 160, 173),
 			new Rect(summary.Left, summary.Top + 5, half, 15), FontWeights.SemiBold);
 		c.CenteredText($"{s.CpuPercent:0}%", 15, Colors.White,
 			new Rect(summary.Left, summary.Top + 23, half, 22), FontWeights.SemiBold);
 		c.Line(new Point(summary.Left + half, summary.Top + 9),
 			new Point(summary.Left + half, summary.Bottom - 9), Color.FromRgb(43, 51, 61));
-		c.CenteredText("内存", 10, Color.FromRgb(148, 160, 173),
+		c.CenteredText(Loc.T("ScreenLabelMemory"), 10, Color.FromRgb(148, 160, 173),
 			new Rect(summary.Left + half, summary.Top + 5, half, 15), FontWeights.SemiBold);
 		c.CenteredText($"{s.MemoryPercent:0}%", 15, Colors.White,
 			new Rect(summary.Left + half, summary.Top + 23, half, 22), FontWeights.SemiBold);
@@ -183,17 +183,17 @@ public static class BuiltInThemes
 		c.Text(s.Timestamp.ToString("HH:mm"), 19, c.AccentColor,
 			new Point(safe.Left, safe.Top + 4), FontWeights.SemiBold);
 
-		MinimalMetric(c, safe, safe.Top + 76, "处理器", s.CpuPercent);
-		MinimalMetric(c, safe, safe.Top + 194, "内存", s.MemoryPercent);
+		MinimalMetric(c, safe, safe.Top + 76, Loc.T("ScreenLabelProcessor"), s.CpuPercent);
+		MinimalMetric(c, safe, safe.Top + 194, Loc.T("ScreenLabelMemory"), s.MemoryPercent);
 
 		c.Line(new Point(safe.Left, safe.Bottom - 69),
 			new Point(safe.Right, safe.Bottom - 69), Color.FromRgb(27, 33, 40));
-		c.Text("下载", 11, Color.FromRgb(154, 166, 179),
+		c.Text(Loc.T("ScreenLabelDownload"), 11, Color.FromRgb(154, 166, 179),
 			new Point(safe.Left, safe.Bottom - 51), FontWeights.SemiBold);
 		c.Text($"{s.DownloadMbps:0.0} Mbps", 11, Colors.White,
 			new Point(safe.Left, safe.Bottom - 51), FontWeights.SemiBold,
 			TextAlignment.Right, safe.Width);
-		c.Text("上传", 11, Color.FromRgb(154, 166, 179),
+		c.Text(Loc.T("ScreenLabelUpload"), 11, Color.FromRgb(154, 166, 179),
 			new Point(safe.Left, safe.Bottom - 27), FontWeights.SemiBold);
 		c.Text($"{s.UploadMbps:0.0} Mbps", 11, Colors.White,
 			new Point(safe.Left, safe.Bottom - 27), FontWeights.SemiBold,
@@ -215,7 +215,7 @@ public static class BuiltInThemes
 		Color accent = c.AccentColor;
 		c.Gradient(Color.FromRgb(4, 6, 11), Darken(accent, 0.82), new Point(0, 0), new Point(1, 1));
 
-		ThemeHeader.Draw(c, s, "霓虹时钟", showTime: false);
+		ThemeHeader.Draw(c, s, Loc.T("ScreenTitleNeonClock"), showTime: false);
 
 		c.AlignedText(s.Timestamp.ToString("HH:mm"), 39, Colors.White,
 			new Rect(safe.Left, safe.Top + 72, safe.Width, 56), FontWeights.SemiBold, TextAlignment.Left);
@@ -227,40 +227,40 @@ public static class BuiltInThemes
 			Color.FromRgb(28, 34, 42), accent);
 
 		double dateTop = safe.Top + 238;
-		c.AlignedText(s.Timestamp.ToString("dddd"), 16, accent,
+		c.AlignedText(Loc.DayName(s.Timestamp), 16, accent,
 			new Rect(safe.Left, dateTop + 14, safe.Width, 27), FontWeights.SemiBold, TextAlignment.Left);
-		c.AlignedText(ChineseDate(s.Timestamp), 15, Colors.White,
+		c.AlignedText(Loc.LongDate(s.Timestamp), 15, Colors.White,
 			new Rect(safe.Left, dateTop + 50, safe.Width, 27), FontWeights.Medium, TextAlignment.Left);
 	}
 	private static void FlipClock(ScreenCanvas c, SystemSnapshot s)
 	{
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(8, 10, 13));
-		ThemeHeader.Draw(c, s, "翻页时钟", showTime: false);
+		ThemeHeader.Draw(c, s, Loc.T("ScreenTitleFlipClock"), showTime: false);
 
 		double gap = 6;
 		double width = (safe.Width - gap) / 2;
 		double cardTop = safe.Top + 68;
-		c.CenteredText("小时", 10, Color.FromRgb(138, 150, 164),
+		c.CenteredText(Loc.T("ScreenLabelHours"), 10, Color.FromRgb(138, 150, 164),
 			new Rect(safe.Left, safe.Top + 134, width, 17), FontWeights.SemiBold);
-		c.CenteredText("分钟", 10, Color.FromRgb(138, 150, 164),
+		c.CenteredText(Loc.T("ScreenLabelMinutes"), 10, Color.FromRgb(138, 150, 164),
 			new Rect(safe.Left + width + gap, safe.Top + 134, width, 17), FontWeights.SemiBold);
 		FlipTile(c, new Rect(safe.Left, cardTop, width, width), s.Timestamp.ToString("HH"));
 		FlipTile(c, new Rect(safe.Left + width + gap, cardTop, width, width), s.Timestamp.ToString("mm"));
 
 		var seconds = new Rect(safe.Left, safe.Top + 169, safe.Width, 44);
 		c.RoundedRect(seconds, 10, Color.FromRgb(16, 20, 26), Color.FromRgb(31, 38, 47));
-		c.AlignedText("秒钟", 11, Color.FromRgb(157, 169, 182),
+		c.AlignedText(Loc.T("ScreenLabelSeconds"), 11, Color.FromRgb(157, 169, 182),
 			new Rect(seconds.Left + 12, seconds.Top, seconds.Width - 24, seconds.Height),
 			FontWeights.SemiBold, TextAlignment.Left);
 		c.AlignedText(s.Timestamp.ToString("ss"), 21, c.AccentColor,
 			new Rect(seconds.Left + 12, seconds.Top, seconds.Width - 24, seconds.Height),
 			FontWeights.SemiBold, TextAlignment.Right);
 
-		c.AlignedText(s.Timestamp.ToString("dddd"), 14, c.AccentColor,
+		c.AlignedText(Loc.DayName(s.Timestamp), 14, c.AccentColor,
 			new Rect(safe.Left, safe.Top + 269, safe.Width, 24),
 			FontWeights.SemiBold, TextAlignment.Left);
-		c.AlignedText(ChineseDate(s.Timestamp), 15, Colors.White,
+		c.AlignedText(Loc.LongDate(s.Timestamp), 15, Colors.White,
 			new Rect(safe.Left, safe.Top + 300, safe.Width, 25),
 			FontWeights.Medium, TextAlignment.Left);
 	}
@@ -286,7 +286,7 @@ public static class BuiltInThemes
 		ThemeHeader.Draw(
 			c,
 			s,
-			musicPlaying ? "正在播放" : musicPaused ? "已暂停" : "未在播放",
+			Loc.T(musicPlaying ? "ScreenMusicPlaying" : musicPaused ? "ScreenMusicPaused" : "ScreenMusicStopped"),
 			musicPlaying || musicPaused ? c.AccentColor : Color.FromRgb(126, 139, 153));
 		c.Text(musicSnapshot.Title, 22.0, Colors.White, new Point(safeBounds.Left, safeBounds.Top + 73.0), FontWeights.SemiBold, TextAlignment.Left, safeBounds.Width, 92.0);
 		if (musicPlaying && !string.IsNullOrWhiteSpace(musicSnapshot.Artist))
@@ -332,8 +332,6 @@ public static class BuiltInThemes
 		}
 	}
 
-		private static string ChineseDate(DateTimeOffset value) =>
-		$"{value.Year}年{value.Month}月{value.Day}日";
 	private static Color Darken(Color c, double n)
 	{
 		return Color.FromRgb((byte)((double)(int)c.R * (1.0 - n)), (byte)((double)(int)c.G * (1.0 - n)), (byte)((double)(int)c.B * (1.0 - n)));
