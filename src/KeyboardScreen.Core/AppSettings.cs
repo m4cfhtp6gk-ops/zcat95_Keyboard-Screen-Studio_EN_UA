@@ -84,6 +84,8 @@ public sealed class AppSettings
 
 	public TelegramSettings Telegram { get; set; } = new();
 
+	public NotificationSettings Notifications { get; set; } = new();
+
 
 
 
