@@ -81,6 +81,7 @@
         <TrayIcon.Menu>
           <NativeMenu>
             <NativeMenuItem Header="{infra:Localize TrayShowWindow}" Command="{Binding ShowWindowCommand}" />
+            <NativeMenuItem Header="{infra:Localize TrayPomodoroToggle}" Command="{Binding TogglePomodoroCommand}" />
             <NativeMenuItemSeparator />
             <NativeMenuItem Header="{infra:Localize TrayExit}" Command="{Binding ExitCommand}" />
           </NativeMenu>

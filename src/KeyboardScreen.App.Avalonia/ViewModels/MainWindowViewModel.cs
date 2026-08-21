@@ -24,6 +24,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly BinanceStockSnapshotSource _binanceStockSource = new();
     private readonly TokscaleDataSource _tokscaleSource = new();
     private readonly ClaudeUsageSnapshotSource _claudeUsageSource = new();
+    private readonly CurrencySnapshotSource _currencySource = new();
+    private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -121,6 +123,18 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
     private bool _claudeCountLocalTokens = true;
     private ClaudeUsageSnapshot? _claudeUsage;
+    private string _currencyBase = "USD";
+    private string _currencyQuotes = "EUR, UAH, PLN";
+    private CurrencySnapshot? _currencySnapshot;
+    private string _cryptoSymbol1 = "BTCUSDT";
+    private string _cryptoSymbol2 = "ETHUSDT";
+    private string _cryptoSymbol3 = string.Empty;
+    private string _cryptoSymbol4 = string.Empty;
+    private bool _cryptoRedForGain;
+    private CryptoSnapshot? _cryptoSnapshot;
+    private int _pomodoroFocusMinutes = 25;
+    private int _pomodoroBreakMinutes = 5;
+    private int _pomodoroTargetCycles = 4;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -147,6 +161,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
         OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
+        StartPomodoroCommand = new RelayCommand(StartPomodoro);
+        StopPomodoroCommand = new RelayCommand(StopPomodoro);
+        _pomodoroTimer.Changed += OnPomodoroChanged;
         CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
         OpenLatestReleaseCommand = new RelayCommand(() =>
         {
@@ -176,6 +193,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenTokscaleDocsCommand { get; }
     public ICommand OpenClaudeSiteCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
+    public ICommand StartPomodoroCommand { get; }
+    public ICommand StopPomodoroCommand { get; }
     public ICommand CheckForUpdatesCommand { get; }
     public ICommand OpenLatestReleaseCommand { get; }
 
@@ -1210,6 +1229,117 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         get => _claudeCountLocalTokens;
         set { if (SetProperty(ref _claudeCountLocalTokens, value)) ScheduleCommit(); }
     }
+
+    public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
+    public bool IsCryptoTheme => SelectedTheme?.Id == "crypto";
+    public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
+
+    public string CurrencyBase
+    {
+        get => _currencyBase;
+        set { if (SetProperty(ref _currencyBase, value)) ScheduleCommit(); }
+    }
+
+    public string CurrencyQuotes
+    {
+        get => _currencyQuotes;
+        set { if (SetProperty(ref _currencyQuotes, value)) ScheduleCommit(); }
+    }
+
+    public string CryptoSymbol1
+    {
+        get => _cryptoSymbol1;
+        set { if (SetProperty(ref _cryptoSymbol1, value)) ScheduleCommit(); }
+    }
+
+    public string CryptoSymbol2
+    {
+        get => _cryptoSymbol2;
+        set { if (SetProperty(ref _cryptoSymbol2, value)) ScheduleCommit(); }
+    }
+
+    public string CryptoSymbol3
+    {
+        get => _cryptoSymbol3;
+        set { if (SetProperty(ref _cryptoSymbol3, value)) ScheduleCommit(); }
+    }
+
+    public string CryptoSymbol4
+    {
+        get => _cryptoSymbol4;
+        set { if (SetProperty(ref _cryptoSymbol4, value)) ScheduleCommit(); }
+    }
+
+    public bool CryptoRedForGain
+    {
+        get => _cryptoRedForGain;
+        set
+        {
+            if (SetProperty(ref _cryptoRedForGain, value))
+            {
+                OnPropertyChanged(nameof(CryptoColorPreference));
+                ScheduleCommit();
+            }
+        }
+    }
+
+    /// <summary>Display-text picker over the stored bool, like <see cref="StockColorPreference"/>.</summary>
+    public string CryptoColorPreference
+    {
+        get => StockColorPreferences[_cryptoRedForGain ? 0 : 1];
+        set => CryptoRedForGain = string.Equals(value, StockColorPreferences[0], StringComparison.Ordinal);
+    }
+
+    public int PomodoroFocusMinutes
+    {
+        get => _pomodoroFocusMinutes;
+        set { if (SetProperty(ref _pomodoroFocusMinutes, Math.Clamp(value, 1, 180))) ScheduleCommit(); }
+    }
+
+    public int PomodoroBreakMinutes
+    {
+        get => _pomodoroBreakMinutes;
+        set { if (SetProperty(ref _pomodoroBreakMinutes, Math.Clamp(value, 1, 60))) ScheduleCommit(); }
+    }
+
+    public int PomodoroTargetCycles
+    {
+        get => _pomodoroTargetCycles;
+        set { if (SetProperty(ref _pomodoroTargetCycles, Math.Clamp(value, 1, 12))) ScheduleCommit(); }
+    }
+
+    public bool IsPomodoroRunning => _pomodoroTimer.IsRunning;
+
+    public void TogglePomodoro()
+    {
+        if (_pomodoroTimer.IsRunning)
+        {
+            StopPomodoro();
+        }
+        else
+        {
+            StartPomodoro();
+        }
+    }
+
+    private void StartPomodoro() => _pomodoroTimer.Start(new PomodoroSettings
+    {
+        FocusMinutes = PomodoroFocusMinutes,
+        BreakMinutes = PomodoroBreakMinutes,
+        TargetCycles = PomodoroTargetCycles
+    });
+
+    private void StopPomodoro() => _pomodoroTimer.Stop();
+
+    private void OnPomodoroChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            OnPropertyChanged(nameof(IsPomodoroRunning));
+            if (!_loading && !_disposed)
+            {
+                _ = RefreshAndPushAsync(AutoPush, forcePush: true);
+            }
+        });
     public bool IsMusicTheme => SelectedTheme is not null &&
         MediaThemeAutomation.IsMusicThemeId(SelectedTheme.Id);
     public bool IsSystemTheme => SelectedTheme?.Id is
@@ -1247,7 +1377,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         _settings = await _settingsStore.LoadAsync();
         _imageTheme.ImagePath = _settings.ImagePath;
-        _themes = BuiltInThemes.Create(_imageTheme);
+        _themes = BuiltInThemes.Create(_imageTheme, _pomodoroTimer);
         _perfVisualTheme = (PerformanceVisualTheme?)_themes.FirstOrDefault(theme => theme.Id == "performance-visual");
         BuildThemeGroups();
         ReloadFonts();
@@ -1327,6 +1457,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _tencentStockSource.Dispose();
         _binanceStockSource.Dispose();
         _claudeUsageSource.Dispose();
+        _currencySource.Dispose();
+        _pomodoroTimer.Changed -= OnPomodoroChanged;
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -1394,8 +1526,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
-        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -1461,6 +1593,22 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             ? ClaudeUsageSettings.DefaultModelScope
             : _settings.ClaudeUsage.ModelScope;
         ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
+        _settings.Currency ??= new CurrencySettings();
+        CurrencyBase = string.IsNullOrWhiteSpace(_settings.Currency.BaseCurrency)
+            ? "USD"
+            : _settings.Currency.BaseCurrency;
+        CurrencyQuotes = string.Join(", ", _settings.Currency.QuoteCurrencies ?? []);
+        _settings.Crypto ??= new CryptoSettings();
+        IReadOnlyList<StockItemSettings> cryptoItems = NormalizeCryptoItems(_settings.Crypto);
+        CryptoSymbol1 = cryptoItems[0].Symbol;
+        CryptoSymbol2 = cryptoItems[1].Symbol;
+        CryptoSymbol3 = cryptoItems[2].Symbol;
+        CryptoSymbol4 = cryptoItems[3].Symbol;
+        CryptoRedForGain = _settings.Crypto.RedForGain;
+        _settings.Pomodoro ??= new PomodoroSettings();
+        PomodoroFocusMinutes = _settings.Pomodoro.FocusMinutes;
+        PomodoroBreakMinutes = _settings.Pomodoro.BreakMinutes;
+        PomodoroTargetCycles = _settings.Pomodoro.TargetCycles;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1531,6 +1679,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsStockTheme));
         OnPropertyChanged(nameof(IsAiTheme));
         OnPropertyChanged(nameof(IsClaudeTheme));
+        OnPropertyChanged(nameof(IsCurrencyTheme));
+        OnPropertyChanged(nameof(IsCryptoTheme));
+        OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -1678,6 +1829,28 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 new StockItemSettings { Enabled = StockEnabled5, Symbol = StockSymbol5.Trim(), Alias = StockAlias5.Trim() }
             ]
         };
+        _settings.Currency = new CurrencySettings
+        {
+            BaseCurrency = string.IsNullOrWhiteSpace(CurrencyBase) ? "USD" : CurrencyBase.Trim().ToUpperInvariant(),
+            QuoteCurrencies = SplitCurrencyCodes(CurrencyQuotes)
+        };
+        _settings.Crypto = new CryptoSettings
+        {
+            RedForGain = CryptoRedForGain,
+            Items =
+            [
+                new StockItemSettings { Symbol = CryptoSymbol1.Trim() },
+                new StockItemSettings { Symbol = CryptoSymbol2.Trim() },
+                new StockItemSettings { Symbol = CryptoSymbol3.Trim() },
+                new StockItemSettings { Symbol = CryptoSymbol4.Trim() }
+            ]
+        };
+        _settings.Pomodoro = new PomodoroSettings
+        {
+            FocusMinutes = PomodoroFocusMinutes,
+            BreakMinutes = PomodoroBreakMinutes,
+            TargetCycles = PomodoroTargetCycles
+        };
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -1772,6 +1945,24 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _claudeUsage = claudeUsage;
             }
 
+            CurrencySnapshot? currency = null;
+            if (requestedTheme.Id == "currency" || theme.Id == "currency")
+            {
+                currency = await _currencySource.ReadAsync(
+                    _settings.Currency ?? new CurrencySettings(),
+                    cancellationToken);
+                _currencySnapshot = currency;
+            }
+
+            CryptoSnapshot? crypto = null;
+            if (requestedTheme.Id == "crypto" || theme.Id == "crypto")
+            {
+                crypto = await _binanceStockSource.ReadCryptoAsync(
+                    _settings.Crypto ?? new CryptoSettings(),
+                    cancellationToken);
+                _cryptoSnapshot = crypto;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -1795,7 +1986,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Weather = weather,
                 Stocks = stocks,
                 AiQuota = aiQuota,
-                ClaudeUsage = claudeUsage
+                ClaudeUsage = claudeUsage,
+                Currency = currency,
+                Crypto = crypto
             };
             _latestFrame = _renderer.Render(
                 theme,
@@ -1948,6 +2141,22 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         return items;
     }
 
+    private static IReadOnlyList<StockItemSettings> NormalizeCryptoItems(CryptoSettings settings)
+    {
+        var items = (settings.Items ?? []).Take(4).ToList();
+        while (items.Count < 4)
+        {
+            items.Add(new StockItemSettings { Symbol = string.Empty });
+        }
+        return items;
+    }
+
+    private static List<string> SplitCurrencyCodes(string value) =>
+        value.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(code => code.ToUpperInvariant())
+            .Distinct()
+            .ToList();
+
     private ScreenInsets ReadSafeArea()
     {
         int left = ReadClamped(SafeLeft, 10, 0, 60);
@@ -2024,8 +2233,30 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "ai-quota" => aiQuota.Available
                 ? $"{aiQuota.PlatformName} · {aiQuota.PrimaryDisplay}"
                 : _tokscaleCatalog?.Message ?? Loc.T("SummaryNoTokscaleData"),
+            "currency" => _currencySnapshot is { Available: true, Rates.Count: > 0 } currencySnapshot
+                ? Loc.T("SummaryCurrency",
+                    currencySnapshot.Rates.Count,
+                    currencySnapshot.BaseCurrency,
+                    currencySnapshot.UpdatedAt.ToString("HH:mm"))
+                : _currencySnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureCurrency"),
+            "crypto" => _cryptoSnapshot is { Coins.Count: > 0 } cryptoSnapshot
+                ? Loc.T("SummaryCrypto", cryptoSnapshot.Coins.Count, cryptoSnapshot.UpdatedAt.ToString("HH:mm"))
+                : _cryptoSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureCrypto"),
+            "pomodoro" => BuildPomodoroSummary(),
             _ => Loc.T("SummaryLocalOnly")
         };
+
+    private string BuildPomodoroSummary()
+    {
+        PomodoroSnapshot state = _pomodoroTimer.Read();
+        string remaining = $"{(int)state.Remaining.TotalMinutes:00}:{state.Remaining.Seconds:00}";
+        return state.Phase switch
+        {
+            PomodoroPhase.Focus => Loc.T("SummaryPomodoroPhase", Loc.T("ScreenPomodoroFocus"), remaining),
+            PomodoroPhase.Break => Loc.T("SummaryPomodoroPhase", Loc.T("ScreenPomodoroBreak"), remaining),
+            _ => Loc.T("SummaryPomodoroIdle")
+        };
+    }
 
     private static string GetLoadingSummary(string themeId) =>
         themeId switch
@@ -2034,6 +2265,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "music" or "music-minimal" or "music-poster" => Loc.T("LoadingMusic"),
             "clock-weather-dot" or "weather-five-day" => Loc.T("LoadingWeather"),
             "stocks" => Loc.T("LoadingStocks"),
+            "currency" => Loc.T("LoadingCurrency"),
+            "crypto" => Loc.T("LoadingCrypto"),
             "ai-quota" => Loc.T("LoadingAiUsage"),
             "claude-usage" => Loc.T("LoadingClaude"),
             _ => Loc.T("LoadingTheme")

@@ -19,6 +19,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly WindowsMusicSnapshotSource _musicSource = new();
     private readonly OpenMeteoWeatherSnapshotSource _weatherSource = new();
     private readonly YahooStockSnapshotSource _stockSource = new();
+    private readonly BinanceStockSnapshotSource _binanceSource = new();
+    private readonly CurrencySnapshotSource _currencySource = new();
+    private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -587,7 +590,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         _settings = await _settingsStore.LoadAsync();
         _imageTheme.ImagePath = _settings.ImagePath;
-        _themes = BuiltInThemes.Create(_imageTheme);
+        _themes = BuiltInThemes.Create(_imageTheme, _pomodoroTimer);
         BuildThemeGroups();
         ReloadFonts();
         ApplySettings();
@@ -632,6 +635,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _transport.Dispose();
         _weatherSource.Dispose();
         _stockSource.Dispose();
+        _binanceSource.Dispose();
+        _currencySource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -700,8 +705,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "dashboard", "performance", "network", "system-minimal"], byId);
-        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -974,12 +979,30 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            CurrencySnapshot? currency = null;
+            if (theme.Id == "currency")
+            {
+                currency = await _currencySource.ReadAsync(
+                    _settings.Currency ?? new CurrencySettings(),
+                    cancellationToken);
+            }
+
+            CryptoSnapshot? crypto = null;
+            if (theme.Id == "crypto")
+            {
+                crypto = await _binanceSource.ReadCryptoAsync(
+                    _settings.Crypto ?? new CryptoSettings(),
+                    cancellationToken);
+            }
+
             SystemSnapshot snapshot = system with
             {
                 Music = music,
                 Weather = weather,
                 Stocks = stocks,
-                AiQuota = AiQuotaSnapshot.Empty
+                AiQuota = AiQuotaSnapshot.Empty,
+                Currency = currency,
+                Crypto = crypto
             };
             _latestFrame = _renderer.Render(
                 theme,

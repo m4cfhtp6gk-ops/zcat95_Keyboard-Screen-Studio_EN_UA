@@ -580,6 +580,90 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsCurrencyTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CurrencyHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize CurrencyHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CurrencyBaseLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="3" Text="{Binding CurrencyBase, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CurrencyQuotesLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="64" Text="{Binding CurrencyQuotes, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CurrencyQuotesHint}" TextWrapping="Wrap" />
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsCryptoTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CryptoHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize CryptoHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="24,180">
+                          <TextBlock Grid.Column="1" Classes="secondary" Text="{infra:Localize CryptoPairLabel}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,180">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
+                          <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="BTCUSDT" Text="{Binding CryptoSymbol1, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,180">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="2" />
+                          <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="ETHUSDT" Text="{Binding CryptoSymbol2, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,180">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="3" />
+                          <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="SOLUSDT" Text="{Binding CryptoSymbol3, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="24,180">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="4" />
+                          <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="TONUSDT" Text="{Binding CryptoSymbol4, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,220">
+                          <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize StocksColorLabel}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize StocksCacheNote}" />
+                          </StackPanel>
+                          <ComboBox
+                              Grid.Column="1"
+                              ItemsSource="{Binding StockColorPreferences}"
+                              SelectedItem="{Binding CryptoColorPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsPomodoroTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize PomodoroHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize PomodoroHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="170,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize PomodoroFocusLabel}" />
+                          <NumericUpDown Grid.Column="1" Classes="compact-value" Minimum="1" Maximum="180" Increment="5" FormatString="0" ShowButtonSpinner="False" Value="{Binding PomodoroFocusMinutes, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="170,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize PomodoroBreakLabel}" />
+                          <NumericUpDown Grid.Column="1" Classes="compact-value" Minimum="1" Maximum="60" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding PomodoroBreakMinutes, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="170,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize PomodoroCyclesLabel}" />
+                          <NumericUpDown Grid.Column="1" Classes="compact-value" Minimum="1" Maximum="12" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding PomodoroTargetCycles, Mode=TwoWay}" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Button Command="{Binding StartPomodoroCommand}" IsEnabled="{Binding !IsPomodoroRunning}" Content="{infra:Localize PomodoroStart}" />
+                          <Button Command="{Binding StopPomodoroCommand}" IsEnabled="{Binding IsPomodoroRunning}" Content="{infra:Localize PomodoroStop}" />
+                        </StackPanel>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsAiTheme}" Classes="card">
                       <StackPanel Spacing="16">
                         <Grid ColumnDefinitions="*,Auto,12,Auto">

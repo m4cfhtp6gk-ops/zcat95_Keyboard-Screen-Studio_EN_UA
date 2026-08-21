@@ -66,6 +66,12 @@ public sealed class AppSettings
 
 	public ClaudeUsageSettings ClaudeUsage { get; set; } = new();
 
+	public CurrencySettings Currency { get; set; } = new();
+
+	public CryptoSettings Crypto { get; set; } = new();
+
+	public PomodoroSettings Pomodoro { get; set; } = new();
+
 
 
 
