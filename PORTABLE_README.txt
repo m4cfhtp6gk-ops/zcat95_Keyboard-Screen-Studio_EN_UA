@@ -1,4 +1,4 @@
-Keyboard Screen Studio v1.0.2 portable build
+Keyboard Screen Studio v1.2.0 portable build
 
 1. Double-click KeyboardScreenStudio.exe to start. No .NET installation needed.
 2. The first run shows the connection guide. The program creates a Data folder

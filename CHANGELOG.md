@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.0 - 2026-08-21
 
 ### Added
 
@@ -26,6 +26,11 @@
 - The stock gain/loss colour and data-source preferences are stored as values
   rather than as their display text, so changing language cannot invalidate a
   saved choice.
+
+### Fixed
+
+- The dot-matrix analog clock's DOWN / UP row now shares the CPU / MEM column
+  grid instead of pushing UP to the right edge.
 
 ## v1.1.2 - 2026-08-10
 
