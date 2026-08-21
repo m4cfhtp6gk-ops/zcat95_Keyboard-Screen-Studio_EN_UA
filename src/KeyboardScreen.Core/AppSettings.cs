@@ -62,6 +62,8 @@ public sealed class AppSettings
 
 	public StockSettings Stocks { get; set; } = new();
 
+	public ClaudeUsageSettings ClaudeUsage { get; set; } = new();
+
 
 
 

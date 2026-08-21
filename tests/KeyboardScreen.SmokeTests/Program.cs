@@ -659,6 +659,105 @@ if (OperatingSystem.IsWindows())
     Console.WriteLine($"PASS system source CPU={snapshot.CpuPercent:0.0}% MEM={snapshot.MemoryPercent:0.0}%");
 }
 
+// ---- Claude usage --------------------------------------------------------
+// Legacy payload shape: the per-model weekly window is its own seven_day_* key.
+var claudeLegacy = new Queue<string>(new[]
+{
+    """[{"uuid":"org-123","name":"Personal","capabilities":["chat"]}]""",
+    """{"five_hour":{"utilization":42,"resets_at":"2026-08-21T21:59:59Z"},"seven_day":{"utilization":"73%","resets_at":"2026-08-25T16:59:59Z"},"seven_day_opus":{"utilization":5,"resets_at":null},"seven_day_fable":{"utilization":91.5,"resets_at":"2026-08-25T16:59:59Z"}}"""
+});
+var claudeHandler = new ClaudeHandler(claudeLegacy);
+using (var claudeClient = new HttpClient(claudeHandler))
+using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+       { BaseUrl = "https://claude.test/api" })
+{
+    var claudeSettings = new ClaudeUsageSettings { SessionKey = "sk-ant-test" };
+    var claudeSnapshot = await claudeSource.ReadAsync(claudeSettings);
+    Assert(claudeSnapshot.Available, "Claude usage snapshot must be available");
+    Assert(claudeSettings.OrganizationId == "org-123", "the organization id should be resolved and cached");
+    Assert(claudeHandler.Requests.Count == 2, "one organization lookup plus one usage read");
+    Assert(claudeHandler.Requests[1].Contains("/organizations/org-123/usage"), "usage must be read for the resolved org");
+    Assert(claudeHandler.Cookies.All(cookie => cookie.Contains("sessionKey=sk-ant-test")), "every request must carry the session cookie");
+    Assert(Math.Abs(claudeSnapshot.Session!.UtilizationPercent - 42) < 0.001, "session utilization was not parsed");
+    Assert(Math.Abs(claudeSnapshot.Week!.UtilizationPercent - 73) < 0.001, "a percent string like \"73%\" must parse");
+    Assert(Math.Abs(claudeSnapshot.ModelWeek!.UtilizationPercent - 91.5) < 0.001, "the legacy seven_day_fable window was not parsed");
+    Assert(claudeSnapshot.ModelWeek.ScopeName == "Fable", "the model window keeps its scope name");
+    Assert(claudeSnapshot.Session.ResetsAt is not null && claudeSnapshot.Week.ResetsAt is not null, "reset times were not parsed");
+    Assert(claudeSnapshot.Windows.Count() == 3, "all three windows should be present");
+
+    var cached = await claudeSource.ReadAsync(claudeSettings);
+    Assert(ReferenceEquals(claudeSnapshot, cached), "a second read inside the cache window must not call the API");
+    Assert(claudeHandler.Requests.Count == 2, "the cached read issued extra requests");
+}
+
+// Newer payload shape: seven_day_* per-model keys are nulled out and the real
+// figure arrives in limits[]. The array must win.
+var claudeModern = new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":10,"resets_at":"2026-08-21T21:59:59Z"},"seven_day":{"utilization":20,"resets_at":"2026-08-25T16:59:59Z"},"seven_day_fable":{"utilization":0,"resets_at":null},"limits":[{"kind":"weekly_scoped","percent":64,"resets_at":"2026-08-25T16:59:59Z","scope":{"model":{"id":null,"display_name":"Fable"}}},{"kind":"weekly_scoped","percent":3,"resets_at":null,"scope":{"model":{"id":"claude-opus-5","display_name":"Opus"}}}]}"""
+});
+using (var modernClient = new HttpClient(new ClaudeHandler(claudeModern)))
+using (var modernSource = new ClaudeUsageSnapshotSource(modernClient, new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+       { BaseUrl = "https://claude.test/api" })
+{
+    var modernSnapshot = await modernSource.ReadAsync(
+        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+    Assert(Math.Abs(modernSnapshot.ModelWeek!.UtilizationPercent - 64) < 0.001, "limits[] must override the nulled legacy key");
+    Assert(modernSnapshot.ModelWeek.ScopeName == "Fable", "the scoped window should be the requested model");
+}
+
+// An unconfigured source reports unavailable without touching the network.
+using (var idleSource = new ClaudeUsageSnapshotSource(new HttpClient(new ClaudeHandler(new Queue<string>()))))
+{
+    var idle = await idleSource.ReadAsync(new ClaudeUsageSettings());
+    Assert(!idle.Available, "a source with no session key must not be available");
+}
+
+// Local token counting: only records inside the window count, and the model
+// window only counts records from that model.
+var transcriptRoot = Path.Combine(Path.GetTempPath(), $"kss-claude-{Guid.NewGuid():N}", "projects", "demo");
+Directory.CreateDirectory(transcriptRoot);
+try
+{
+    var recent = DateTimeOffset.Now.AddMinutes(-30).ToString("o");
+    var midWeek = DateTimeOffset.Now.AddDays(-3).ToString("o");
+    var tooOld = DateTimeOffset.Now.AddDays(-30).ToString("o");
+    // Built by concatenation: the payload's own braces make an interpolated raw
+    // string literal ambiguous.
+    static string Record(string stamp, string model, string usage) =>
+        "{\"type\":\"assistant\",\"timestamp\":\"" + stamp + "\",\"message\":{\"model\":\"" + model
+        + "\",\"usage\":{" + usage + "}}}";
+
+    await File.WriteAllLinesAsync(Path.Combine(transcriptRoot, "session.jsonl"),
+    [
+        Record(recent, "claude-fable-5",
+            "\"input_tokens\":100,\"output_tokens\":50,\"cache_creation_input_tokens\":10,\"cache_read_input_tokens\":900000"),
+        Record(midWeek, "claude-opus-5",
+            "\"input_tokens\":200,\"output_tokens\":100,\"cache_creation_input_tokens\":0"),
+        Record(tooOld, "claude-fable-5", "\"input_tokens\":9999,\"output_tokens\":9999"),
+        """{"type":"user","message":{"content":"no usage block here"}}"""
+    ]);
+
+    var reader = new ClaudeCodeTokenReader(Path.Combine(transcriptRoot, ".."));
+    var totals = reader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), "fable");
+    Assert(totals.Available, "the reader should have found transcripts");
+    Assert(totals.Session == 160, $"the 5h window should count only the recent record, got {totals.Session}");
+    Assert(totals.Week == 460, $"the weekly window should skip the 30-day-old record, got {totals.Week}");
+    Assert(totals.ModelWeek == 160, $"the model window should count Fable only, got {totals.ModelWeek}");
+
+    var noScope = reader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), null);
+    Assert(noScope.ModelWeek == 0, "no model scope means no model total");
+}
+finally
+{
+    try { Directory.Delete(Path.GetDirectoryName(transcriptRoot)!, recursive: true); } catch (IOException) { }
+}
+
+var missingReader = new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), $"kss-absent-{Guid.NewGuid():N}"));
+Assert(!missingReader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), "fable").Available,
+    "a missing transcripts directory must report nothing rather than throwing");
+Console.WriteLine("PASS Claude usage source, limits[] override, cache and local token counting");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");
@@ -801,6 +900,33 @@ static byte FindStartOfFrame(byte[] jpeg)
     }
 
     return 0;
+}
+
+/// Records what was asked for so the tests can assert on headers and paths.
+sealed class ClaudeHandler : HttpMessageHandler
+{
+    private readonly Queue<string> _responses;
+    public List<string> Requests { get; } = [];
+    public List<string> Cookies { get; } = [];
+
+    public ClaudeHandler(Queue<string> responses)
+    {
+        _responses = responses;
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Requests.Add(request.RequestUri?.ToString() ?? string.Empty);
+        Cookies.Add(request.Headers.TryGetValues("Cookie", out var values) ? string.Join("; ", values) : string.Empty);
+        if (_responses.Count == 0)
+        {
+            throw new InvalidOperationException("No mocked Claude response remains.");
+        }
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(_responses.Dequeue())
+        });
+    }
 }
 
 sealed class SequenceHandler : HttpMessageHandler
