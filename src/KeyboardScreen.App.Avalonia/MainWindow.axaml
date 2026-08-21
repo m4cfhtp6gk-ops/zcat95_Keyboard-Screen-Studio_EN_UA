@@ -978,6 +978,57 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize NotifyHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize NotifyHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifyEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize NotifyClaudeLabel}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyClaudeSub}" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsEnabled="{Binding NotifyEnabled}" IsChecked="{Binding NotifyClaude, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize NotifyOfflineLabel}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyOfflineSub}" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsEnabled="{Binding NotifyEnabled}" IsChecked="{Binding NotifyOffline, Mode=TwoWay}" />
+                        </Grid>
+                        <StackPanel Spacing="6">
+                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize NotifyPriceHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyPriceHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="140,10,*,10,*">
+                          <TextBlock Classes="secondary" Text="{infra:Localize NotifyPriceSymbol}" />
+                          <TextBlock Grid.Column="2" Classes="secondary" Text="{infra:Localize NotifyPriceAboveLabel}" />
+                          <TextBlock Grid.Column="4" Classes="secondary" Text="{infra:Localize NotifyPriceBelowLabel}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="140,10,*,10,*">
+                          <TextBox IsEnabled="{Binding NotifyEnabled}" MaxLength="20" PlaceholderText="BTCUSDT" Text="{Binding NotifySymbol1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="2" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyAbove1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="4" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyBelow1, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="140,10,*,10,*">
+                          <TextBox IsEnabled="{Binding NotifyEnabled}" MaxLength="20" PlaceholderText="ETHUSDT" Text="{Binding NotifySymbol2, Mode=TwoWay}" />
+                          <TextBox Grid.Column="2" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyAbove2, Mode=TwoWay}" />
+                          <TextBox Grid.Column="4" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyBelow2, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="140,10,*,10,*">
+                          <TextBox IsEnabled="{Binding NotifyEnabled}" MaxLength="20" PlaceholderText="TONUSDT" Text="{Binding NotifySymbol3, Mode=TwoWay}" />
+                          <TextBox Grid.Column="2" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyAbove3, Mode=TwoWay}" />
+                          <TextBox Grid.Column="4" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyBelow3, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyWindowsOnly}" />
+                      </StackPanel>
+                    </Border>
+
                     <Border Classes="card" Padding="16">
                       <Grid ColumnDefinitions="92,*">
                         <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize SafeAreaHeading}" />

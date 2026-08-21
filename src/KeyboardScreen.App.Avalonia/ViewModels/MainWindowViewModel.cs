@@ -163,6 +163,21 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _telegramPopupExtra;
     private DateTimeOffset _telegramPopupUntil;
     private CancellationTokenSource? _telegramPopupDelay;
+    private readonly NotificationEngine _notificationEngine = new();
+    private readonly WindowsToastNotifier _toastNotifier = new();
+    private DateTimeOffset _lastNotificationSweep = DateTimeOffset.MinValue;
+    private bool _notifyEnabled;
+    private bool _notifyClaude = true;
+    private bool _notifyOffline = true;
+    private string _notifySymbol1 = string.Empty;
+    private string _notifyAbove1 = string.Empty;
+    private string _notifyBelow1 = string.Empty;
+    private string _notifySymbol2 = string.Empty;
+    private string _notifyAbove2 = string.Empty;
+    private string _notifyBelow2 = string.Empty;
+    private string _notifySymbol3 = string.Empty;
+    private string _notifyAbove3 = string.Empty;
+    private string _notifyBelow3 = string.Empty;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -1670,6 +1685,114 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         await RefreshAndPushAsync(AutoPush, forcePush: true, cancellationToken: CancellationToken.None);
     }
 
+    public bool NotifyEnabled
+    {
+        get => _notifyEnabled;
+        set { if (SetProperty(ref _notifyEnabled, value)) ScheduleCommit(); }
+    }
+
+    public bool NotifyClaude
+    {
+        get => _notifyClaude;
+        set { if (SetProperty(ref _notifyClaude, value)) ScheduleCommit(); }
+    }
+
+    public bool NotifyOffline
+    {
+        get => _notifyOffline;
+        set { if (SetProperty(ref _notifyOffline, value)) ScheduleCommit(); }
+    }
+
+    public string NotifySymbol1 { get => _notifySymbol1; set { if (SetProperty(ref _notifySymbol1, value)) ScheduleCommit(); } }
+    public string NotifyAbove1 { get => _notifyAbove1; set { if (SetProperty(ref _notifyAbove1, value)) ScheduleCommit(); } }
+    public string NotifyBelow1 { get => _notifyBelow1; set { if (SetProperty(ref _notifyBelow1, value)) ScheduleCommit(); } }
+    public string NotifySymbol2 { get => _notifySymbol2; set { if (SetProperty(ref _notifySymbol2, value)) ScheduleCommit(); } }
+    public string NotifyAbove2 { get => _notifyAbove2; set { if (SetProperty(ref _notifyAbove2, value)) ScheduleCommit(); } }
+    public string NotifyBelow2 { get => _notifyBelow2; set { if (SetProperty(ref _notifyBelow2, value)) ScheduleCommit(); } }
+    public string NotifySymbol3 { get => _notifySymbol3; set { if (SetProperty(ref _notifySymbol3, value)) ScheduleCommit(); } }
+    public string NotifyAbove3 { get => _notifyAbove3; set { if (SetProperty(ref _notifyAbove3, value)) ScheduleCommit(); } }
+    public string NotifyBelow3 { get => _notifyBelow3; set { if (SetProperty(ref _notifyBelow3, value)) ScheduleCommit(); } }
+
+    private NotificationSettings BuildNotificationSettings() => new()
+    {
+        Enabled = NotifyEnabled,
+        ClaudeThresholds = NotifyClaude,
+        DeviceOffline = NotifyOffline,
+        PriceAlerts =
+        [
+            BuildPriceAlert(NotifySymbol1, NotifyAbove1, NotifyBelow1),
+            BuildPriceAlert(NotifySymbol2, NotifyAbove2, NotifyBelow2),
+            BuildPriceAlert(NotifySymbol3, NotifyAbove3, NotifyBelow3)
+        ]
+    };
+
+    private static PriceAlertSettings BuildPriceAlert(string symbol, string above, string below) => new()
+    {
+        Symbol = symbol.Trim(),
+        Above = ParseBound(above),
+        Below = ParseBound(below)
+    };
+
+    private static double? ParseBound(string value) =>
+        double.TryParse(value.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) && parsed > 0
+            ? parsed
+            : null;
+
+    private static string FormatBound(double? value) =>
+        value is { } bound ? bound.ToString(CultureInfo.InvariantCulture) : string.Empty;
+
+    /// <summary>
+    /// Runs at most twice a minute on the refresh tick; the sources behind it
+    /// hold their own caches, and the engine holds the cooldowns.
+    /// </summary>
+    private async Task SweepNotificationsAsync(CancellationToken cancellationToken)
+    {
+        NotificationSettings settings = _settings.Notifications ?? new NotificationSettings();
+        DateTimeOffset now = DateTimeOffset.Now;
+        if (!settings.Enabled || now - _lastNotificationSweep < TimeSpan.FromSeconds(30))
+        {
+            return;
+        }
+
+        _lastNotificationSweep = now;
+        try
+        {
+            ClaudeUsageSnapshot? claude = null;
+            if (settings.ClaudeThresholds && (_settings.ClaudeUsage?.IsConfigured ?? false))
+            {
+                claude = await _claudeUsageSource.ReadAsync(_settings.ClaudeUsage!, cancellationToken);
+                _claudeUsage = claude;
+            }
+
+            IReadOnlyDictionary<string, double>? prices = null;
+            if (settings.HasConfiguredAlerts)
+            {
+                CryptoSnapshot alertPrices = await _binanceStockSource.ReadCryptoAsync(
+                    new CryptoSettings
+                    {
+                        Items = settings.PriceAlerts
+                            .Where(alert => alert.IsConfigured)
+                            .Select(alert => new StockItemSettings { Symbol = alert.Symbol })
+                            .ToList()
+                    },
+                    cancellationToken);
+                prices = alertPrices.Coins.ToDictionary(coin => coin.Symbol, coin => coin.Price, StringComparer.Ordinal);
+            }
+
+            bool? pushFailed = PushDiagnostics.Latest is { } lastPush ? !lastPush.Success : null;
+            foreach (AppNotification notification in _notificationEngine.Evaluate(
+                settings, new NotificationInputs(claude, pushFailed, prices), now))
+            {
+                _toastNotifier.Show(notification.Title, notification.Message);
+            }
+        }
+        catch (Exception)
+        {
+            // A failed sweep tries again on the next tick; alerts must never
+            // break the render loop.
+        }
+    }
+
     private (string Title, string? Preview) FormatTelegramPopup(TelegramMessageEvent message)
     {
         int total = 1 + _telegramPopupExtra;
@@ -2003,6 +2126,24 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         TelegramPopupsEnabled = _settings.Telegram.PopupsEnabled;
         TelegramPrivacyMode = _settings.Telegram.PrivacyMode;
         TelegramPopupSeconds = _settings.Telegram.PopupSeconds;
+        _settings.Notifications ??= new NotificationSettings();
+        NotifyEnabled = _settings.Notifications.Enabled;
+        NotifyClaude = _settings.Notifications.ClaudeThresholds;
+        NotifyOffline = _settings.Notifications.DeviceOffline;
+        var alerts = (_settings.Notifications.PriceAlerts ?? []).Take(3).ToList();
+        while (alerts.Count < 3)
+        {
+            alerts.Add(new PriceAlertSettings());
+        }
+        NotifySymbol1 = alerts[0].Symbol;
+        NotifyAbove1 = FormatBound(alerts[0].Above);
+        NotifyBelow1 = FormatBound(alerts[0].Below);
+        NotifySymbol2 = alerts[1].Symbol;
+        NotifyAbove2 = FormatBound(alerts[1].Above);
+        NotifyBelow2 = FormatBound(alerts[1].Below);
+        NotifySymbol3 = alerts[2].Symbol;
+        NotifyAbove3 = FormatBound(alerts[2].Above);
+        NotifyBelow3 = FormatBound(alerts[2].Below);
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -2263,6 +2404,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             Token = GitHubToken.Trim()
         };
         _settings.Telegram = BuildTelegramSettings();
+        _settings.Notifications = BuildNotificationSettings();
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2297,6 +2439,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             await PushLatestAsync(cancellationToken, forcePush);
         }
+
+        await SweepNotificationsAsync(cancellationToken);
     }
 
     private IStockSnapshotSource GetStockSource() =>

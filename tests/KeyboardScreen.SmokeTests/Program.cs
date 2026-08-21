@@ -1140,6 +1140,62 @@ var overlayDimmed = renderer.Render(
 Assert(overlayDimmed.JpegBytes is [0xFF, 0xD8, ..], "the popup over a dimmed frame did not render");
 Console.WriteLine("PASS Telegram popup: defaults, truncation, overlay renders");
 
+// ---- notification engine ----------------------------------------------------
+var notifyEngine = new NotificationEngine();
+var notifySettings = new NotificationSettings
+{
+    Enabled = true,
+    PriceAlerts = [new PriceAlertSettings { Symbol = "btc-usd", Above = 100_000 }]
+};
+var notifyT0 = new DateTimeOffset(2026, 8, 21, 12, 0, 0, TimeSpan.Zero);
+
+static ClaudeUsageSnapshot ClaudeAt(int sessionPercent) => new(
+    Available: true,
+    Session: new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, sessionPercent, DateTimeOffset.Now.AddHours(2)),
+    Week: new ClaudeUsageWindow(ClaudeUsageWindowKind.Week, 10, DateTimeOffset.Now.AddDays(3)),
+    ModelWeek: null,
+    UpdatedAt: DateTimeOffset.Now);
+
+Assert(notifyEngine.Evaluate(new NotificationSettings(), new NotificationInputs(ClaudeAt(99)), notifyT0).Count == 0,
+    "a disabled master switch must silence everything");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(50)), notifyT0).Count == 0,
+    "50% must not cross any threshold");
+var notify80 = notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(85)), notifyT0);
+Assert(notify80.Count == 1 && notify80[0].TriggerKey == "claude-session",
+    "85% must fire the session threshold once");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(86)), notifyT0.AddMinutes(1)).Count == 0,
+    "the same threshold must not refire");
+var notify95 = notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(96)), notifyT0.AddHours(2));
+Assert(notify95.Count == 1 && notify95[0].Message.Contains("96"),
+    "crossing a higher threshold must fire again with the current percent");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(5)), notifyT0.AddHours(3)).Count == 0,
+    "a reset window fires nothing by itself");
+var notifyRearmed = notifyEngine.Evaluate(notifySettings, new NotificationInputs(ClaudeAt(85)), notifyT0.AddHours(4));
+Assert(notifyRearmed.Count == 1, "after a window reset the thresholds must be armed again");
+
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(DevicePushFailed: false), notifyT0).Count == 0,
+    "a healthy push fires nothing");
+var notifyOffline = notifyEngine.Evaluate(notifySettings, new NotificationInputs(DevicePushFailed: true), notifyT0.AddHours(5));
+Assert(notifyOffline.Count == 1 && notifyOffline[0].TriggerKey == "device-offline",
+    "the first failed push must fire the offline notice");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(DevicePushFailed: true), notifyT0.AddHours(5).AddMinutes(1)).Count == 0,
+    "a still-failing push must not refire");
+
+var priceOk = new Dictionary<string, double> { ["BTCUSDT"] = 99_000 };
+var priceHigh = new Dictionary<string, double> { ["BTCUSDT"] = 100_500 };
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: priceOk), notifyT0.AddHours(6)).Count == 0,
+    "a price inside the bound fires nothing");
+var notifyPrice = notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: priceHigh), notifyT0.AddHours(7));
+Assert(notifyPrice.Count == 1 && notifyPrice[0].TriggerKey == "price-BTCUSDT-above",
+    "crossing the bound must fire the price alert");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: priceHigh), notifyT0.AddHours(9)).Count == 0,
+    "a price still beyond the bound must stay silent until it re-arms");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: priceOk), notifyT0.AddHours(10)).Count == 0,
+    "returning inside the bound only re-arms");
+Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: priceHigh), notifyT0.AddHours(11)).Count == 1,
+    "a re-armed alert must fire on the next crossing");
+Console.WriteLine("PASS notification engine: thresholds, offline transition, price re-arm, cooldowns");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");
