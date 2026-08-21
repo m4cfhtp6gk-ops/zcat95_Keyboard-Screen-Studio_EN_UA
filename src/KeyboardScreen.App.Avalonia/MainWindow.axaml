@@ -906,6 +906,78 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize TelegramHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize TelegramHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Spacing="10">
+                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize TelegramGuideHeading}" />
+                          <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize TelegramGuideStep1}" /><TextBlock Classes="secondary" Text="{infra:Localize TelegramGuideStep1Hint}" /></StackPanel>
+                            <Border Grid.Row="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" /></Border>
+                            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize TelegramGuideStep2}" /><TextBlock Classes="secondary" Text="{infra:Localize TelegramGuideStep2Hint}" TextWrapping="Wrap" /></StackPanel>
+                            <Border Grid.Row="4" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" /></Border>
+                            <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize TelegramGuideStep3}" /><TextBlock Classes="secondary" Text="{infra:Localize TelegramGuideStep3Hint}" /></StackPanel>
+                          </Grid>
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,16,*">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramApiIdLabel}" />
+                            <TextBox MaxLength="12" Text="{Binding TelegramApiId, Mode=TwoWay}" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="2" Spacing="6">
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramApiHashLabel}" />
+                            <TextBox MaxLength="40" PasswordChar="*" Text="{Binding TelegramApiHash, Mode=TwoWay}" />
+                          </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,12,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramPhoneLabel}" />
+                            <TextBox MaxLength="20" PlaceholderText="{infra:Localize TelegramPhonePlaceholder}" Text="{Binding TelegramPhone, Mode=TwoWay}" />
+                          </StackPanel>
+                          <Button Grid.Column="2" VerticalAlignment="Bottom" IsEnabled="{Binding CanTelegramConnect}" Command="{Binding ConnectTelegramCommand}" Content="{infra:Localize TelegramConnect}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding TelegramStatusText}" TextWrapping="Wrap" />
+                        <Grid IsVisible="{Binding IsTelegramCodeNeeded}" ColumnDefinitions="*,12,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramCodeLabel}" />
+                            <TextBox MaxLength="10" Text="{Binding TelegramCode, Mode=TwoWay}" />
+                          </StackPanel>
+                          <Button Grid.Column="2" VerticalAlignment="Bottom" Command="{Binding SubmitTelegramCodeCommand}" Content="{infra:Localize TelegramCodeSubmit}" />
+                        </Grid>
+                        <Grid IsVisible="{Binding IsTelegramPasswordNeeded}" ColumnDefinitions="*,12,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramPasswordLabel}" />
+                            <TextBox MaxLength="64" PasswordChar="*" Text="{Binding TelegramPassword, Mode=TwoWay}" />
+                          </StackPanel>
+                          <Button Grid.Column="2" VerticalAlignment="Bottom" Command="{Binding SubmitTelegramPasswordCommand}" Content="{infra:Localize TelegramPasswordSubmit}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{infra:Localize TelegramPopupsEnabledLabel}" />
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding TelegramPopupsEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,220">
+                          <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize TelegramPrivacyLabel}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize TelegramMutedNote}" />
+                          </StackPanel>
+                          <ComboBox
+                              Grid.Column="1"
+                              ItemsSource="{Binding TelegramPrivacyOptions}"
+                              SelectedItem="{Binding TelegramPrivacyPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize TelegramPopupSecondsLabel}" />
+                          <Slider Grid.Column="1" Minimum="3" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding TelegramPopupSeconds, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="3" Maximum="15" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding TelegramPopupSeconds, Mode=TwoWay}" />
+                        </Grid>
+                        <Button IsVisible="{Binding IsTelegramConnected}" Command="{Binding TelegramLogoutCommand}" Content="{infra:Localize TelegramLogout}" />
+                      </StackPanel>
+                    </Border>
+
                     <Border Classes="card" Padding="16">
                       <Grid ColumnDefinitions="92,*">
                         <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize SafeAreaHeading}" />

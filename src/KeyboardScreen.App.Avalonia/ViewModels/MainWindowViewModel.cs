@@ -150,6 +150,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
+    private TelegramService? _telegramService;
+    private string _telegramApiId = string.Empty;
+    private string _telegramApiHash = string.Empty;
+    private string _telegramPhone = string.Empty;
+    private string _telegramCode = string.Empty;
+    private string _telegramPassword = string.Empty;
+    private bool _telegramPopupsEnabled = true;
+    private TelegramPrivacyMode _telegramPrivacyMode = TelegramPrivacyMode.Sender;
+    private int _telegramPopupSeconds = 6;
+    private TelegramMessageEvent? _telegramPopup;
+    private int _telegramPopupExtra;
+    private DateTimeOffset _telegramPopupUntil;
+    private CancellationTokenSource? _telegramPopupDelay;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -179,6 +192,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StartPomodoroCommand = new RelayCommand(StartPomodoro);
         StopPomodoroCommand = new RelayCommand(StopPomodoro);
         _pomodoroTimer.Changed += OnPomodoroChanged;
+        ConnectTelegramCommand = new AsyncCommand(ConnectTelegramAsync);
+        SubmitTelegramCodeCommand = new RelayCommand(SubmitTelegramCode);
+        SubmitTelegramPasswordCommand = new RelayCommand(SubmitTelegramPassword);
+        TelegramLogoutCommand = new AsyncCommand(TelegramLogoutAsync);
         CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
         OpenLatestReleaseCommand = new RelayCommand(() =>
         {
@@ -210,6 +227,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand RefreshTokscaleCommand { get; }
     public ICommand StartPomodoroCommand { get; }
     public ICommand StopPomodoroCommand { get; }
+    public ICommand ConnectTelegramCommand { get; }
+    public ICommand SubmitTelegramCodeCommand { get; }
+    public ICommand SubmitTelegramPasswordCommand { get; }
+    public ICommand TelegramLogoutCommand { get; }
+
+    /// <summary>Set by the window: shows the Telegram risk notice dialog once.</summary>
+    public Func<Task>? ShowTelegramNoticeAsync { get; set; }
     public ICommand CheckForUpdatesCommand { get; }
     public ICommand OpenLatestReleaseCommand { get; }
 
@@ -1427,6 +1451,237 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         get => _scheduleNightBrightness;
         set { if (SetProperty(ref _scheduleNightBrightness, Math.Clamp(value, 20, 100))) ScheduleCommit(); }
     }
+
+    public string TelegramApiId
+    {
+        get => _telegramApiId;
+        set { if (SetProperty(ref _telegramApiId, value)) ScheduleCommit(); }
+    }
+
+    public string TelegramApiHash
+    {
+        get => _telegramApiHash;
+        set { if (SetProperty(ref _telegramApiHash, value)) ScheduleCommit(); }
+    }
+
+    public string TelegramPhone
+    {
+        get => _telegramPhone;
+        set { if (SetProperty(ref _telegramPhone, value)) ScheduleCommit(); }
+    }
+
+    public string TelegramCode
+    {
+        get => _telegramCode;
+        set => SetProperty(ref _telegramCode, value);
+    }
+
+    public string TelegramPassword
+    {
+        get => _telegramPassword;
+        set => SetProperty(ref _telegramPassword, value);
+    }
+
+    public bool TelegramPopupsEnabled
+    {
+        get => _telegramPopupsEnabled;
+        set { if (SetProperty(ref _telegramPopupsEnabled, value)) ScheduleCommit(); }
+    }
+
+    public int TelegramPopupSeconds
+    {
+        get => _telegramPopupSeconds;
+        set { if (SetProperty(ref _telegramPopupSeconds, Math.Clamp(value, 3, 15))) ScheduleCommit(); }
+    }
+
+    public TelegramPrivacyMode TelegramPrivacyMode
+    {
+        get => _telegramPrivacyMode;
+        set
+        {
+            if (SetProperty(ref _telegramPrivacyMode, value))
+            {
+                OnPropertyChanged(nameof(TelegramPrivacyPreference));
+                ScheduleCommit();
+            }
+        }
+    }
+
+    /// <summary>Display-text picker over the stored enum, like <see cref="StockSourcePreference"/>.</summary>
+    public string TelegramPrivacyPreference
+    {
+        get => TelegramPrivacyOptions[Math.Clamp((int)_telegramPrivacyMode, 0, TelegramPrivacyOptions.Count - 1)];
+        set
+        {
+            IReadOnlyList<string> options = TelegramPrivacyOptions;
+            for (int index = 0; index < options.Count; index++)
+            {
+                if (string.Equals(options[index], value, StringComparison.Ordinal))
+                {
+                    TelegramPrivacyMode = (TelegramPrivacyMode)index;
+                    return;
+                }
+            }
+        }
+    }
+
+    public IReadOnlyList<string> TelegramPrivacyOptions =>
+        [Loc.T("TelegramPrivacyCounter"), Loc.T("TelegramPrivacySender"), Loc.T("TelegramPrivacySenderPreview")];
+
+    public bool IsTelegramCodeNeeded => _telegramService?.State == TelegramState.WaitingForCode;
+    public bool IsTelegramPasswordNeeded => _telegramService?.State == TelegramState.WaitingForPassword;
+    public bool IsTelegramConnected => _telegramService?.State == TelegramState.Connected;
+    public bool CanTelegramConnect => _telegramService?.State
+        is null or TelegramState.Disconnected or TelegramState.Failed;
+
+    public string TelegramStatusText => _telegramService?.State switch
+    {
+        TelegramState.Connecting => Loc.T("TelegramStateConnecting"),
+        TelegramState.WaitingForCode => Loc.T("TelegramStateWaitingCode"),
+        TelegramState.WaitingForPassword => Loc.T("TelegramStateWaitingPassword"),
+        TelegramState.Connected => Loc.T("TelegramStateConnected"),
+        TelegramState.Failed => Loc.T("TelegramStateFailed", _telegramService?.LastError ?? "?"),
+        _ => Loc.T("TelegramStateDisconnected")
+    };
+
+    private TelegramSettings BuildTelegramSettings() => new()
+    {
+        ApiId = TelegramApiId.Trim(),
+        ApiHash = TelegramApiHash.Trim(),
+        PhoneNumber = TelegramPhone.Trim(),
+        PopupsEnabled = TelegramPopupsEnabled,
+        PrivacyMode = TelegramPrivacyMode,
+        PopupSeconds = TelegramPopupSeconds
+    };
+
+    private async Task ConnectTelegramAsync()
+    {
+        if (_telegramService is null)
+        {
+            return;
+        }
+
+        if (!_settings.HasAcknowledgedTelegramNotice)
+        {
+            if (ShowTelegramNoticeAsync is not null)
+            {
+                await ShowTelegramNoticeAsync();
+            }
+
+            _settings.HasAcknowledgedTelegramNotice = true;
+        }
+
+        _settings.Telegram = BuildTelegramSettings();
+        await _settingsStore.SaveAsync(_settings);
+        if (!_settings.Telegram.IsConfigured)
+        {
+            return;
+        }
+
+        _telegramService.Connect(_settings.Telegram);
+    }
+
+    private void SubmitTelegramCode()
+    {
+        if (!string.IsNullOrWhiteSpace(TelegramCode))
+        {
+            _telegramService?.SubmitCode(TelegramCode);
+            TelegramCode = string.Empty;
+        }
+    }
+
+    private void SubmitTelegramPassword()
+    {
+        if (!string.IsNullOrWhiteSpace(TelegramPassword))
+        {
+            _telegramService?.SubmitPassword(TelegramPassword);
+            TelegramPassword = string.Empty;
+        }
+    }
+
+    private async Task TelegramLogoutAsync()
+    {
+        if (_telegramService is not null)
+        {
+            await _telegramService.LogoutAsync();
+        }
+    }
+
+    private void OnTelegramStateChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(RaiseTelegramStateProperties);
+
+    private void RaiseTelegramStateProperties()
+    {
+        OnPropertyChanged(nameof(TelegramStatusText));
+        OnPropertyChanged(nameof(IsTelegramCodeNeeded));
+        OnPropertyChanged(nameof(IsTelegramPasswordNeeded));
+        OnPropertyChanged(nameof(IsTelegramConnected));
+        OnPropertyChanged(nameof(CanTelegramConnect));
+    }
+
+    private void OnTelegramMessage(object? sender, TelegramMessageEvent message) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed || !TelegramPopupsEnabled)
+            {
+                return;
+            }
+
+            DateTimeOffset now = DateTimeOffset.Now;
+            if (_telegramPopup is not null && now < _telegramPopupUntil)
+            {
+                _telegramPopupExtra++;
+                _telegramPopup = message;
+            }
+            else
+            {
+                _telegramPopup = message;
+                _telegramPopupExtra = 0;
+            }
+
+            _telegramPopupUntil = now.AddSeconds(TelegramPopupSeconds);
+            _ = ShowTelegramPopupAsync();
+        });
+
+    /// <summary>Pushes the popup immediately, then reverts once its time is up.</summary>
+    private async Task ShowTelegramPopupAsync()
+    {
+        _telegramPopupDelay?.Cancel();
+        _telegramPopupDelay?.Dispose();
+        _telegramPopupDelay = new CancellationTokenSource();
+        CancellationToken token = _telegramPopupDelay.Token;
+
+        await RefreshAndPushAsync(AutoPush, forcePush: true, cancellationToken: CancellationToken.None);
+        try
+        {
+            TimeSpan remaining = _telegramPopupUntil - DateTimeOffset.Now;
+            if (remaining > TimeSpan.Zero)
+            {
+                await Task.Delay(remaining, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        _telegramPopup = null;
+        _telegramPopupExtra = 0;
+        await RefreshAndPushAsync(AutoPush, forcePush: true, cancellationToken: CancellationToken.None);
+    }
+
+    private (string Title, string? Preview) FormatTelegramPopup(TelegramMessageEvent message)
+    {
+        int total = 1 + _telegramPopupExtra;
+        return TelegramPrivacyMode switch
+        {
+            TelegramPrivacyMode.Counter => (Loc.T("ScreenTgNewMessages", total), null),
+            TelegramPrivacyMode.Sender => (WithExtra(message.SenderName), null),
+            _ => (WithExtra(message.SenderName), TelegramPopupOverlay.TruncatePreview(message.Preview))
+        };
+
+        string WithExtra(string name) => _telegramPopupExtra > 0 ? $"{name} +{_telegramPopupExtra}" : name;
+    }
     public bool IsMusicTheme => SelectedTheme is not null &&
         MediaThemeAutomation.IsMusicThemeId(SelectedTheme.Id);
     public bool IsSystemTheme => SelectedTheme?.Id is
@@ -1471,6 +1726,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _themes = BuiltInThemes.Create(_imageTheme, _pomodoroTimer);
         _perfVisualTheme = (PerformanceVisualTheme?)_themes.FirstOrDefault(theme => theme.Id == "performance-visual");
         _hardwareTheme = (HardwareMonitorTheme?)_themes.FirstOrDefault(theme => theme.Id == "hardware");
+        _telegramService = new TelegramService(
+            Path.GetDirectoryName(_settingsStore.Path) is { Length: > 0 } settingsDirectory
+                ? settingsDirectory
+                : AppContext.BaseDirectory);
+        _telegramService.StateChanged += OnTelegramStateChanged;
+        _telegramService.MessageReceived += OnTelegramMessage;
         BuildThemeGroups();
         ReloadFonts();
         ApplySettings();
@@ -1480,6 +1741,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _loading = false;
         _lifetime = new CancellationTokenSource();
         _ = RunRefreshLoopAsync(_lifetime.Token);
+        // A stored session means the user already logged in - reconnect quietly.
+        if (_settings.Telegram is { IsConfigured: true } && _telegramService is { HasStoredSession: true })
+        {
+            _telegramService.Connect(_settings.Telegram);
+        }
         await RefreshPreviewAsync();
     }
 
@@ -1552,6 +1818,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _currencySource.Dispose();
         _hardwareSource.Dispose();
         _gitHubSource.Dispose();
+        _telegramPopupDelay?.Cancel();
+        _telegramPopupDelay?.Dispose();
+        if (_telegramService is not null)
+        {
+            _telegramService.StateChanged -= OnTelegramStateChanged;
+            _telegramService.MessageReceived -= OnTelegramMessage;
+            _telegramService.Dispose();
+        }
         _pomodoroTimer.Changed -= OnPomodoroChanged;
         _desktopServices.Dispose();
         _refreshLock.Dispose();
@@ -1722,6 +1996,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.GitHub ??= new GitHubSettings();
         GitHubUsername = _settings.GitHub.Username;
         GitHubToken = _settings.GitHub.Token;
+        _settings.Telegram ??= new TelegramSettings();
+        TelegramApiId = _settings.Telegram.ApiId;
+        TelegramApiHash = _settings.Telegram.ApiHash;
+        TelegramPhone = _settings.Telegram.PhoneNumber;
+        TelegramPopupsEnabled = _settings.Telegram.PopupsEnabled;
+        TelegramPrivacyMode = _settings.Telegram.PrivacyMode;
+        TelegramPopupSeconds = _settings.Telegram.PopupSeconds;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1981,6 +2262,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             Username = GitHubUsername.Trim().TrimStart('@'),
             Token = GitHubToken.Trim()
         };
+        _settings.Telegram = BuildTelegramSettings();
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2146,6 +2428,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Hardware = hardware,
                 GitHub = gitHub
             };
+
+            Action<ScreenCanvas>? popupOverlay = null;
+            if (_telegramPopup is { } telegramPopup && DateTimeOffset.Now < _telegramPopupUntil)
+            {
+                (string popupTitle, string? popupPreview) = FormatTelegramPopup(telegramPopup);
+                popupOverlay = overlayCanvas =>
+                    TelegramPopupOverlay.Draw(overlayCanvas, popupTitle, popupPreview);
+            }
             _latestFrame = _renderer.Render(
                 theme,
                 snapshot,
@@ -2169,7 +2459,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     ImageAnalogOrder,
                     ImageFlipTimeFontSize,
                     DotMatrixProgressHeaderFontSize),
-                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow));
+                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow),
+                popupOverlay);
 
             using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
             var bitmap = new Bitmap(stream);

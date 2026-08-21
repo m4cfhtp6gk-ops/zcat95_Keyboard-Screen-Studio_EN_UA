@@ -1099,6 +1099,47 @@ var gitHubError = renderer.Render(gitHubTheme,
 Assert(gitHubError.JpegBytes is [0xFF, 0xD8, ..], "the errored GitHub view did not render");
 Console.WriteLine("PASS GitHub contributions: week math, HTML+GraphQL parsing, cache, renders");
 
+// ---- Telegram popup overlay -------------------------------------------------
+var telegramDefaults = new TelegramSettings();
+Assert(!telegramDefaults.IsConfigured && telegramDefaults.PopupsEnabled
+    && telegramDefaults.PrivacyMode == TelegramPrivacyMode.Sender && telegramDefaults.PopupSeconds == 6,
+    "Telegram defaults are wrong");
+Assert(new TelegramSettings { ApiId = "123", ApiHash = "abc", PhoneNumber = "+380" }.IsConfigured,
+    "a filled Telegram config must count as configured");
+Assert(TelegramPopupOverlay.TruncatePreview("line one\nline two") == "line one line two",
+    "previews must flatten line breaks");
+Assert(TelegramPopupOverlay.TruncatePreview(new string('x', 200)).Length == 96
+    && TelegramPopupOverlay.TruncatePreview(new string('x', 200)).EndsWith('…'),
+    "long previews must truncate with an ellipsis");
+Assert(TelegramPopupOverlay.TruncatePreview(null) == "", "a null preview must flatten to empty");
+// Skia drops a whole text run when it meets an astral-plane rune the font
+// lacks, so emoji must be stripped before drawing.
+Assert(TelegramPopupOverlay.TruncatePreview("Привіт! 🎉 Це працює 🚀") == "Привіт! Це працює",
+    "emoji must be stripped from previews");
+
+var overlayBase = renderer.Render(themes.Single(theme => theme.Id == "clock-dot-matrix"), SystemSnapshot.DesignSample);
+var overlayFrame = renderer.Render(
+    themes.Single(theme => theme.Id == "clock-dot-matrix"),
+    SystemSnapshot.DesignSample,
+    overlay: canvas => TelegramPopupOverlay.Draw(canvas, "Ruslan",
+        TelegramPopupOverlay.TruncatePreview("Привіт! Глянь, що вийшло 🎉")));
+Assert(overlayFrame.JpegBytes is [0xFF, 0xD8, ..], "the popup overlay did not render");
+Assert(!overlayFrame.JpegBytes.AsSpan().SequenceEqual(overlayBase.JpegBytes),
+    "the overlay must change the frame");
+var overlayNoPreview = renderer.Render(
+    themes.Single(theme => theme.Id == "clock-dot-matrix"),
+    SystemSnapshot.DesignSample,
+    overlay: canvas => TelegramPopupOverlay.Draw(canvas, "3 new messages", null));
+Assert(overlayNoPreview.JpegBytes is [0xFF, 0xD8, ..], "the counter-mode popup did not render");
+// At night the popup draws after dimming, so it stays bright over a dim theme.
+var overlayDimmed = renderer.Render(
+    themes.Single(theme => theme.Id == "clock-dot-matrix"),
+    SystemSnapshot.DesignSample,
+    brightnessPercent: 40,
+    overlay: canvas => TelegramPopupOverlay.Draw(canvas, "Ruslan", "hello"));
+Assert(overlayDimmed.JpegBytes is [0xFF, 0xD8, ..], "the popup over a dimmed frame did not render");
+Console.WriteLine("PASS Telegram popup: defaults, truncation, overlay renders");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

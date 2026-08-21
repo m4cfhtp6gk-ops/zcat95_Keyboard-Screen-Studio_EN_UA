@@ -46,6 +46,8 @@ public sealed class AppSettings
 
 	public bool HasAcknowledgedGitHubNotice { get; set; }
 
+	public bool HasAcknowledgedTelegramNotice { get; set; }
+
 	public bool AutoSwitchToMusic { get; set; }
 
 	public bool AutoMediaThemeSwitch { get; set; }
@@ -79,6 +81,8 @@ public sealed class AppSettings
 	public HardwareMonitorSettings HardwareMonitor { get; set; } = new();
 
 	public GitHubSettings GitHub { get; set; } = new();
+
+	public TelegramSettings Telegram { get; set; } = new();
 
 
 
