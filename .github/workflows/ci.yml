@@ -25,8 +25,12 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      # The macOS project is not part of the solution, so the solution restore
+      # never touches it and its --no-restore build fails with NETSDK1004.
       - name: Restore
-        run: dotnet restore KeyboardScreenStudio.sln
+        run: |
+          dotnet restore KeyboardScreenStudio.sln
+          dotnet restore src/KeyboardScreen.App.Mac/KeyboardScreen.App.Mac.csproj
 
       - name: Build
         run: dotnet build KeyboardScreenStudio.sln -c Release --no-restore
