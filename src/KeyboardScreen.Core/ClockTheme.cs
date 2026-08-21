@@ -4,9 +4,9 @@ namespace KeyboardScreen.Core;
 public sealed class ClockTheme : IScreenTheme
 {
     public string Id => "clock";
-    public string DisplayName => "极简时钟";
-    public string Description => "时间、秒钟、中文日期与可定制底部文字";
-    public string Details => "秒钟与分钟基线对齐；日期使用无前导零的中文格式。";
+    public string DisplayName => Loc.T("ThemeClockName");
+    public string Description => Loc.T("ThemeClockDescription");
+    public string Details => Loc.T("ThemeClockDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -15,7 +15,7 @@ public sealed class ClockTheme : IScreenTheme
         var safe = canvas.SafeBounds;
         canvas.Fill(background);
 
-        ThemeHeader.Draw(canvas, snapshot, "本地时间", showTime: false);
+        ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitleLocalTime"), showTime: false);
         canvas.Line(new Point(safe.Left, safe.Top + 38),
             new Point(safe.Left + 48, safe.Top + 38), Color.FromRgb(43, 50, 58), 2);
 
@@ -32,15 +32,13 @@ public sealed class ClockTheme : IScreenTheme
 
         canvas.Line(new Point(safe.Left, safe.Top + 230),
             new Point(safe.Left + 48, safe.Top + 230), Color.FromRgb(34, 41, 49), 2);
-        canvas.AlignedText(snapshot.Timestamp.ToString("dddd"), 15, accent,
+        canvas.AlignedText(Loc.DayName(snapshot.Timestamp), 15, accent,
             new Rect(safe.Left, safe.Top + 216, safe.Width, 27),
             FontWeights.SemiBold, TextAlignment.Right);
-        canvas.AlignedText(ChineseDate(snapshot.Timestamp), 16, Colors.White,
+        canvas.AlignedText(Loc.LongDate(snapshot.Timestamp), 16, Colors.White,
             new Rect(safe.Left, safe.Top + 254, safe.Width, 27),
             FontWeights.Medium, TextAlignment.Right);
 
 
     }
-    private static string ChineseDate(DateTimeOffset value) =>
-        $"{value.Year}年{value.Month}月{value.Day}日";
 }

@@ -16,6 +16,7 @@ internal static class Program
         VerifyGuideWindowConstructs();
         VerifyAccentColorWindowConstructs();
         VerifyRiskNoticeWindowConstructs();
+        VerifyLocalizedWindowTitleFollowsLanguage();
 
         VerifyStartupGateBehaviors();
         VerifyStartupVisibilityBehavior();
@@ -44,6 +45,39 @@ internal static class Program
         var window = new RiskNoticeWindow("title", "subtitle", "body");
         window.Show();
         window.Close();
+    }
+
+    /// <summary>
+    /// Exercises the {infra:Localize} markup extension end to end: the title must
+    /// come from the catalogue at load time and must follow a language switch on
+    /// a window that is already open.
+    /// </summary>
+    private static void VerifyLocalizedWindowTitleFollowsLanguage()
+    {
+        Loc.Instance.Initialize(AppLanguage.English);
+        var window = new AccentColorWindow("#E4694C");
+        window.Show();
+        try
+        {
+            Assert(
+                window.Title == Loc.T("AccentTitle"),
+                "the Localize markup extension did not resolve the window title");
+
+            Loc.Language = AppLanguage.Ukrainian;
+            Assert(
+                window.Title == Loc.T("AccentTitle"),
+                "an open window did not pick up the language change");
+
+            Loc.Language = AppLanguage.ChineseSimplified;
+            Assert(
+                window.Title == Loc.T("AccentTitle"),
+                "an open window did not pick up a second language change");
+        }
+        finally
+        {
+            Loc.Language = AppLanguage.English;
+            window.Close();
+        }
     }
 
     private static void VerifyStartupGateBehaviors()

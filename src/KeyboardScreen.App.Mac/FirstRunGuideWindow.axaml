@@ -2,8 +2,9 @@
     x:Class="KeyboardScreen.App.Avalonia.FirstRunGuideWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure"
     xmlns:controls="using:KeyboardScreen.App.Avalonia.Controls"
-    Title="连接你的 Linx68"
+    Title="{infra:Localize GuideTitle}"
     Width="520"
     SizeToContent="Height"
     CanResize="False"
@@ -36,8 +37,8 @@
     <Grid RowDefinitions="Auto,24,Auto,22,1,20,Auto,18,48">
       <Grid ColumnDefinitions="*,44">
         <StackPanel Spacing="7">
-          <TextBlock FontSize="25" FontWeight="SemiBold" Text="连接你的 Linx68" />
-          <TextBlock Classes="secondary" FontSize="13" Text="开启键盘图像 API，只需完成下面四步" />
+          <TextBlock FontSize="25" FontWeight="SemiBold" Text="{infra:Localize GuideTitle}" />
+          <TextBlock Classes="secondary" FontSize="13" Text="{infra:Localize GuideSubtitle}" />
         </StackPanel>
         <Button
             Grid.Column="1"
@@ -55,32 +56,32 @@
           <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="1" />
           </Border>
-          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="确保键盘连接到和电脑相同的局域网" />
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="{infra:Localize GuideStep1}" />
         </Grid>
         <Grid ColumnDefinitions="40,*">
           <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="2" />
           </Border>
-          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="单击旋钮进入菜单" />
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="{infra:Localize GuideStep2}" />
         </Grid>
         <Grid ColumnDefinitions="40,*">
           <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="3" />
           </Border>
-          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="旋转选择图像 API" />
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="{infra:Localize GuideStep3}" />
         </Grid>
         <Grid ColumnDefinitions="40,*">
           <Border Width="30" Height="30" HorizontalAlignment="Left" Background="{DynamicResource KssSelectedBrush}" CornerRadius="15">
             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="4" />
           </Border>
-          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="扫码获取 IP 地址" />
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="14" Text="{infra:Localize GuideStep4}" />
         </Grid>
       </StackPanel>
 
       <Border Grid.Row="4" Background="{DynamicResource KssDividerBrush}" />
 
       <StackPanel Grid.Row="6">
-        <TextBlock FontSize="14" FontWeight="SemiBold" Text="设备 IP 地址" />
+        <TextBlock FontSize="14" FontWeight="SemiBold" Text="{infra:Localize GuideDeviceIp}" />
         <controls:IpAddressEditor x:Name="IpEditor" Margin="0,12,0,0" />
         <TextBlock
             x:Name="ValidationText"
@@ -96,14 +97,14 @@
             Height="48"
             HorizontalAlignment="Stretch"
             Click="LaterButton_OnClick"
-            Content="稍后设置" />
+            Content="{infra:Localize GuideLater}" />
         <Button
             Grid.Column="2"
             Height="48"
             HorizontalAlignment="Stretch"
             FontWeight="SemiBold"
             Click="ContinueButton_OnClick"
-            Content="保存并继续" />
+            Content="{infra:Localize GuideSaveContinue}" />
       </Grid>
     </Grid>
   </Border>

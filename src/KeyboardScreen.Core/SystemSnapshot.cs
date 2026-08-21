@@ -10,7 +10,8 @@ public sealed record SystemSnapshot(
     AiQuotaSnapshot? AiQuota = null,
     WeatherSnapshot? Weather = null,
     StockSnapshot? Stocks = null,
-    double? GpuPercent = null)
+    double? GpuPercent = null,
+    ClaudeUsageSnapshot? ClaudeUsage = null)
 {
     public static SystemSnapshot DesignSample { get; } = new(
         DateTimeOffset.Now,
@@ -31,6 +32,15 @@ public sealed record SystemSnapshot(
             56,
             remainingCount: 1,
             resetPeriod: AiResetPeriod.Weekly),
-        new WeatherSnapshot(true, "北京", 26, 28, 61, 2, true, DateTimeOffset.Now),
-        GpuPercent: 45.0);
+        new WeatherSnapshot(true, WeatherSettings.DefaultLocationQuery, 26, 28, 61, 2, true, DateTimeOffset.Now),
+        GpuPercent: 45.0,
+        ClaudeUsage: new ClaudeUsageSnapshot(
+            Available: true,
+            Session: new ClaudeUsageWindow(
+                ClaudeUsageWindowKind.Session, 42, DateTimeOffset.Now.AddHours(2).AddMinutes(44), 1_180_000),
+            Week: new ClaudeUsageWindow(
+                ClaudeUsageWindowKind.Week, 73, DateTimeOffset.Now.AddDays(4).AddHours(9), 18_400_000),
+            ModelWeek: new ClaudeUsageWindow(
+                ClaudeUsageWindowKind.ModelWeek, 91, DateTimeOffset.Now.AddDays(4).AddHours(9), 6_250_000, "Fable"),
+            UpdatedAt: DateTimeOffset.Now));
 }

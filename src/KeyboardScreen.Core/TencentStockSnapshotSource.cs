@@ -7,9 +7,10 @@ using System.Text.RegularExpressions;
 namespace KeyboardScreen.Core;
 
 /// <summary>
-/// 腾讯行情源（qt.gtimg.cn，国内可直连）。响应为 GBK 编码文本，
-/// 每行形如 v_sh600000="1~名称~代码~现价~昨收~..."，字段 3=现价、
-/// 4=昨收、30=时间戳、32=涨跌幅（%）。
+/// Tencent quote feed (qt.gtimg.cn). The response is GBK-encoded text with one
+/// line per symbol, shaped v_sh600000="1~name~code~last~previousClose~...";
+/// field 3 is the last price, 4 the previous close, 30 the timestamp and
+/// 32 the change in percent.
 /// </summary>
 public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposable
 {
@@ -73,7 +74,7 @@ public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposab
         {
             if (supported.Length == 0)
             {
-                return new StockSnapshot([], now, settings.RedForGain, false, "暂不支持当前代码格式");
+                return new StockSnapshot([], now, settings.RedForGain, false, Loc.T("StockUnsupportedSymbol"));
             }
 
             var uri = "https://qt.gtimg.cn/q=" + string.Join(",", supported.Select(entry => entry.Code));
@@ -100,7 +101,7 @@ public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposab
 
             if (quoteEntries.Count == 0)
             {
-                return new StockSnapshot([], now, settings.RedForGain, false, "未能解析行情数据");
+                return new StockSnapshot([], now, settings.RedForGain, false, Loc.T("StockParseFailed"));
             }
 
             if (quoteEntries.Count == 2)
@@ -142,7 +143,8 @@ public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposab
         var closesByCode = new Dictionary<string, IReadOnlyList<double>>(StringComparer.OrdinalIgnoreCase);
         foreach (string code in codes)
         {
-            // 腾讯日K对美股使用带 .OQ 后缀的内部代码（如 usAAPL.OQ），其余市场用原代码。
+            // For US symbols the daily-candle endpoint wants an internal code with an .OQ
+            // suffix (usAAPL.OQ); every other market uses the code unchanged.
             string klineCode = code.StartsWith("us", StringComparison.OrdinalIgnoreCase)
                 ? code + ".OQ"
                 : code;
@@ -163,7 +165,7 @@ public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposab
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
             {
-                // 走势数据失败不影响行情显示
+                // A failed trend fetch must not hide the quotes themselves.
             }
         }
 
@@ -220,9 +222,9 @@ public sealed class TencentStockSnapshotSource : IStockSnapshotSource, IDisposab
     }
 
     /// <summary>
-    /// 将 Yahoo 风格代码映射为腾讯代码：600519.SS→sh600519、
-    /// 000001.SZ→sz000001、0700.HK→hk00700、AAPL→usAAPL；
-    /// 其余格式（如 BTC-USD）返回 null。
+    /// Maps a Yahoo-style symbol to a Tencent code: 600519.SS to sh600519,
+    /// 000001.SZ to sz000001, 0700.HK to hk00700, AAPL to usAAPL. Anything else
+    /// (BTC-USD, for instance) returns null.
     /// </summary>
     public static string? MapSymbol(string symbol)
     {

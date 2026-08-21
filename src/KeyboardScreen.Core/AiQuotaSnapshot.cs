@@ -63,7 +63,7 @@ public sealed record AiQuotaSnapshot(
         {
             string percent = $"{Math.Round(ClampedRemainingPercent):0}%";
             return AccessType == AiAccessType.Subscription && RemainingCount is >= 0
-                ? $"{percent} / {RemainingCount}次"
+                ? Loc.T("AiRemainingWithCount", percent, RemainingCount)
                 : percent;
         }
     }

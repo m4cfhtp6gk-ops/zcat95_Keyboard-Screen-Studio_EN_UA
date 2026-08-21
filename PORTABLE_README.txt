@@ -1,25 +1,38 @@
-Keyboard Screen Studio v1.0.2 绿色便携版
+Keyboard Screen Studio v1.0.2 portable build
 
-1. 双击 KeyboardScreenStudio.exe 启动，无需安装 .NET。
-2. 首次启动会显示连接引导；程序会自动创建 Data 文件夹并保存本机配置。
-3. 将获得合法使用权的 TTF 或 OTF 字体放入 Fonts 文件夹后，程序会自动识别。
-4. 程序通过 HTTP POST 将 JPEG 直接推送到键盘设备。
+1. Double-click KeyboardScreenStudio.exe to start. No .NET installation needed.
+2. The first run shows the connection guide. The program creates a Data folder
+   and keeps this machine's settings there.
+3. Drop TTF or OTF fonts you are licensed to use into the Fonts folder and the
+   program picks them up automatically.
+4. The program pushes JPEGs straight to the keyboard over HTTP POST.
+5. The interface is available in English, Ukrainian and Simplified Chinese.
+   Change it under Other settings.
 
-隐私提醒
+Privacy
 
-- Data\settings.json 包含设备地址、城市、股票代码和本地图片路径。
-- AI 用量功能依赖用户自行安装的开源工具 Tokscale；KSS 仅在本机调用 Tokscale 的 JSON 命令，不读取 API Key，也不保存平台凭据。
-- 设备传输为未加密 HTTP，只应在可信本地网络中使用。
+- Data\settings.json holds the device address, city, stock symbols and the path
+  to your local image.
+- AI usage relies on Tokscale, an open-source tool you install yourself. KSS
+  only calls Tokscale's JSON commands locally; it does not read API keys and
+  does not store platform credentials.
+- The transfer to the device is unencrypted HTTP. Use it only on a trusted
+  local network.
 
-第三方服务
+Third-party services
 
-- 天气数据由 Open-Meteo 提供，采用 CC BY 4.0：
+- Weather data comes from Open-Meteo under CC BY 4.0:
   https://open-meteo.com/en/license
-- 自动定位城市名由 BigDataCloud 解析。
-- Yahoo Finance 股票数据与 Tokscale 本地用量均为非官方实验性集成，可能延迟、不准确或失效。
-- 股票数据仅供信息展示，不构成投资建议。
-- 本项目与 Linx68 品牌、设备制造商及上述平台不存在隶属、授权、认可或赞助关系。
+- Auto-detected city names are resolved by BigDataCloud.
+- The Yahoo Finance quotes and the Tokscale local usage data are unofficial,
+  experimental integrations that may be delayed, inaccurate or stop working.
+- Stock data is shown for information only and is not investment advice.
+- This project has no affiliation with, authorization from, endorsement by or
+  sponsorship from the Linx68 brand, the device manufacturer, or any of the
+  platforms above.
 
-许可证
+Licence
 
-项目源码采用 MIT License。应用图标与托盘图标采用单独的视觉资产许可。完整项目许可、隐私说明及第三方许可文件随程序提供。
+The source code is under the MIT License. The application and tray icons are
+covered by a separate visual-asset licence. The full project licence, the
+privacy notice and the third-party licence files ship with the program.

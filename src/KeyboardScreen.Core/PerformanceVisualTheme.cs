@@ -30,9 +30,9 @@ public sealed class PerformanceVisualTheme : IScreenTheme
     private readonly bool[] _enabled = [true, true, true, true, true];
 
     public string Id => "performance-visual";
-    public string DisplayName => "性能可视化";
-    public string Description => "CPU、内存、网络上下行与 GPU 使用率曲线";
-    public string Details => "以最近 60 秒的滚动曲线展示系统性能；GPU 数据不可用时显示为“不可用”。";
+    public string DisplayName => Loc.T("ThemePerformanceVisualName");
+    public string Description => Loc.T("ThemePerformanceVisualDescription");
+    public string Details => Loc.T("ThemePerformanceVisualDetails");
 
     public void SetModulesEnabled(bool cpu, bool memory, bool download, bool upload, bool gpu)
     {
@@ -51,7 +51,7 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         Push(snapshot);
         Rect safe = canvas.SafeBounds;
         canvas.Fill(Background);
-        ThemeHeader.Draw(canvas, snapshot, DisplayName);
+        ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitlePerformanceVisual"));
 
         bool[] enabled;
         lock (_sync)
@@ -66,19 +66,19 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         }
         if (enabled[1])
         {
-            panels.Add(("内存", $"{snapshot.MemoryPercent:0}%", _series[1], MemoryColor, 100.0));
+            panels.Add((Loc.T("ScreenLabelMemory"), $"{snapshot.MemoryPercent:0}%", _series[1], MemoryColor, 100.0));
         }
         if (enabled[2])
         {
-            panels.Add(("下载", $"▼ {snapshot.DownloadMbps:0.0}", _series[2], DownloadColor, 100.0));
+            panels.Add((Loc.T("ScreenLabelDownload"), $"▼ {snapshot.DownloadMbps:0.0}", _series[2], DownloadColor, 100.0));
         }
         if (enabled[3])
         {
-            panels.Add(("上传", $"▲ {snapshot.UploadMbps:0.0}", _series[3], UploadColor, 100.0));
+            panels.Add((Loc.T("ScreenLabelUpload"), $"▲ {snapshot.UploadMbps:0.0}", _series[3], UploadColor, 100.0));
         }
         if (enabled[4])
         {
-            panels.Add(("GPU", snapshot.GpuPercent is double gpu ? $"{gpu:0}%" : "不可用", _series[4], GpuColor, 100.0));
+            panels.Add(("GPU", snapshot.GpuPercent is double gpu ? $"{gpu:0}%" : Loc.T("ScreenGpuUnavailable"), _series[4], GpuColor, 100.0));
         }
 
         double headerHeight = 32;

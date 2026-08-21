@@ -30,7 +30,7 @@ public sealed class WindowsMusicSnapshotSource : IMusicSnapshotSource
 				: TimeSpan.Zero;
 			return new MusicSnapshot(
 				Available: true,
-				string.IsNullOrWhiteSpace(properties.Title) ? "未知曲目" : properties.Title,
+				string.IsNullOrWhiteSpace(properties.Title) ? Loc.T("MusicUnknownTrack") : properties.Title,
 				properties.Artist ?? string.Empty,
 				timeline.Position,
 				duration,

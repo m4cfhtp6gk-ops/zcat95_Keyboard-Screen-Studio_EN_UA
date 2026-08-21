@@ -2,7 +2,8 @@
     x:Class="KeyboardScreen.App.Avalonia.App"
     x:CompileBindings="False"
     xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure">
   <Application.Resources>
     <ResourceDictionary>
       <!-- Keep the desktop control layer neutral; theme color belongs to the keyboard canvas. -->
@@ -79,9 +80,9 @@
       <TrayIcon Icon="/Assets/TrayIcon.ico" ToolTipText="Keyboard Screen Studio" Command="{Binding ShowWindowCommand}">
         <TrayIcon.Menu>
           <NativeMenu>
-            <NativeMenuItem Header="打开主窗口" Command="{Binding ShowWindowCommand}" />
+            <NativeMenuItem Header="{infra:Localize TrayShowWindow}" Command="{Binding ShowWindowCommand}" />
             <NativeMenuItemSeparator />
-            <NativeMenuItem Header="退出" Command="{Binding ExitCommand}" />
+            <NativeMenuItem Header="{infra:Localize TrayExit}" Command="{Binding ExitCommand}" />
           </NativeMenu>
         </TrayIcon.Menu>
       </TrayIcon>

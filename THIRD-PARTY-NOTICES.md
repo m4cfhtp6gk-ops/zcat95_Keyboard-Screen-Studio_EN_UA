@@ -6,7 +6,7 @@ Keyboard Screen Studio source code is licensed under the MIT License. Third-part
 
 - **.NET 8 self-contained runtime** — Microsoft .NET Library License. The applicable runtime license and third-party notices are distributed in `Licenses/dotnet-LICENSE.txt` and `Licenses/dotnet-ThirdPartyNotices.txt`.
 - **Doto** — Copyright 2024 The Doto Project Authors. Licensed under the SIL Open Font License 1.1. The license is distributed in `Licenses/Doto-OFL.txt`.
-- **MiSans** — Copyright © 小米科技有限责任公司 (Xiaomi). Free for global commercial use, bundled as the default UI font with attribution. Licensed under the MiSans Font Intellectual Property License Agreement; the license is distributed in `Licenses/MiSans-LICENSE.pdf`.
+- **MiSans** — Copyright © Xiaomi Inc. (小米科技有限责任公司). Free for global commercial use, bundled as the default UI font with attribution. Licensed under the MiSans Font Intellectual Property License Agreement; the license is distributed in `Licenses/MiSans-LICENSE.pdf`.
 
 The project's MIT license does not relicense these components.
 

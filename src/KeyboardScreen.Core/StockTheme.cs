@@ -4,9 +4,9 @@ namespace KeyboardScreen.Core;
 public sealed class StockTheme : IScreenTheme
 {
     public string Id => "stocks";
-    public string DisplayName => "股票 (Beta)";
-    public string Description => "2-5 项市场行情与双股走势对比";
-    public string Details => "支持 A股、港股、美股与虚拟币代码，可配置别名、涨跌颜色与数据源；恰好两只股票时显示近 5 日走势对比。";
+    public string DisplayName => Loc.T("ThemeStocksName");
+    public string Description => Loc.T("ThemeStocksDescription");
+    public string Details => Loc.T("ThemeStocksDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -17,15 +17,15 @@ public sealed class StockTheme : IScreenTheme
         var stroke = Color.FromRgb(29, 36, 45);
 
         canvas.Fill(Color.FromRgb(5, 9, 14));
-        ThemeHeader.Draw(canvas, snapshot, "股票");
+        ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitleStocks"));
 
         var quotes = (stocks?.Quotes ?? []).ToList();
 
         if (quotes.Count == 0)
         {
-            canvas.AlignedText("暂无行情", 17, Colors.White,
+            canvas.AlignedText(Loc.T("ScreenStocksEmpty"), 17, Colors.White,
                 new Rect(safe.Left, safe.Top + 145, safe.Width, 26), FontWeights.SemiBold, TextAlignment.Center);
-            canvas.AlignedText("请在屏幕配置中添加代码", 10, secondary,
+            canvas.AlignedText(Loc.T("ScreenStocksAddSymbols"), 10, secondary,
                 new Rect(safe.Left, safe.Top + 180, safe.Width, 18), FontWeights.Normal, TextAlignment.Center);
             return;
         }
@@ -79,7 +79,7 @@ public sealed class StockTheme : IScreenTheme
             }
         }
 
-        var footer = stocks is { IsStale: true } ? "上次行情数据" : $"更新 {stocks?.UpdatedAt:HH:mm}";
+        var footer = stocks is { IsStale: true } ? Loc.T("ScreenStocksStale") : Loc.T("ScreenWeatherUpdated", stocks?.UpdatedAt.ToString("HH:mm"));
         canvas.AlignedText(footer, 9, secondary,
             new Rect(safe.Left, safe.Bottom - 21, safe.Width, 14), FontWeights.Normal, TextAlignment.Center);
     }

@@ -7,9 +7,9 @@ public sealed class DotMatrixProgressTheme : IScreenTheme
     private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
     public string Id => "clock-dot-progress";
-    public string DisplayName => "点阵进度";
-    public string Description => "用全屏点阵显示自然时间进度";
-    public string Details => "按今天、本周、本月、本季度或本年计算已经经过的比例，白色点阵由下向上逐步填充。";
+    public string DisplayName => Loc.T("ThemeClockDotProgressName");
+    public string Description => Loc.T("ThemeClockDotProgressDescription");
+    public string Details => Loc.T("ThemeClockDotProgressDetails");
 
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
@@ -106,10 +106,10 @@ public sealed class DotMatrixProgressTheme : IScreenTheme
 
     private static string GetLabel(DotMatrixProgressPeriod period) => period switch
     {
-        DotMatrixProgressPeriod.Week => "本周",
-        DotMatrixProgressPeriod.Month => "本月",
-        DotMatrixProgressPeriod.Quarter => "本季度",
-        DotMatrixProgressPeriod.Year => "本年",
-        _ => "今天"
+        DotMatrixProgressPeriod.Week => Loc.T("ScreenPeriodWeek"),
+        DotMatrixProgressPeriod.Month => Loc.T("ScreenPeriodMonth"),
+        DotMatrixProgressPeriod.Quarter => Loc.T("ScreenPeriodQuarter"),
+        DotMatrixProgressPeriod.Year => Loc.T("ScreenPeriodYear"),
+        _ => Loc.T("ScreenPeriodToday")
     };
 }

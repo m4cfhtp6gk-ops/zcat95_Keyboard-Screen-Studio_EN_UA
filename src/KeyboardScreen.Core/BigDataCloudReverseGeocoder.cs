@@ -25,7 +25,7 @@ public sealed class BigDataCloudReverseGeocoder : IDisposable
         string latitudeText = latitude.ToString("0.######", CultureInfo.InvariantCulture);
         string longitudeText = longitude.ToString("0.######", CultureInfo.InvariantCulture);
         string uri = "https://api.bigdatacloud.net/data/reverse-geocode-client"
-            + $"?latitude={latitudeText}&longitude={longitudeText}&localityLanguage=zh";
+            + $"?latitude={latitudeText}&longitude={longitudeText}&localityLanguage={Loc.T("ReverseGeocodeLanguageCode")}";
 
         using HttpResponseMessage response = await _client.GetAsync(uri, cancellationToken);
         response.EnsureSuccessStatusCode();

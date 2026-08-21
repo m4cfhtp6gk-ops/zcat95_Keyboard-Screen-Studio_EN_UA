@@ -2,8 +2,8 @@
 namespace KeyboardScreen.Core;
 
 /// <summary>
-/// 统一主题头部设计规范：标题 12pt SemiBold 位于 (Left, Top+7)，
-/// 时间 14pt White 右上对齐位于 Top+5，与监控类主题完全一致。
+/// The shared theme header: a 12pt SemiBold title at (Left, Top+7) and a 14pt
+/// white clock right-aligned at Top+5, matching the monitoring themes exactly.
 /// </summary>
 public static class ThemeHeader
 {
@@ -17,12 +17,18 @@ public static class ThemeHeader
         bool showTime = true)
     {
         Rect safe = canvas.SafeBounds;
+
+        // Reserve the clock's corner so a long title truncates instead of
+        // running into it; translations are wider than the original Chinese.
+        const double clockReserve = 46;
         canvas.Text(
             title,
             12,
             titleColor ?? TitleColor,
             new Point(safe.Left, safe.Top + 7),
-            FontWeights.SemiBold);
+            FontWeights.SemiBold,
+            TextAlignment.Left,
+            showTime ? safe.Width - clockReserve : safe.Width);
         if (showTime)
         {
             canvas.Text(

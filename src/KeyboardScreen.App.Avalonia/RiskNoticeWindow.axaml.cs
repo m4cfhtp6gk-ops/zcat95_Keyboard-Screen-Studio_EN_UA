@@ -2,12 +2,13 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Transformation;
+using KeyboardScreen.Core;
 
 namespace KeyboardScreen.App.Avalonia;
 
 public sealed partial class RiskNoticeWindow : Window
 {
-    public RiskNoticeWindow() : this("使用提示", string.Empty, string.Empty)
+    public RiskNoticeWindow() : this(Loc.T("RiskNoticeTitle"), string.Empty, string.Empty)
     {
     }
 

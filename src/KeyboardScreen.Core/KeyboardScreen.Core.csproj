@@ -9,6 +9,14 @@
     <Compile Include="Platform\Windows\**" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'" />
   </ItemGroup>
   <ItemGroup>
+    <!-- WithCulture=false is required: the .en / .uk / .zh-Hans infix otherwise
+         reads as a culture tag and MSBuild ships these in satellite assemblies
+         instead of embedding them in the main one. -->
+    <EmbeddedResource Include="Localization/Strings.en.json" LogicalName="KeyboardScreen.Core.Localization.Strings.en.json" WithCulture="false" />
+    <EmbeddedResource Include="Localization/Strings.uk.json" LogicalName="KeyboardScreen.Core.Localization.Strings.uk.json" WithCulture="false" />
+    <EmbeddedResource Include="Localization/Strings.zh-Hans.json" LogicalName="KeyboardScreen.Core.Localization.Strings.zh-Hans.json" WithCulture="false" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="Assets\Fonts\Doto.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="Assets\Fonts\Doto-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Fonts\MiSans-Medium.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />

@@ -9,6 +9,9 @@ public sealed class AppSettings
 
 	public UiThemeMode UiThemeMode { get; set; } = UiThemeMode.System;
 
+	/// <summary>Language identifier ("en", "uk", "zh-Hans"); empty means "ask the OS".</summary>
+	public string Language { get; set; } = string.Empty;
+
 
 	public bool AutoPush { get; set; } = true;
 
@@ -39,6 +42,8 @@ public sealed class AppSettings
 
 	public bool HasAcknowledgedAiUsageNotice { get; set; }
 
+	public bool HasAcknowledgedClaudeNotice { get; set; }
+
 	public bool AutoSwitchToMusic { get; set; }
 
 	public bool AutoMediaThemeSwitch { get; set; }
@@ -58,6 +63,8 @@ public sealed class AppSettings
 	public WeatherSettings Weather { get; set; } = new();
 
 	public StockSettings Stocks { get; set; } = new();
+
+	public ClaudeUsageSettings ClaudeUsage { get; set; } = new();
 
 
 

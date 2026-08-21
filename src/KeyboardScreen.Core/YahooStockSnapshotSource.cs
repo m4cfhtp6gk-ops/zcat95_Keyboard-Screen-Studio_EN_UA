@@ -81,13 +81,13 @@ public sealed class YahooStockSnapshotSource : IStockSnapshotSource, IDisposable
         var chart = document.RootElement.GetProperty("chart");
         if (chart.TryGetProperty("error", out var error) && error.ValueKind is not JsonValueKind.Null)
         {
-            throw new InvalidOperationException($"无法读取 {item.Symbol}");
+            throw new InvalidOperationException(Loc.T("StockReadFailed", item.Symbol));
         }
 
         var result = chart.GetProperty("result");
         if (result.GetArrayLength() == 0)
         {
-            throw new InvalidOperationException($"没有找到代码：{item.Symbol}");
+            throw new InvalidOperationException(Loc.T("StockSymbolNotFound", item.Symbol));
         }
 
         var meta = result[0].GetProperty("meta");
@@ -97,7 +97,7 @@ public sealed class YahooStockSnapshotSource : IStockSnapshotSource, IDisposable
             : ReadNumber(meta, "previousClose");
         if (previous == 0)
         {
-            throw new InvalidOperationException($"{item.Symbol} 缺少昨收数据");
+            throw new InvalidOperationException(Loc.T("StockMissingPreviousClose", item.Symbol));
         }
 
         var timestamp = meta.TryGetProperty("regularMarketTime", out var marketTime)
@@ -142,7 +142,7 @@ public sealed class YahooStockSnapshotSource : IStockSnapshotSource, IDisposable
     {
         if (!element.TryGetProperty(propertyName, out var property) || !property.TryGetDouble(out var value))
         {
-            throw new InvalidOperationException($"行情缺少 {propertyName}");
+            throw new InvalidOperationException(Loc.T("StockQuoteMissingField", propertyName));
         }
         return value;
     }

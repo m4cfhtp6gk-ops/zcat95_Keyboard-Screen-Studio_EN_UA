@@ -2,7 +2,8 @@
     x:Class="KeyboardScreen.App.Avalonia.RiskNoticeWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="使用提示"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure"
+    Title="{infra:Localize RiskNoticeTitle}"
     Width="520"
     SizeToContent="Height"
     CanResize="False"
@@ -54,7 +55,7 @@
           <TextBlock x:Name="NoticeBody" FontSize="14" LineHeight="23" TextWrapping="Wrap" />
           <TextBlock
               Classes="secondary"
-              Text="你可以继续使用；此提示只会显示一次。"
+              Text="{infra:Localize RiskNoticeFooter}"
               TextWrapping="Wrap" />
         </StackPanel>
       </Border>
@@ -65,7 +66,7 @@
           HorizontalAlignment="Stretch"
           FontWeight="SemiBold"
           Click="ContinueButton_OnClick"
-          Content="我已了解" />
+          Content="{infra:Localize RiskNoticeAck}" />
     </Grid>
   </Border>
 </Window>

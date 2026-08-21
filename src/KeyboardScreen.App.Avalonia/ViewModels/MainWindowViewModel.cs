@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly YahooStockSnapshotSource _yahooStockSource = new();
     private readonly TencentStockSnapshotSource _tencentStockSource = new();
     private readonly TokscaleDataSource _tokscaleSource = new();
+    private readonly ClaudeUsageSnapshotSource _claudeUsageSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -43,7 +44,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _selectedNavigation = "screen";
     private ThemeItemViewModel? _selectedTheme;
     private Bitmap? _previewImage;
-    private string _deviceStatus = "断开连接";
+    private string _deviceStatus = Loc.T("StatusDisconnected");
     private bool _deviceConnected;
     private string _deviceIp = string.Empty;
     private string _accentColor = "#E4694C";
@@ -60,7 +61,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private bool _startMinimized;
     private bool _launchAtStartup;
     private bool _weatherAutomaticLocation = true;
-    private string _weatherLocation = "北京";
+    private string _weatherLocation = WeatherSettings.DefaultLocationQuery;
     private string _stockSymbol1 = string.Empty;
     private string _stockAlias1 = string.Empty;
     private string _stockSymbol2 = string.Empty;
@@ -71,8 +72,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _stockAlias4 = string.Empty;
     private string _stockSymbol5 = string.Empty;
     private string _stockAlias5 = string.Empty;
-    private string _stockColorPreference = "红涨绿跌";
-    private string _stockSourcePreference = "腾讯行情";
+    private bool _stockRedForGain = true;
+    private bool _stockUseTencentSource = true;
     private bool _stockEnabled1 = true;
     private bool _stockEnabled2 = true;
     private bool _stockEnabled3 = true;
@@ -83,14 +84,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private TokscaleCatalog? _tokscaleCatalog;
     private string _aiDisplayName = string.Empty;
     private decimal _aiProgressTarget;
-    private string _tokscaleStatusTitle = "正在检测 Tokscale";
-    private string _tokscaleStatusMessage = "正在读取本机用量数据…";
+    private string _tokscaleStatusTitle = Loc.T("TokscaleDetecting");
+    private string _tokscaleStatusMessage = Loc.T("TokscaleReadingLocal");
     private TokscaleStatus _tokscaleStatus = TokscaleStatus.NoData;
     private string _currentThemeName = string.Empty;
     private string _currentThemeDescription = string.Empty;
     private string _currentThemeDetails = string.Empty;
-    private string _sourceSummary = "正在读取数据…";
-    private string _lastUpdated = "尚未刷新";
+    private string _sourceSummary = Loc.T("SourceReading");
+    private string _lastUpdated = Loc.T("LastUpdatedNever");
     private string _safeLeft = "10";
     private string _safeTop = "52";
     private string _safeRight = "10";
@@ -113,6 +114,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _imageFlipTimeFontSize = 29;
     private UiThemeMode _uiThemeMode = UiThemeMode.System;
     private string _updateStatusText = string.Empty;
+    private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
+    private string _claudeSessionKey = string.Empty;
+    private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
+    private bool _claudeCountLocalTokens = true;
+    private ClaudeUsageSnapshot? _claudeUsage;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -128,6 +134,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _desktopServices = desktopServices;
         _fontCatalog = new FontFolderCatalog(Path.Combine(AppContext.BaseDirectory, "Fonts"));
         _fontCatalog.FontsChanged += FontCatalogOnFontsChanged;
+        Loc.Instance.LanguageChanged += OnLanguageChanged;
 
         SelectNavigationCommand = new ParameterizedCommand<string>(value =>
             SelectedNavigation = string.IsNullOrWhiteSpace(value) ? "screen" : value);
@@ -153,9 +160,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<TokscaleDataOption> TokscaleOptions { get; } = [];
     public IReadOnlyList<AiUsageModeOption> AiUsageModes { get; } =
     [
-        new(AiUsageDataKind.SubscriptionRemaining, "订阅剩余额度", "读取 Tokscale Usage 中的周期额度与重置时间"),
-        new(AiUsageDataKind.ModelTokens, "模型 Token", "按客户端、供应商和模型显示累计 Token"),
-        new(AiUsageDataKind.ModelCost, "模型费用", "按客户端、供应商和模型显示估算费用")
+        new(AiUsageDataKind.SubscriptionRemaining, "AiKindSubscription", "AiKindSubscriptionHint"),
+        new(AiUsageDataKind.ModelTokens, "AiKindModelTokens", "AiKindModelTokensHint"),
+        new(AiUsageDataKind.ModelCost, "AiKindModelCost", "AiKindModelCostHint")
     ];
 
     public ICommand SelectNavigationCommand { get; }
@@ -189,6 +196,25 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsAboutPage => SelectedNavigation == "about";
 
     public string AppVersion { get; } = ResolveAppVersion();
+
+    public string AppVersionLabel => Loc.T("AboutVersion", AppVersion);
+
+    public IReadOnlyList<AppLanguageInfo> AppLanguages => AppLanguageInfo.All;
+
+    public AppLanguageInfo SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            if (value is null || !SetProperty(ref _selectedLanguage, value))
+            {
+                return;
+            }
+
+            Loc.Language = value.Language;
+            ScheduleCommit();
+        }
+    }
 
     private static string ResolveAppVersion()
     {
@@ -367,14 +393,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 item.IsSelected = ReferenceEquals(item, value);
             }
 
-            CurrentThemeName = value.Name;
-            CurrentThemeDescription = value.Id == "image" && !string.IsNullOrWhiteSpace(_imageTheme.ImagePath)
-                ? _imageTheme.ImagePath
-                : value.Description;
-            CurrentThemeDetails = value.Details;
+            ApplySelectedThemeText(value);
             Interlocked.Increment(ref _themeSelectionVersion);
             SourceSummary = GetLoadingSummary(value.Id);
-            LastUpdated = "正在刷新";
+            LastUpdated = Loc.T("LastUpdatedRefreshing");
             RaiseThemeContextProperties();
             ScheduleCommit();
         }
@@ -418,7 +440,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    public string DeviceSummary => string.IsNullOrWhiteSpace(DeviceIp) ? "地址未配置" : DeviceIp;
+    public string DeviceSummary => string.IsNullOrWhiteSpace(DeviceIp) ? Loc.T("DeviceNotConfigured") : DeviceIp;
 
     public string AccentColor
     {
@@ -458,17 +480,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             if (_refreshSeconds < 60)
             {
-                return $"{_refreshSeconds} 秒";
+                return Loc.T("DurationSeconds", _refreshSeconds);
             }
             if (_refreshSeconds % 3600 == 0)
             {
-                return $"{_refreshSeconds / 3600} 小时";
+                return Loc.T("DurationHours", _refreshSeconds / 3600);
             }
             if (_refreshSeconds % 60 == 0)
             {
-                return $"{_refreshSeconds / 60} 分钟";
+                return Loc.T("DurationMinutes", _refreshSeconds / 60);
             }
-            return $"{_refreshSeconds} 秒";
+            return Loc.T("DurationSeconds", _refreshSeconds);
         }
     }
 
@@ -616,21 +638,55 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _stockAlias3, value)) ScheduleCommit(); }
     }
 
-    public string StockColorPreference
+    /// <summary>True when a rise is drawn red (the mainland-China convention).</summary>
+    public bool StockRedForGain
     {
-        get => _stockColorPreference;
-        set { if (SetProperty(ref _stockColorPreference, value)) ScheduleCommit(); }
+        get => _stockRedForGain;
+        set
+        {
+            if (SetProperty(ref _stockRedForGain, value))
+            {
+                OnPropertyChanged(nameof(StockColorPreference));
+                ScheduleCommit();
+            }
+        }
     }
 
-    public IReadOnlyList<string> StockColorPreferences { get; } = ["红涨绿跌", "绿涨红跌"];
+    /// <summary>
+    /// The picker binds to display text, but the choice itself is stored as a
+    /// bool, so switching language never invalidates the saved preference.
+    /// </summary>
+    public string StockColorPreference
+    {
+        get => StockColorPreferences[_stockRedForGain ? 0 : 1];
+        set => StockRedForGain = string.Equals(value, StockColorPreferences[0], StringComparison.Ordinal);
+    }
+
+    public IReadOnlyList<string> StockColorPreferences =>
+        [Loc.T("StockColorRedUp"), Loc.T("StockColorGreenUp")];
+
+    /// <summary>True for the Tencent feed, false for Yahoo Finance.</summary>
+    public bool StockUseTencentSource
+    {
+        get => _stockUseTencentSource;
+        set
+        {
+            if (SetProperty(ref _stockUseTencentSource, value))
+            {
+                OnPropertyChanged(nameof(StockSourcePreference));
+                ScheduleCommit();
+            }
+        }
+    }
 
     public string StockSourcePreference
     {
-        get => _stockSourcePreference;
-        set { if (SetProperty(ref _stockSourcePreference, value)) ScheduleCommit(); }
+        get => StockSourceOptions[_stockUseTencentSource ? 0 : 1];
+        set => StockUseTencentSource = string.Equals(value, StockSourceOptions[0], StringComparison.Ordinal);
     }
 
-    public IReadOnlyList<string> StockSourceOptions { get; } = ["腾讯行情", "雅虎 Finance"];
+    public IReadOnlyList<string> StockSourceOptions =>
+        [Loc.T("StockSourceTencent"), Loc.T("StockSourceYahoo")];
 
     public string StockSymbol4
     {
@@ -904,7 +960,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _imageTimePlacement, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<ImageTimePlacement> ImageTimePlacements { get; } =
+    public IReadOnlyList<ImageTimePlacement> ImageTimePlacements =>
         Enum.GetValues<ImageTimePlacement>();
 
     public ImageClockStyle ImageClockStyle
@@ -924,7 +980,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    public IReadOnlyList<ImageClockStyle> ImageClockStyles { get; } =
+    public IReadOnlyList<ImageClockStyle> ImageClockStyles =>
         [ImageClockStyle.Digital, ImageClockStyle.Analog, ImageClockStyle.Flip];
 
     public bool ImageTimeBackground
@@ -939,7 +995,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _imageTextColor, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<ImageTextColor> ImageTextColors { get; } = Enum.GetValues<ImageTextColor>();
+    public IReadOnlyList<ImageTextColor> ImageTextColors => Enum.GetValues<ImageTextColor>();
 
     public ImageTextAlignment ImageTextAlignment
     {
@@ -947,7 +1003,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _imageTextAlignment, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<ImageTextAlignment> ImageTextAlignments { get; } = Enum.GetValues<ImageTextAlignment>();
+    public IReadOnlyList<ImageTextAlignment> ImageTextAlignments => Enum.GetValues<ImageTextAlignment>();
 
     public int ImageTimeFontSize
     {
@@ -973,7 +1029,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _imageDigitalOrder, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<ImageDigitalOrder> ImageDigitalOrders { get; } = Enum.GetValues<ImageDigitalOrder>();
+    public IReadOnlyList<ImageDigitalOrder> ImageDigitalOrders => Enum.GetValues<ImageDigitalOrder>();
 
     public int ImageLargeTimeFontSize
     {
@@ -993,7 +1049,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _imageAnalogOrder, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<ImageAnalogOrder> ImageAnalogOrders { get; } = Enum.GetValues<ImageAnalogOrder>();
+    public IReadOnlyList<ImageAnalogOrder> ImageAnalogOrders => Enum.GetValues<ImageAnalogOrder>();
 
     public int ImageFlipTimeFontSize
     {
@@ -1026,7 +1082,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _uiThemeMode, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<UiThemeMode> UiThemeModes { get; } = Enum.GetValues<UiThemeMode>();
+    public IReadOnlyList<UiThemeMode> UiThemeModes => Enum.GetValues<UiThemeMode>();
 
     public DotMatrixProgressPeriod DotMatrixProgressPeriod
     {
@@ -1034,7 +1090,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _dotMatrixProgressPeriod, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<DotMatrixProgressPeriod> DotMatrixProgressPeriods { get; } =
+    public IReadOnlyList<DotMatrixProgressPeriod> DotMatrixProgressPeriods =>
         Enum.GetValues<DotMatrixProgressPeriod>();
 
     public int DotMatrixProgressHeaderFontSize
@@ -1050,6 +1106,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public int ThemeAccentColumnSpan => IsImageTheme || IsDotMatrixProgressTheme ? 1 : 3;
     public bool IsStockTheme => SelectedTheme?.Id == "stocks";
     public bool IsAiTheme => SelectedTheme?.Id == "ai-quota";
+
+    public bool IsClaudeTheme => SelectedTheme?.Id == "claude-usage";
+
+    /// <summary>
+    /// The claude.ai session cookie. It is written to this machine's settings
+    /// file and sent to claude.ai only; the risk notice says so before it is asked for.
+    /// </summary>
+    public string ClaudeSessionKey
+    {
+        get => _claudeSessionKey;
+        set
+        {
+            if (SetProperty(ref _claudeSessionKey, value))
+            {
+                // A different account means the cached organization is wrong.
+                _settings.ClaudeUsage.OrganizationId = string.Empty;
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string ClaudeModelScope
+    {
+        get => _claudeModelScope;
+        set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
+    }
+
+    public bool ClaudeCountLocalTokens
+    {
+        get => _claudeCountLocalTokens;
+        set { if (SetProperty(ref _claudeCountLocalTokens, value)) ScheduleCommit(); }
+    }
     public bool IsMusicTheme => SelectedTheme is not null &&
         MediaThemeAutomation.IsMusicThemeId(SelectedTheme.Id);
     public bool IsSystemTheme => SelectedTheme?.Id is
@@ -1060,6 +1148,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             "stocks" => !_settings.HasAcknowledgedStockNotice,
             "ai-quota" => !_settings.HasAcknowledgedAiUsageNotice,
+            "claude-usage" => !_settings.HasAcknowledgedClaudeNotice,
             _ => false
         };
 
@@ -1072,6 +1161,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
             case "ai-quota":
                 _settings.HasAcknowledgedAiUsageNotice = true;
+                break;
+            case "claude-usage":
+                _settings.HasAcknowledgedClaudeNotice = true;
                 break;
             default:
                 return;
@@ -1117,7 +1209,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     private async Task CheckForUpdatesAsync()
     {
-        UpdateStatusText = "正在检查更新…";
+        UpdateStatusText = Loc.T("UpdateChecking");
         IsUpdateAvailable = false;
         if (!Version.TryParse(AppVersion, out Version? currentVersion))
         {
@@ -1127,7 +1219,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         UpdateCheckResult result = await new ReleaseUpdateChecker().CheckAsync(currentVersion);
         if (result.Error is not null)
         {
-            UpdateStatusText = $"检查失败（{result.Error}），请重试";
+            UpdateStatusText = Loc.T("UpdateCheckFailed", result.Error);
             return;
         }
 
@@ -1135,11 +1227,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             LatestReleaseUrl = result.HtmlUrl;
             IsUpdateAvailable = true;
-            UpdateStatusText = $"发现新版本 {result.TagName}";
+            UpdateStatusText = Loc.T("UpdateAvailable", result.TagName);
         }
         else
         {
-            UpdateStatusText = "已是最新版本";
+            UpdateStatusText = Loc.T("UpdateUpToDate");
         }
     }
 
@@ -1154,12 +1246,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _lifetime?.Cancel();
         _commitDelay?.Cancel();
         _fontCatalog.FontsChanged -= FontCatalogOnFontsChanged;
+        Loc.Instance.LanguageChanged -= OnLanguageChanged;
         _fontCatalog.Dispose();
         (_systemSource as IDisposable)?.Dispose();
         _transport.Dispose();
         _weatherSource.Dispose();
         _yahooStockSource.Dispose();
         _tencentStockSource.Dispose();
+        _claudeUsageSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -1168,15 +1262,69 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         await Task.CompletedTask;
     }
 
+    private void ApplySelectedThemeText(ThemeItemViewModel theme)
+    {
+        CurrentThemeName = theme.Name;
+        CurrentThemeDescription = theme.Id == "image" && !string.IsNullOrWhiteSpace(_imageTheme.ImagePath)
+            ? _imageTheme.ImagePath
+            : theme.Description;
+        CurrentThemeDetails = theme.Details;
+    }
+
+    /// <summary>
+    /// Re-reads every piece of derived text after the language changed. Bindings
+    /// on this view model refresh from the blanket notification; the item view
+    /// models and the rendered preview have to be told individually.
+    /// </summary>
+    private void OnLanguageChanged(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            OnPropertyChanged(null);
+
+            foreach (ThemeGroupViewModel group in ThemeGroups)
+            {
+                group.RaiseLocalizedTextChanged();
+            }
+
+            foreach (AiUsageModeOption mode in AiUsageModes)
+            {
+                mode.RaiseLocalizedTextChanged();
+            }
+
+            if (SelectedTheme is { } selected)
+            {
+                ApplySelectedThemeText(selected);
+            }
+
+            UpdateTokscaleStatusTitle();
+            RebuildTokscaleOptions();
+            ReloadFonts();
+            _ = RefreshAndPushAsync(shouldPush: false, forcePush: false);
+        });
+
+    private void UpdateTokscaleStatusTitle() =>
+        TokscaleStatusTitle = _tokscaleStatus switch
+        {
+            TokscaleStatus.Ready => Loc.T("TokscaleStatusReady"),
+            TokscaleStatus.NotInstalled => Loc.T("TokscaleStatusNotInstalled"),
+            TokscaleStatus.NoData => Loc.T("TokscaleStatusNoData"),
+            _ => Loc.T("TokscaleStatusError")
+        };
+
     private void BuildThemeGroups()
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
-        AddGroup("监控", ["system", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
-        AddGroup("时间", ["clock", "clock-neon", "clock-flip", "image"], byId);
-        AddGroup("资讯", ["weather-five-day", "stocks", "ai-quota"], byId);
-        AddGroup("音乐", ["music", "music-minimal", "music-poster"], byId);
-        AddGroup("点阵", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
+        AddGroup("ThemeGroupMonitoring", ["system", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
+        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "image"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
+        AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
         IdleThemeOptions.Clear();
         MusicThemeOptions.Clear();
@@ -1187,7 +1335,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private void AddGroup(
-        string name,
+        string nameKey,
         IEnumerable<string> ids,
         IReadOnlyDictionary<string, IScreenTheme> byId)
     {
@@ -1195,7 +1343,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             .Where(byId.ContainsKey)
             .Select(id => new ThemeItemViewModel(byId[id]))
             .ToArray();
-        ThemeGroups.Add(new ThemeGroupViewModel(name, items));
+        ThemeGroups.Add(new ThemeGroupViewModel(nameKey, items));
     }
 
     private void ApplySettings()
@@ -1204,6 +1352,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         DeviceIp = ExtractDeviceIp(_settings.DeviceEndpoint);
         AccentColor = string.IsNullOrWhiteSpace(_settings.AccentColor) ? "#E4694C" : _settings.AccentColor;
         SelectedFontId = _settings.SelectedFontId;
+        SelectedLanguage = AppLanguageInfo.For(
+            string.IsNullOrWhiteSpace(_settings.Language)
+                ? Loc.Language
+                : AppLanguageInfo.Parse(_settings.Language));
         RefreshSeconds = _settings.RefreshSeconds;
         AutoPush = _settings.AutoPush;
         AutoMediaThemeSwitch = _settings.AutoMediaThemeSwitch;
@@ -1217,7 +1369,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         LaunchAtStartup = _settings.LaunchAtStartup;
         WeatherAutomaticLocation = _settings.Weather?.UseAutomaticLocation ?? true;
         WeatherLocation = string.IsNullOrWhiteSpace(_settings.Weather?.LocationQuery)
-            ? "北京"
+            ? WeatherSettings.DefaultLocationQuery
             : _settings.Weather.LocationQuery;
         IReadOnlyList<StockItemSettings> stockItems = NormalizeStockItems(_settings.Stocks ?? new StockSettings());
         StockSymbol1 = stockItems[0].Symbol;
@@ -1230,10 +1382,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockAlias4 = stockItems[3].Alias;
         StockSymbol5 = stockItems[4].Symbol;
         StockAlias5 = stockItems[4].Alias;
-        StockColorPreference = (_settings.Stocks?.RedForGain ?? true) ? "红涨绿跌" : "绿涨红跌";
-        StockSourcePreference = (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent
-            ? "腾讯行情"
-            : "雅虎 Finance";
+        _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
+        ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
+            ? ClaudeUsageSettings.DefaultModelScope
+            : _settings.ClaudeUsage.ModelScope;
+        ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
+        StockRedForGain = _settings.Stocks?.RedForGain ?? true;
+        StockUseTencentSource = (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
         StockEnabled2 = stockItems[1].Enabled;
         StockEnabled3 = stockItems[2].Enabled;
@@ -1301,6 +1457,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(ThemeAccentColumnSpan));
         OnPropertyChanged(nameof(IsStockTheme));
         OnPropertyChanged(nameof(IsAiTheme));
+        OnPropertyChanged(nameof(IsClaudeTheme));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -1311,13 +1468,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         TokscaleCatalog catalog = await _tokscaleSource.ReadCatalogAsync(force);
         _tokscaleCatalog = catalog;
         _tokscaleStatus = catalog.Status;
-        TokscaleStatusTitle = catalog.Status switch
-        {
-            TokscaleStatus.Ready => "Tokscale 已连接",
-            TokscaleStatus.NotInstalled => "尚未检测到 Tokscale",
-            TokscaleStatus.NoData => "Tokscale 暂无数据",
-            _ => "Tokscale 读取失败"
-        };
+        UpdateTokscaleStatusTitle();
         TokscaleStatusMessage = catalog.Message;
         OnPropertyChanged(nameof(IsTokscaleReady));
         OnPropertyChanged(nameof(IsTokscaleUnavailable));
@@ -1342,8 +1493,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         if (_tokscaleStatus == TokscaleStatus.Ready && TokscaleOptions.Count == 0)
         {
             TokscaleStatusMessage = SelectedAiUsageMode?.Kind == AiUsageDataKind.SubscriptionRemaining
-                ? "Tokscale 已连接，但没有订阅额度数据。可切换到模型 Token 或模型费用。"
-                : "Tokscale 已连接，但当前没有模型统计数据。";
+                ? Loc.T("TokscaleNoSubscriptionData")
+                : Loc.T("TokscaleNoModelData");
         }
     }
     private void ScheduleCommit()
@@ -1388,6 +1539,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             ? AccentColor.Trim().ToUpperInvariant()
             : "#E4694C";
         _settings.SelectedFontId = SelectedFontId;
+        _settings.Language = SelectedLanguage.Id;
         _settings.RefreshSeconds = RefreshSeconds;
         _settings.AutoPush = AutoPush;
         _settings.AutoMediaThemeSwitch = AutoMediaThemeSwitch;
@@ -1433,11 +1585,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         };
         _settings.Weather ??= new WeatherSettings();
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
-        _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? "北京" : WeatherLocation.Trim();
+        _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
+        _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        _settings.ClaudeUsage.SessionKey = ClaudeSessionKey.Trim();
+        _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
+            ? ClaudeUsageSettings.DefaultModelScope
+            : ClaudeModelScope.Trim();
+        _settings.ClaudeUsage.CountLocalTokens = ClaudeCountLocalTokens;
         _settings.Stocks = new StockSettings
         {
-            SourceKind = StockSourcePreference == "腾讯行情" ? StockSourceKind.Tencent : StockSourceKind.Yahoo,
-            RedForGain = StockColorPreference == "红涨绿跌",
+            SourceKind = StockUseTencentSource ? StockSourceKind.Tencent : StockSourceKind.Yahoo,
+            RedForGain = StockRedForGain,
             Items =
             [
                 new StockItemSettings { Enabled = StockEnabled1, Symbol = StockSymbol1.Trim(), Alias = StockAlias1.Trim() },
@@ -1529,6 +1687,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            ClaudeUsageSnapshot? claudeUsage = null;
+            if (requestedTheme.Id == "claude-usage" || theme.Id == "claude-usage")
+            {
+                claudeUsage = await _claudeUsageSource.ReadAsync(
+                    _settings.ClaudeUsage ?? new ClaudeUsageSettings(),
+                    cancellationToken);
+                _claudeUsage = claudeUsage;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -1551,7 +1718,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Music = music,
                 Weather = weather,
                 Stocks = stocks,
-                AiQuota = aiQuota
+                AiQuota = aiQuota,
+                ClaudeUsage = claudeUsage
             };
             _latestFrame = _renderer.Render(
                 theme,
@@ -1590,7 +1758,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
                 PreviewImage = bitmap;
                 accepted = true;
-                LastUpdated = $"更新于 {DateTime.Now:HH:mm:ss}";
+                LastUpdated = Loc.T("LastUpdatedAt", DateTime.Now.ToString("HH:mm:ss"));
                 SourceSummary = BuildSourceSummary(requestedTheme.Id, system, music, weather, stocks, aiQuota);
             });
             if (!accepted)
@@ -1604,7 +1772,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 if (selectionVersion == Volatile.Read(ref _themeSelectionVersion))
                 {
-                    SourceSummary = $"刷新失败：{ex.Message}";
+                    SourceSummary = Loc.T("RefreshFailed", ex.Message);
                 }
             });
         }
@@ -1638,7 +1806,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         Dispatcher.UIThread.Post(() =>
         {
             DeviceConnected = connected;
-            DeviceStatus = connected ? "设备在线" : "断开连接";
+            DeviceStatus = Loc.T(connected ? "StatusOnline" : "StatusDisconnected");
         });
 
     private void ReloadFonts()
@@ -1750,27 +1918,46 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         themeId switch
         {
             "system" or "dashboard" or "performance" or "network" or "system-minimal" =>
-                $"CPU {system.CpuPercent:0}% · 内存 {system.MemoryPercent:0}% · 下载 {system.DownloadMbps:0.0}M · 上传 {system.UploadMbps:0.0}M",
+                Loc.T("SummarySystem",
+                    system.CpuPercent.ToString("0"),
+                    system.MemoryPercent.ToString("0"),
+                    system.DownloadMbps.ToString("0.0"),
+                    system.UploadMbps.ToString("0.0")),
             "music" or "music-minimal" or "music-poster" =>
-                music.Available ? $"{(music.IsPlaying ? "正在播放" : "已暂停")} · {music.Title} — {music.Artist}" : "当前没有可用的 Windows 媒体会话",
+                music.Available
+                    ? Loc.T("SummaryMusic",
+                        Loc.T(music.IsPlaying ? "ScreenMusicPlaying" : "ScreenMusicPaused"),
+                        music.Title,
+                        music.Artist)
+                    : Loc.T("SummaryNoMediaSession"),
             "clock-weather-dot" or "weather-five-day" or "image" when weather is { Available: true } =>
-                weather is { Available: true } ? $"{weather.LocationName} · {weather.TemperatureC:0}° · {weather.ConditionText}" : weather?.ErrorMessage ?? "暂无天气数据",
+                weather is { Available: true }
+                    ? Loc.T("SummaryWeather", weather.LocationName, weather.TemperatureC.ToString("0"), weather.ConditionText)
+                    : weather?.ErrorMessage ?? Loc.T("SummaryNoWeather"),
             "stocks" =>
-                stocks is { Quotes.Count: > 0 } ? $"{stocks.Quotes.Count} 项行情 · 更新 {stocks.UpdatedAt:HH:mm}" : stocks?.ErrorMessage ?? "请先配置股票代码",
+                stocks is { Quotes.Count: > 0 }
+                    ? Loc.T("SummaryStocks", stocks.Quotes.Count, stocks.UpdatedAt.ToString("HH:mm"))
+                    : stocks?.ErrorMessage ?? Loc.T("SummaryConfigureStocks"),
+            "claude-usage" => _claudeUsage is { Available: true, Session: { } claudeSession, Week: { } claudeWeek }
+                ? Loc.T("SummaryClaude",
+                    claudeSession.EffectivePercent.ToString("0"),
+                    claudeWeek.EffectivePercent.ToString("0"))
+                : _claudeUsage?.ErrorMessage ?? Loc.T("SummaryClaudeNotConfigured"),
             "ai-quota" => aiQuota.Available
                 ? $"{aiQuota.PlatformName} · {aiQuota.PrimaryDisplay}"
-                : _tokscaleCatalog?.Message ?? "尚未读取 Tokscale 数据",
-            _ => "此主题仅使用本地时间与设置"
+                : _tokscaleCatalog?.Message ?? Loc.T("SummaryNoTokscaleData"),
+            _ => Loc.T("SummaryLocalOnly")
         };
 
     private static string GetLoadingSummary(string themeId) =>
         themeId switch
         {
-            "system" or "dashboard" or "performance" or "network" or "system-minimal" => "正在读取电脑状态…",
-            "music" or "music-minimal" or "music-poster" => "正在读取媒体状态…",
-            "clock-weather-dot" or "weather-five-day" => "正在读取天气数据…",
-            "stocks" => "正在读取股票行情…",
-            "ai-quota" => "正在读取 AI 用量…",
-            _ => "正在刷新主题数据…"
+            "system" or "dashboard" or "performance" or "network" or "system-minimal" => Loc.T("LoadingSystem"),
+            "music" or "music-minimal" or "music-poster" => Loc.T("LoadingMusic"),
+            "clock-weather-dot" or "weather-five-day" => Loc.T("LoadingWeather"),
+            "stocks" => Loc.T("LoadingStocks"),
+            "ai-quota" => Loc.T("LoadingAiUsage"),
+            "claude-usage" => Loc.T("LoadingClaude"),
+            _ => Loc.T("LoadingTheme")
         };
 }

@@ -1,6 +1,7 @@
 <Styles
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:infra="using:KeyboardScreen.App.Avalonia.Infrastructure"
     xmlns:behaviors="using:KeyboardScreen.App.Avalonia.Behaviors">
 
   <Styles.Resources>
@@ -296,8 +297,8 @@
     <Setter Property="MinWidth" Value="92" />
     <Setter Property="Height" Value="30" />
     <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
-    <Setter Property="OnContent" Value="启用" />
-    <Setter Property="OffContent" Value="关闭" />
+    <Setter Property="OnContent" Value="{infra:Localize ToggleOn}" />
+    <Setter Property="OffContent" Value="{infra:Localize ToggleOff}" />
     <Setter Property="KnobTransitions">
       <Transitions>
         <DoubleTransition Property="Canvas.Left" Duration="0:0:0.16" />
