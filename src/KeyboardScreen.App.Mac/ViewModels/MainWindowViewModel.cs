@@ -704,7 +704,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
-        AddGroup("ThemeGroupMonitoring", ["system", "dashboard", "performance", "network", "system-minimal"], byId);
+        AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
         AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);

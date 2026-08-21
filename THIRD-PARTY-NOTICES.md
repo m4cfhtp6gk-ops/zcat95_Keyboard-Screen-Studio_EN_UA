@@ -7,6 +7,7 @@ Keyboard Screen Studio source code is licensed under the MIT License. Third-part
 - **.NET 8 self-contained runtime** — Microsoft .NET Library License. The applicable runtime license and third-party notices are distributed in `Licenses/dotnet-LICENSE.txt` and `Licenses/dotnet-ThirdPartyNotices.txt`.
 - **Doto** — Copyright 2024 The Doto Project Authors. Licensed under the SIL Open Font License 1.1. The license is distributed in `Licenses/Doto-OFL.txt`.
 - **MiSans** — Copyright © Xiaomi Inc. (小米科技有限责任公司). Free for global commercial use, bundled as the default UI font with attribution. Licensed under the MiSans Font Intellectual Property License Agreement; the license is distributed in `Licenses/MiSans-LICENSE.pdf`.
+- **LibreHardwareMonitorLib** — Copyright © LibreHardwareMonitor contributors. Licensed under the Mozilla Public License 2.0; the license is distributed in `Licenses/LibreHardwareMonitor-LICENSE.txt`. Source: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
 
 The project's MIT license does not relicense these components.
 
@@ -17,6 +18,9 @@ The project's MIT license does not relicense these components.
 - This personal project uses Open-Meteo's non-commercial free endpoint. Commercial redistributors and users must obtain an applicable Open-Meteo licence or configure another compliant service endpoint.
 - The experimental stock integration retrieves display data from an unofficial Yahoo Finance web endpoint. It is not a stable or endorsed API and may become unavailable.
 - The experimental AI-usage integration reads local usage data exposed by the user-installed open-source Tokscale tool (https://github.com/junhoyeo/tokscale). KSS does not bundle or sign in to it, and it may stop working when the tool or the underlying platforms change.
+- The optional Claude usage screen calls claude.ai account endpoints with a session key the user supplies. This is not a public or documented API; it may stop working at any time, and the key is stored locally and sent to claude.ai only.
+- Crypto prices come from the Binance public market-data endpoint (https://data-api.binance.vision) without an API key, subject to Binance's terms and rate limits.
+- Exchange rates come from the ExchangeRate-API open endpoint (https://www.exchangerate-api.com), which requires attribution: rates by ExchangeRate-API. The open endpoint updates daily and may be rate-limited.
 
 ## Visual assets
 

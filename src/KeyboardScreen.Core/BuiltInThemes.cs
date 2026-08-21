@@ -28,6 +28,7 @@ public static class BuiltInThemes
 		return new IScreenTheme[]
 		{
 			new SystemStatusTheme(),
+			new HardwareMonitorTheme(),
 			Make("dashboard", Loc.T("ThemeDashboardName"), Loc.T("ThemeDashboardDescription"), Loc.T("ThemeDashboardDetails"), Dashboard),
 			Make("performance", Loc.T("ThemePerformanceName"), Loc.T("ThemePerformanceDescription"), Loc.T("ThemePerformanceDetails"), Performance),
 			Make("network", Loc.T("ThemeNetworkName"), Loc.T("ThemeNetworkDescription"), Loc.T("ThemeNetworkDetails"), Network),

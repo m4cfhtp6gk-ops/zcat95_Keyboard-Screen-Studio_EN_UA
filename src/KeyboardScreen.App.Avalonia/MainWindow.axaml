@@ -580,6 +580,21 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsHardwareTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize HardwareHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize HardwareHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="150,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize HardwarePageSecondsLabel}" />
+                          <Slider Grid.Column="1" Minimum="3" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding HardwarePageSeconds, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="3" Maximum="10" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding HardwarePageSeconds, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsCurrencyTheme}" Classes="card">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
