@@ -25,6 +25,14 @@ public sealed partial class MainWindow : Window
         WindowsRoundedWindow.UseCustomCorners(this);
         _viewModel = new MainWindowViewModel(new WindowsDesktopServices());
         _viewModel.PickImageAsync = PickImageAsync;
+        _viewModel.ShowTelegramNoticeAsync = async () =>
+        {
+            var dialog = new RiskNoticeWindow(
+                Loc.T("RiskTelegramTitle"),
+                Loc.T("RiskTelegramHeading"),
+                Loc.T("RiskTelegramBody"));
+            await dialog.ShowDialog<bool>(this);
+        };
         DataContext = _viewModel;
         _viewModel.PropertyChanged += ViewModel_OnPropertyChanged;
         Opened += MainWindow_OnOpened;
