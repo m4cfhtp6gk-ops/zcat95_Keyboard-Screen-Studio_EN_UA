@@ -471,5 +471,15 @@
   "PomodoroStop": "Stop",
   "SummaryPomodoroIdle": "Timer stopped",
   "SummaryPomodoroPhase": "{0} · {1} left",
-  "TrayPomodoroToggle": "Start / stop Pomodoro"
+  "TrayPomodoroToggle": "Start / stop Pomodoro",
+  "ScheduleHeading": "Night schedule",
+  "ScheduleHint": "At night the screen can switch to another theme and dim the render.",
+  "ScheduleNightStartLabel": "Night starts",
+  "ScheduleNightEndLabel": "Night ends",
+  "ScheduleTimeHint": "24-hour HH:mm, e.g. 22:00; the window may cross midnight.",
+  "ScheduleSwitchThemeLabel": "Switch theme at night",
+  "ScheduleNightThemeLabel": "Night theme",
+  "ScheduleDimLabel": "Dim the screen at night",
+  "ScheduleBrightnessLabel": "Night brightness",
+  "ScheduleMediaNote": "While music plays, media automation outranks the schedule."
 }

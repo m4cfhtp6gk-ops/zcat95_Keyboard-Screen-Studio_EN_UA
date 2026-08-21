@@ -135,6 +135,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _pomodoroFocusMinutes = 25;
     private int _pomodoroBreakMinutes = 5;
     private int _pomodoroTargetCycles = 4;
+    private bool _scheduleEnabled;
+    private string _scheduleNightStart = "22:00";
+    private string _scheduleNightEnd = "07:00";
+    private bool _scheduleSwitchTheme;
+    private string _scheduleNightThemeId = "clock";
+    private bool _scheduleDimAtNight = true;
+    private int _scheduleNightBrightness = 60;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -1340,6 +1347,48 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _ = RefreshAndPushAsync(AutoPush, forcePush: true);
             }
         });
+
+    public bool ScheduleEnabled
+    {
+        get => _scheduleEnabled;
+        set { if (SetProperty(ref _scheduleEnabled, value)) ScheduleCommit(); }
+    }
+
+    public string ScheduleNightStart
+    {
+        get => _scheduleNightStart;
+        set { if (SetProperty(ref _scheduleNightStart, value)) ScheduleCommit(); }
+    }
+
+    public string ScheduleNightEnd
+    {
+        get => _scheduleNightEnd;
+        set { if (SetProperty(ref _scheduleNightEnd, value)) ScheduleCommit(); }
+    }
+
+    public bool ScheduleSwitchTheme
+    {
+        get => _scheduleSwitchTheme;
+        set { if (SetProperty(ref _scheduleSwitchTheme, value)) ScheduleCommit(); }
+    }
+
+    public string ScheduleNightThemeId
+    {
+        get => _scheduleNightThemeId;
+        set { if (SetProperty(ref _scheduleNightThemeId, value)) ScheduleCommit(); }
+    }
+
+    public bool ScheduleDimAtNight
+    {
+        get => _scheduleDimAtNight;
+        set { if (SetProperty(ref _scheduleDimAtNight, value)) ScheduleCommit(); }
+    }
+
+    public int ScheduleNightBrightness
+    {
+        get => _scheduleNightBrightness;
+        set { if (SetProperty(ref _scheduleNightBrightness, Math.Clamp(value, 20, 100))) ScheduleCommit(); }
+    }
     public bool IsMusicTheme => SelectedTheme is not null &&
         MediaThemeAutomation.IsMusicThemeId(SelectedTheme.Id);
     public bool IsSystemTheme => SelectedTheme?.Id is
@@ -1609,6 +1658,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         PomodoroFocusMinutes = _settings.Pomodoro.FocusMinutes;
         PomodoroBreakMinutes = _settings.Pomodoro.BreakMinutes;
         PomodoroTargetCycles = _settings.Pomodoro.TargetCycles;
+        _settings.Schedule ??= new ThemeScheduleSettings();
+        ScheduleEnabled = _settings.Schedule.Enabled;
+        ScheduleNightStart = FormatScheduleTime(_settings.Schedule.NightStart, "22:00");
+        ScheduleNightEnd = FormatScheduleTime(_settings.Schedule.NightEnd, "07:00");
+        ScheduleSwitchTheme = !string.IsNullOrWhiteSpace(_settings.Schedule.NightThemeId);
+        ScheduleNightThemeId = string.IsNullOrWhiteSpace(_settings.Schedule.NightThemeId)
+            ? "clock"
+            : _settings.Schedule.NightThemeId;
+        ScheduleDimAtNight = _settings.Schedule.DimAtNight;
+        ScheduleNightBrightness = _settings.Schedule.NightBrightnessPercent;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1851,6 +1910,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             BreakMinutes = PomodoroBreakMinutes,
             TargetCycles = PomodoroTargetCycles
         };
+        _settings.Schedule = new ThemeScheduleSettings
+        {
+            Enabled = ScheduleEnabled,
+            NightStart = FormatScheduleTime(ScheduleNightStart, "22:00"),
+            NightEnd = FormatScheduleTime(ScheduleNightEnd, "07:00"),
+            NightThemeId = ScheduleSwitchTheme ? ScheduleNightThemeId : string.Empty,
+            DimAtNight = ScheduleDimAtNight,
+            NightBrightnessPercent = ScheduleNightBrightness
+        };
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -1863,7 +1931,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch)
+                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true)
                 {
                     await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
                 }
@@ -1910,10 +1978,18 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             SystemSnapshot system = await Task.Run(async () => await _systemSource.ReadAsync(cancellationToken));
             _musicSource.IgnoreBrowserSessions = IgnoreBrowserMediaSessions;
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
+            bool mediaPlaying = music.Available && music.IsPlaying;
+            DateTimeOffset scheduleNow = DateTimeOffset.Now;
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
-                music.Available && music.IsPlaying,
+                mediaPlaying,
                 requestedTheme.Id);
+            // Media automation outranks the schedule, but only while it is
+            // actually showing the playing theme; the night theme applies otherwise.
+            if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
+            {
+                effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);
+            }
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
                 ?? requestedTheme;
@@ -2012,7 +2088,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     ImageAnalogClockSize,
                     ImageAnalogOrder,
                     ImageFlipTimeFontSize,
-                    DotMatrixProgressHeaderFontSize));
+                    DotMatrixProgressHeaderFontSize),
+                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow));
 
             using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
             var bitmap = new Bitmap(stream);
@@ -2150,6 +2227,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
         return items;
     }
+
+    private static string FormatScheduleTime(string? value, string fallback) =>
+        ThemeSchedule.TryParseTime(value, out TimeSpan time)
+            ? $"{(int)time.TotalHours:00}:{time.Minutes:00}"
+            : fallback;
 
     private static List<string> SplitCurrencyCodes(string value) =>
         value.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

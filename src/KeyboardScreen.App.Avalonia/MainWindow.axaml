@@ -769,6 +769,47 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="18">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="7">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ScheduleHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize ScheduleHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding ScheduleEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,16,*">
+                          <StackPanel Spacing="8">
+                            <TextBlock Classes="secondary" Text="{infra:Localize ScheduleNightStartLabel}" />
+                            <TextBox IsEnabled="{Binding ScheduleEnabled}" MaxLength="5" Text="{Binding ScheduleNightStart, Mode=TwoWay}" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="2" Spacing="8">
+                            <TextBlock Classes="secondary" Text="{infra:Localize ScheduleNightEndLabel}" />
+                            <TextBox IsEnabled="{Binding ScheduleEnabled}" MaxLength="5" Text="{Binding ScheduleNightEnd, Mode=TwoWay}" />
+                          </StackPanel>
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ScheduleTimeHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{infra:Localize ScheduleSwitchThemeLabel}" />
+                          <ToggleSwitch Grid.Column="1" IsEnabled="{Binding ScheduleEnabled}" IsChecked="{Binding ScheduleSwitchTheme, Mode=TwoWay}" />
+                        </Grid>
+                        <StackPanel Spacing="8">
+                          <TextBlock Classes="secondary" Text="{infra:Localize ScheduleNightThemeLabel}" />
+                          <ComboBox IsEnabled="{Binding ScheduleSwitchTheme}" ItemsSource="{Binding IdleThemeOptions}" SelectedValue="{Binding ScheduleNightThemeId, Mode=TwoWay}" SelectedValueBinding="{Binding Id}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{infra:Localize ScheduleDimLabel}" />
+                          <ToggleSwitch Grid.Column="1" IsEnabled="{Binding ScheduleEnabled}" IsChecked="{Binding ScheduleDimAtNight, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="130,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ScheduleBrightnessLabel}" />
+                          <Slider Grid.Column="1" IsEnabled="{Binding ScheduleDimAtNight}" Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding ScheduleNightBrightness, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" IsEnabled="{Binding ScheduleDimAtNight}" Minimum="20" Maximum="100" Increment="5" FormatString="0" ShowButtonSpinner="False" Value="{Binding ScheduleNightBrightness, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ScheduleMediaNote}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">

@@ -471,5 +471,15 @@
   "PomodoroStop": "Стоп",
   "SummaryPomodoroIdle": "Таймер зупинено",
   "SummaryPomodoroPhase": "{0} · залишилось {1}",
-  "TrayPomodoroToggle": "Старт / стоп помодоро"
+  "TrayPomodoroToggle": "Старт / стоп помодоро",
+  "ScheduleHeading": "Нічний розклад",
+  "ScheduleHint": "Уночі екран може перемикатися на іншу тему та зменшувати яскравість.",
+  "ScheduleNightStartLabel": "Початок ночі",
+  "ScheduleNightEndLabel": "Кінець ночі",
+  "ScheduleTimeHint": "24-годинний формат HH:mm, напр. 22:00; вікно може переходити через північ.",
+  "ScheduleSwitchThemeLabel": "Перемикати тему вночі",
+  "ScheduleNightThemeLabel": "Нічна тема",
+  "ScheduleDimLabel": "Зменшувати яскравість уночі",
+  "ScheduleBrightnessLabel": "Нічна яскравість",
+  "ScheduleMediaNote": "Під час відтворення музики медіа-автоматика має пріоритет над розкладом."
 }

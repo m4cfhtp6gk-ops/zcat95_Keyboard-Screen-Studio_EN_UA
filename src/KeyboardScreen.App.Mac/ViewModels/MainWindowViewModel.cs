@@ -954,10 +954,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             _musicSource.IgnoreBrowserSessions = IgnoreBrowserMediaSessions;
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
+            bool mediaPlaying = music.Available && music.IsPlaying;
+            DateTimeOffset scheduleNow = DateTimeOffset.Now;
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
-                music.Available && music.IsPlaying,
+                mediaPlaying,
                 requestedTheme.Id);
+            if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
+            {
+                effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);
+            }
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
                 ?? requestedTheme;
@@ -1026,7 +1032,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     ImageAnalogClockSize,
                     ImageAnalogOrder,
                     ImageFlipTimeFontSize,
-                    DotMatrixProgressHeaderFontSize));
+                    DotMatrixProgressHeaderFontSize),
+                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow));
 
             using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
             var bitmap = new Bitmap(stream);

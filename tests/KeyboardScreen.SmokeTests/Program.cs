@@ -938,6 +938,57 @@ var pomodoroRunningFrame = renderer.Render(pomodoroTheme, SystemSnapshot.DesignS
 Assert(pomodoroRunningFrame.JpegBytes is [0xFF, 0xD8, ..], "the running pomodoro view did not render");
 Console.WriteLine("PASS pomodoro timer: phases, cycle tally, auto-complete, renders");
 
+// ---- theme schedule + night dimming ----------------------------------------
+Assert(ThemeSchedule.TryParseTime("22:00", out var parsedNight) && parsedNight == new TimeSpan(22, 0, 0),
+    "HH:mm must parse");
+Assert(ThemeSchedule.TryParseTime("7:5", out var parsedShort) && parsedShort == new TimeSpan(7, 5, 0),
+    "single-digit H:m must parse");
+Assert(!ThemeSchedule.TryParseTime("24:00", out _) && !ThemeSchedule.TryParseTime("aa:bb", out _)
+    && !ThemeSchedule.TryParseTime("2200", out _) && !ThemeSchedule.TryParseTime("", out _),
+    "invalid times must be rejected");
+
+static DateTimeOffset At(int hour, int minute) => new(2026, 1, 15, hour, minute, 0, TimeSpan.Zero);
+var nightSchedule = new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "07:00" };
+Assert(ThemeSchedule.IsNight(nightSchedule, At(23, 30)), "23:30 falls inside a 22-07 night");
+Assert(ThemeSchedule.IsNight(nightSchedule, At(6, 59)), "06:59 falls inside a 22-07 night");
+Assert(ThemeSchedule.IsNight(nightSchedule, At(22, 0)), "the night starts exactly at its start time");
+Assert(!ThemeSchedule.IsNight(nightSchedule, At(7, 0)), "the night ends exactly at its end time");
+Assert(!ThemeSchedule.IsNight(nightSchedule, At(12, 0)), "noon is not night");
+var afternoonWindow = new ThemeScheduleSettings { Enabled = true, NightStart = "13:00", NightEnd = "15:00" };
+Assert(ThemeSchedule.IsNight(afternoonWindow, At(14, 0)), "a same-day window must work");
+Assert(!ThemeSchedule.IsNight(afternoonWindow, At(15, 0)), "a same-day window ends at its end time");
+Assert(!ThemeSchedule.IsNight(new ThemeScheduleSettings { Enabled = false, NightStart = "22:00", NightEnd = "07:00" }, At(23, 0)),
+    "a disabled schedule is never night");
+Assert(!ThemeSchedule.IsNight(new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "22:00" }, At(23, 0)),
+    "a zero-length window is never night");
+Assert(!ThemeSchedule.IsNight(new ThemeScheduleSettings { Enabled = true, NightStart = "junk", NightEnd = "07:00" }, At(23, 0)),
+    "an unparseable time disables the window");
+
+var nightTheme = new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "07:00", NightThemeId = "clock" };
+Assert(ThemeSchedule.ResolveThemeId(nightTheme, "system", At(23, 0)) == "clock", "the night theme must apply at night");
+Assert(ThemeSchedule.ResolveThemeId(nightTheme, "system", At(12, 0)) == "system", "the day keeps the requested theme");
+Assert(ThemeSchedule.ResolveThemeId(nightSchedule, "system", At(23, 0)) == "system",
+    "an empty night theme keeps the requested theme");
+Assert(ThemeSchedule.ResolveThemeId(null, "system", At(23, 0)) == "system", "missing settings keep the requested theme");
+
+var dimSchedule = new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "07:00", DimAtNight = true, NightBrightnessPercent = 60 };
+Assert(ThemeSchedule.BrightnessPercent(dimSchedule, At(23, 0)) == 60, "the night brightness must apply at night");
+Assert(ThemeSchedule.BrightnessPercent(dimSchedule, At(12, 0)) == 100, "the day stays at full brightness");
+Assert(ThemeSchedule.BrightnessPercent(
+        new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "07:00", DimAtNight = false },
+        At(23, 0)) == 100,
+    "dimming off keeps full brightness at night");
+Assert(ThemeSchedule.BrightnessPercent(new ThemeScheduleSettings { Enabled = true, NightStart = "22:00", NightEnd = "07:00", NightBrightnessPercent = 5 }, At(23, 0)) == 20,
+    "the brightness floor is 20 percent");
+
+var dimTestTheme = themes.Single(theme => theme.Id == "clock-dot-matrix");
+var fullFrame = renderer.Render(dimTestTheme, SystemSnapshot.DesignSample);
+var dimFrame = renderer.Render(dimTestTheme, SystemSnapshot.DesignSample, brightnessPercent: 40);
+Assert(dimFrame.JpegBytes is [0xFF, 0xD8, ..], "the dimmed frame did not render");
+Assert(MeanLuma(dimFrame.JpegBytes) < MeanLuma(fullFrame.JpegBytes) * 0.75,
+    "a 40 percent brightness render must be visibly darker");
+Console.WriteLine("PASS theme schedule: windows, night theme, brightness and dimmed render");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");
@@ -1020,6 +1071,23 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static double MeanLuma(byte[] jpeg)
+{
+    using var bitmap = SkiaSharp.SKBitmap.Decode(jpeg)
+        ?? throw new InvalidOperationException("the JPEG could not be decoded");
+    double sum = 0;
+    for (int y = 0; y < bitmap.Height; y += 4)
+    {
+        for (int x = 0; x < bitmap.Width; x += 4)
+        {
+            var pixel = bitmap.GetPixel(x, y);
+            sum += 0.2126 * pixel.Red + 0.7152 * pixel.Green + 0.0722 * pixel.Blue;
+        }
+    }
+
+    return sum / ((bitmap.Height + 3) / 4 * ((bitmap.Width + 3) / 4));
 }
 
 static bool IsStaticFont(string path)
