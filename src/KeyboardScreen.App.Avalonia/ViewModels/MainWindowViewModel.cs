@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly OpenMeteoWeatherSnapshotSource _weatherSource = new();
     private readonly YahooStockSnapshotSource _yahooStockSource = new();
     private readonly TencentStockSnapshotSource _tencentStockSource = new();
+    private readonly BinanceStockSnapshotSource _binanceStockSource = new();
     private readonly TokscaleDataSource _tokscaleSource = new();
     private readonly ClaudeUsageSnapshotSource _claudeUsageSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
@@ -37,6 +38,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private IReadOnlyList<ScreenFontOption> _fonts = [];
     private ScreenRenderer _renderer = new();
     private RenderedFrame? _latestFrame;
+    public PushDiagnostics PushDiagnostics { get; } = new();
     private CancellationTokenSource? _lifetime;
     private CancellationTokenSource? _commitDelay;
     private bool _loading = true;
@@ -73,7 +75,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _stockSymbol5 = string.Empty;
     private string _stockAlias5 = string.Empty;
     private bool _stockRedForGain = true;
-    private bool _stockUseTencentSource = true;
+    private StockSourceKind _stockSource = StockSourceKind.Tencent;
     private bool _stockEnabled1 = true;
     private bool _stockEnabled2 = true;
     private bool _stockEnabled3 = true;
@@ -143,6 +145,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenFontsFolderCommand = new RelayCommand(() => _desktopServices.OpenFolder(_fontCatalog.FolderPath));
         OpenAuthorCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/zcat95"));
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
+        OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
         CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
         OpenLatestReleaseCommand = new RelayCommand(() =>
@@ -171,6 +174,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenFontsFolderCommand { get; }
     public ICommand OpenAuthorCommand { get; }
     public ICommand OpenTokscaleDocsCommand { get; }
+    public ICommand OpenClaudeSiteCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
     public ICommand CheckForUpdatesCommand { get; }
     public ICommand OpenLatestReleaseCommand { get; }
@@ -198,6 +202,62 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public string AppVersion { get; } = ResolveAppVersion();
 
     public string AppVersionLabel => Loc.T("AboutVersion", AppVersion);
+
+    public string DiagnosticsLastPushText
+    {
+        get
+        {
+            PushDiagnosticsEntry? latest = PushDiagnostics.Latest;
+            if (latest is null)
+            {
+                return Loc.T("DiagnosticsNoPushes");
+            }
+
+            string outcome = latest.Success
+                ? Loc.T("DiagnosticsOk")
+                : Loc.T("DiagnosticsFailed");
+            string status = latest.StatusCode is { } code ? $" · HTTP {code}" : string.Empty;
+            return $"{latest.Timestamp:HH:mm:ss} · {outcome}{status}";
+        }
+    }
+
+    public string DiagnosticsDetailText
+    {
+        get
+        {
+            PushDiagnosticsEntry? latest = PushDiagnostics.Latest;
+            if (latest is null)
+            {
+                return string.Empty;
+            }
+
+            return Loc.T("DiagnosticsLatency") + $" {latest.Latency.TotalMilliseconds:0} ms · "
+                + Loc.T("DiagnosticsFrameSize") + $" {latest.FrameBytes / 1024.0:0} KB";
+        }
+    }
+
+    public string DiagnosticsErrorsText
+    {
+        get
+        {
+            IReadOnlyList<PushDiagnosticsEntry> errors = PushDiagnostics.RecentErrors();
+            if (errors.Count == 0)
+            {
+                return Loc.T("DiagnosticsNoErrors");
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                errors.Select(entry => $"{entry.Timestamp:HH:mm:ss} — {entry.Message}"));
+        }
+    }
+
+    private void RaiseDiagnosticsProperties()
+    {
+        OnPropertyChanged(nameof(DiagnosticsLastPushText));
+        OnPropertyChanged(nameof(DiagnosticsDetailText));
+        OnPropertyChanged(nameof(DiagnosticsErrorsText));
+    }
 
     public IReadOnlyList<AppLanguageInfo> AppLanguages => AppLanguageInfo.All;
 
@@ -666,12 +726,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         [Loc.T("StockColorRedUp"), Loc.T("StockColorGreenUp")];
 
     /// <summary>True for the Tencent feed, false for Yahoo Finance.</summary>
-    public bool StockUseTencentSource
+    /// <summary>Backing enum so a language switch cannot invalidate the choice.</summary>
+    public StockSourceKind StockSource
     {
-        get => _stockUseTencentSource;
+        get => _stockSource;
         set
         {
-            if (SetProperty(ref _stockUseTencentSource, value))
+            if (SetProperty(ref _stockSource, value))
             {
                 OnPropertyChanged(nameof(StockSourcePreference));
                 ScheduleCommit();
@@ -681,12 +742,23 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public string StockSourcePreference
     {
-        get => StockSourceOptions[_stockUseTencentSource ? 0 : 1];
-        set => StockUseTencentSource = string.Equals(value, StockSourceOptions[0], StringComparison.Ordinal);
+        get => StockSourceOptions[Math.Clamp((int)_stockSource, 0, StockSourceOptions.Count - 1)];
+        set
+        {
+            IReadOnlyList<string> options = StockSourceOptions;
+            for (int index = 0; index < options.Count; index++)
+            {
+                if (string.Equals(options[index], value, StringComparison.Ordinal))
+                {
+                    StockSource = (StockSourceKind)index;
+                    return;
+                }
+            }
+        }
     }
 
     public IReadOnlyList<string> StockSourceOptions =>
-        [Loc.T("StockSourceTencent"), Loc.T("StockSourceYahoo")];
+        [Loc.T("StockSourceTencent"), Loc.T("StockSourceYahoo"), Loc.T("StockSourceBinance")];
 
     public string StockSymbol4
     {
@@ -1253,6 +1325,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _weatherSource.Dispose();
         _yahooStockSource.Dispose();
         _tencentStockSource.Dispose();
+        _binanceStockSource.Dispose();
         _claudeUsageSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
@@ -1389,7 +1462,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             : _settings.ClaudeUsage.ModelScope;
         ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
-        StockUseTencentSource = (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent;
+        StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
         StockEnabled2 = stockItems[1].Enabled;
         StockEnabled3 = stockItems[2].Enabled;
@@ -1594,7 +1667,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.ClaudeUsage.CountLocalTokens = ClaudeCountLocalTokens;
         _settings.Stocks = new StockSettings
         {
-            SourceKind = StockUseTencentSource ? StockSourceKind.Tencent : StockSourceKind.Yahoo,
+            SourceKind = StockSource,
             RedForGain = StockRedForGain,
             Items =
             [
@@ -1642,9 +1715,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private IStockSnapshotSource GetStockSource() =>
-        (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent
-            ? _tencentStockSource
-            : _yahooStockSource;
+        (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) switch
+        {
+            StockSourceKind.Yahoo => _yahooStockSource,
+            StockSourceKind.Binance => _binanceStockSource,
+            _ => _tencentStockSource
+        };
 
     private async Task RefreshPreviewAsync(CancellationToken cancellationToken = default)
     {
@@ -1798,6 +1874,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
 
         DevicePushResult result = await _transport.PushAsync(endpoint, _latestFrame, cancellationToken);
+        PushDiagnostics.Record(result, _latestFrame.JpegBytes.Length);
+        Dispatcher.UIThread.Post(RaiseDiagnosticsProperties);
         _lastPushedJpeg = _latestFrame.JpegBytes;
         SetDeviceStatus(result.Success);
     }

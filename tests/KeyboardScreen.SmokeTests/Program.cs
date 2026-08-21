@@ -765,6 +765,51 @@ Assert(!missingReader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.A
     "a missing transcripts directory must report nothing rather than throwing");
 Console.WriteLine("PASS Claude usage source, limits[] override, cache and local token counting");
 
+// ---- Binance crypto source -----------------------------------------------
+Assert(BinanceStockSnapshotSource.NormalizeSymbol("btcusdt") == "BTCUSDT", "Binance pairs must upper-case");
+Assert(BinanceStockSnapshotSource.NormalizeSymbol("BTC-USD") == "BTCUSDT", "Yahoo-style BTC-USD must fold to BTCUSDT");
+Assert(BinanceStockSnapshotSource.NormalizeSymbol("eth/usdt") == "ETHUSDT", "slash pairs must fold");
+
+var binanceResponses = new Queue<string>(new[]
+{
+    """[{"symbol":"BTCUSDT","lastPrice":"64250.10","priceChangePercent":"2.35"},{"symbol":"ETHUSDT","lastPrice":"3120.55","priceChangePercent":"-1.20"}]""",
+    """[[0,"0","0","0","63000.0",0],[0,"0","0","0","63500.5",0],[0,"0","0","0","63800.0",0],[0,"0","0","0","64000.0",0],[0,"0","0","0","64250.1",0]]""",
+    """[[0,"0","0","0","3200.0",0],[0,"0","0","0","3180.0",0],[0,"0","0","0","3150.0",0],[0,"0","0","0","3130.0",0],[0,"0","0","0","3120.55",0]]"""
+});
+var binanceHandler = new ClaudeHandler(binanceResponses);
+using (var binanceClient = new HttpClient(binanceHandler))
+using (var binanceSource = new BinanceStockSnapshotSource(binanceClient) { BaseUrl = "https://binance.test" })
+{
+    var binanceSettings = new StockSettings
+    {
+        SourceKind = StockSourceKind.Binance,
+        RedForGain = false,
+        Items =
+        [
+            new StockItemSettings { Symbol = "BTC-USD", Alias = "Bitcoin" },
+            new StockItemSettings { Symbol = "ETHUSDT" }
+        ]
+    };
+    var binanceSnapshot = await binanceSource.ReadAsync(binanceSettings);
+    Assert(binanceHandler.Requests[0].Contains("/api/v3/ticker/24hr?symbols=")
+        && binanceHandler.Requests[0].Contains("BTCUSDT")
+        && binanceHandler.Requests[0].Contains("ETHUSDT"),
+        "the ticker request must carry the normalized symbol list");
+    Assert(binanceSnapshot.Quotes.Count == 2, "both Binance quotes should be parsed");
+    Assert(binanceSnapshot.Quotes[0].DisplayName == "Bitcoin", "the Binance alias was not applied");
+    Assert(Math.Abs(binanceSnapshot.Quotes[0].CurrentPrice - 64250.10) < 0.001, "the Binance last price was parsed incorrectly");
+    Assert(Math.Abs(binanceSnapshot.Quotes[1].ChangePercent - (-1.20)) < 0.001, "the Binance change percent was parsed incorrectly");
+    Assert(binanceSnapshot.Quotes[0].FiveDayCloses is { Count: 5 } btcCloses && Math.Abs(btcCloses[^1] - 64250.1) < 0.001,
+        "Binance daily closes must feed the five-day chart");
+    Assert(!binanceSnapshot.RedForGain, "the Binance color preference was not preserved");
+    var binanceCached = await binanceSource.ReadAsync(binanceSettings);
+    Assert(ReferenceEquals(binanceSnapshot, binanceCached), "Binance reads inside the cache window must not call the API");
+    Assert(binanceHandler.Requests.Count == 3, "one ticker call plus two klines calls expected");
+    var binanceFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with { Stocks = binanceSnapshot });
+    Assert(binanceFrame.JpegBytes is [0xFF, 0xD8, ..], "the stocks view with Binance data did not render");
+}
+Console.WriteLine("PASS Binance source: normalization, tickers, klines, cache");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

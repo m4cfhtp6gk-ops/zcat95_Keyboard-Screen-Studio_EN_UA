@@ -3,7 +3,8 @@ namespace KeyboardScreen.Core;
 public enum StockSourceKind
 {
     Tencent,
-    Yahoo
+    Yahoo,
+    Binance
 }
 
 public sealed class StockSettings

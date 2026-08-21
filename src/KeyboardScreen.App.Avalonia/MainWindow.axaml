@@ -468,9 +468,23 @@
 
                     <Border IsVisible="{Binding IsClaudeTheme}" Classes="card">
                       <StackPanel Spacing="14">
-                        <StackPanel Spacing="6">
-                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
-                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Grid.Column="1" VerticalAlignment="Top" Command="{Binding OpenClaudeSiteCommand}" Content="{infra:Localize ClaudeOpenSite}" />
+                        </Grid>
+                        <StackPanel Spacing="10">
+                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideHeading}" />
+                          <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep1}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep1Hint}" /></StackPanel>
+                            <Border Grid.Row="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" /></Border>
+                            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep2}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep2Hint}" TextWrapping="Wrap" /></StackPanel>
+                            <Border Grid.Row="4" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" /></Border>
+                            <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep3}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep3Hint}" /></StackPanel>
+                          </Grid>
                         </StackPanel>
                         <StackPanel Spacing="6">
                           <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyLabel}" />
@@ -716,6 +730,22 @@
                         <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DeviceAddress}" />
                         <controls:IpAddressEditor Grid.Column="1" Value="{Binding DeviceIp, Mode=TwoWay}" />
                       </Grid>
+                    </Border>
+
+                    <Border Classes="card" Padding="16">
+                      <StackPanel Spacing="10">
+                        <StackPanel Spacing="4">
+                          <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DiagnosticsHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize DiagnosticsHint}" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,6,Auto" >
+                          <TextBlock Classes="secondary" Text="{infra:Localize DiagnosticsLastPush}" />
+                          <TextBlock Grid.Column="1" Text="{Binding DiagnosticsLastPushText}" />
+                          <TextBlock Grid.Row="2" Classes="secondary" Text="{infra:Localize DiagnosticsRecentErrors}" />
+                          <TextBlock Grid.Row="2" Grid.Column="1" Classes="secondary" Text="{Binding DiagnosticsErrorsText}" TextWrapping="Wrap" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding DiagnosticsDetailText}" />
+                      </StackPanel>
                     </Border>
 
                     <Border Classes="card" Padding="16">
