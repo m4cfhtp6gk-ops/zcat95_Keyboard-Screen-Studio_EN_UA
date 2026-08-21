@@ -471,5 +471,15 @@
   "PomodoroStop": "停止",
   "SummaryPomodoroIdle": "计时器已停止",
   "SummaryPomodoroPhase": "{0} · 剩余 {1}",
-  "TrayPomodoroToggle": "开始 / 停止番茄钟"
+  "TrayPomodoroToggle": "开始 / 停止番茄钟",
+  "ScheduleHeading": "夜间计划",
+  "ScheduleHint": "夜间屏幕可切换到其他主题并降低亮度。",
+  "ScheduleNightStartLabel": "夜间开始",
+  "ScheduleNightEndLabel": "夜间结束",
+  "ScheduleTimeHint": "24 小时制 HH:mm，如 22:00；时段可跨越午夜。",
+  "ScheduleSwitchThemeLabel": "夜间切换主题",
+  "ScheduleNightThemeLabel": "夜间主题",
+  "ScheduleDimLabel": "夜间降低亮度",
+  "ScheduleBrightnessLabel": "夜间亮度",
+  "ScheduleMediaNote": "播放音乐时，媒体自动化优先于计划。"
 }

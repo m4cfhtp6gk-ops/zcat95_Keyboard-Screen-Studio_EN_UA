@@ -72,6 +72,8 @@ public sealed class AppSettings
 
 	public PomodoroSettings Pomodoro { get; set; } = new();
 
+	public ThemeScheduleSettings Schedule { get; set; } = new();
+
 
 
 
