@@ -50,6 +50,7 @@ public static class BuiltInThemes
 			new StockTheme(),
 			new CurrencyTheme(),
 			new CryptoTheme(),
+			new GitHubContributionTheme(),
 			new PomodoroTheme(pomodoroTimer),
 			imageTheme
 		};

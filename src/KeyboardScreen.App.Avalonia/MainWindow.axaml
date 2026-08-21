@@ -580,6 +580,24 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsGitHubTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize GitHubHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize GitHubHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="170,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize GitHubUsernameLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="39" PlaceholderText="octocat" Text="{Binding GitHubUsername, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="170,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize GitHubTokenLabel}" />
+                          <TextBox Grid.Column="1" PasswordChar="*" Text="{Binding GitHubToken, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsHardwareTheme}" Classes="card">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">

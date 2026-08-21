@@ -44,6 +44,8 @@ public sealed class AppSettings
 
 	public bool HasAcknowledgedClaudeNotice { get; set; }
 
+	public bool HasAcknowledgedGitHubNotice { get; set; }
+
 	public bool AutoSwitchToMusic { get; set; }
 
 	public bool AutoMediaThemeSwitch { get; set; }
@@ -75,6 +77,8 @@ public sealed class AppSettings
 	public ThemeScheduleSettings Schedule { get; set; } = new();
 
 	public HardwareMonitorSettings HardwareMonitor { get; set; } = new();
+
+	public GitHubSettings GitHub { get; set; } = new();
 
 
 

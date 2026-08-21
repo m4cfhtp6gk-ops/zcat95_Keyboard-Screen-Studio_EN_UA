@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly CurrencySnapshotSource _currencySource = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly LibreHardwareMonitorSource _hardwareSource = new();
+    private readonly GitHubContributionSource _gitHubSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -146,6 +147,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _hardwarePageSeconds = 5;
     private HardwareSnapshot? _hardwareSnapshot;
     private HardwareMonitorTheme? _hardwareTheme;
+    private string _gitHubUsername = string.Empty;
+    private string _gitHubToken = string.Empty;
+    private GitHubContributionSnapshot? _gitHubSnapshot;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -1245,6 +1249,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsCryptoTheme => SelectedTheme?.Id == "crypto";
     public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
     public bool IsHardwareTheme => SelectedTheme?.Id == "hardware";
+    public bool IsGitHubTheme => SelectedTheme?.Id == "github";
+
+    public string GitHubUsername
+    {
+        get => _gitHubUsername;
+        set { if (SetProperty(ref _gitHubUsername, value)) ScheduleCommit(); }
+    }
+
+    public string GitHubToken
+    {
+        get => _gitHubToken;
+        set { if (SetProperty(ref _gitHubToken, value)) ScheduleCommit(); }
+    }
 
     public int HardwarePageSeconds
     {
@@ -1421,6 +1438,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "stocks" => !_settings.HasAcknowledgedStockNotice,
             "ai-quota" => !_settings.HasAcknowledgedAiUsageNotice,
             "claude-usage" => !_settings.HasAcknowledgedClaudeNotice,
+            "github" => !_settings.HasAcknowledgedGitHubNotice,
             _ => false
         };
 
@@ -1436,6 +1454,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
             case "claude-usage":
                 _settings.HasAcknowledgedClaudeNotice = true;
+                break;
+            case "github":
+                _settings.HasAcknowledgedGitHubNotice = true;
                 break;
             default:
                 return;
@@ -1530,6 +1551,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _claudeUsageSource.Dispose();
         _currencySource.Dispose();
         _hardwareSource.Dispose();
+        _gitHubSource.Dispose();
         _pomodoroTimer.Changed -= OnPomodoroChanged;
         _desktopServices.Dispose();
         _refreshLock.Dispose();
@@ -1599,7 +1621,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -1697,6 +1719,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             _hardwareTheme.PageSeconds = HardwarePageSeconds;
         }
+        _settings.GitHub ??= new GitHubSettings();
+        GitHubUsername = _settings.GitHub.Username;
+        GitHubToken = _settings.GitHub.Token;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1771,6 +1796,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsCryptoTheme));
         OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsHardwareTheme));
+        OnPropertyChanged(nameof(IsGitHubTheme));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -1950,6 +1976,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             NightBrightnessPercent = ScheduleNightBrightness
         };
         _settings.HardwareMonitor = new HardwareMonitorSettings { PageSeconds = HardwarePageSeconds };
+        _settings.GitHub = new GitHubSettings
+        {
+            Username = GitHubUsername.Trim().TrimStart('@'),
+            Token = GitHubToken.Trim()
+        };
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2077,6 +2108,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _hardwareSnapshot = hardware;
             }
 
+            GitHubContributionSnapshot? gitHub = null;
+            if (requestedTheme.Id == "github" || theme.Id == "github")
+            {
+                gitHub = await _gitHubSource.ReadAsync(
+                    _settings.GitHub ?? new GitHubSettings(),
+                    cancellationToken);
+                _gitHubSnapshot = gitHub;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -2103,7 +2143,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 ClaudeUsage = claudeUsage,
                 Currency = currency,
                 Crypto = crypto,
-                Hardware = hardware
+                Hardware = hardware,
+                GitHub = gitHub
             };
             _latestFrame = _renderer.Render(
                 theme,
@@ -2364,6 +2405,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 ? Loc.T("SummaryCrypto", cryptoSnapshot.Coins.Count, cryptoSnapshot.UpdatedAt.ToString("HH:mm"))
                 : _cryptoSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureCrypto"),
             "pomodoro" => BuildPomodoroSummary(),
+            "github" => _gitHubSnapshot is { Available: true, Days.Count: > 0 } gitHubSnapshot
+                ? Loc.T("SummaryGitHub",
+                    gitHubSnapshot.Username,
+                    CountThisWeek(gitHubSnapshot),
+                    gitHubSnapshot.UpdatedAt.ToString("HH:mm"))
+                : _gitHubSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureGitHub"),
             "hardware" => _hardwareSnapshot is { Available: true } hardwareSnapshot
                 ? Loc.T("SummaryHardware",
                     HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Cpu?.TemperatureC),
@@ -2372,6 +2419,21 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 : _hardwareSnapshot?.ErrorMessage ?? Loc.T("SummaryLocalOnly"),
             _ => Loc.T("SummaryLocalOnly")
         };
+
+    private static int CountThisWeek(GitHubContributionSnapshot snapshot)
+    {
+        DateOnly newest = snapshot.Days[^1].Date;
+        int total = 0;
+        foreach (GitHubContributionDay day in snapshot.Days)
+        {
+            if (day.Count > 0 && GitHubContributionTheme.WeeksBack(newest, day.Date) == 0)
+            {
+                total += day.Count;
+            }
+        }
+
+        return total;
+    }
 
     private string BuildPomodoroSummary()
     {
@@ -2394,6 +2456,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "stocks" => Loc.T("LoadingStocks"),
             "currency" => Loc.T("LoadingCurrency"),
             "crypto" => Loc.T("LoadingCrypto"),
+            "github" => Loc.T("LoadingGitHub"),
             "ai-quota" => Loc.T("LoadingAiUsage"),
             "claude-usage" => Loc.T("LoadingClaude"),
             _ => Loc.T("LoadingTheme")
