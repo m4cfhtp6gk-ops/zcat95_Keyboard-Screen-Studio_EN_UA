@@ -1,52 +1,103 @@
-# 更新记录
+# Changelog
+
+## Unreleased
+
+### Added
+
+- English, Ukrainian and Simplified Chinese localization for the whole
+  application: desktop UI, the themes rendered onto the keyboard screen, and
+  service and diagnostic messages.
+- A language picker in *Other settings*. The choice is saved with the rest of
+  the settings; on first run the app follows the operating system's UI culture.
+- Switching language takes effect immediately — open windows, theme names, the
+  font list and the rendered preview all update without a restart.
+
+### Changed
+
+- Dates, weekday names and numbers follow the selected language.
+- Open-Meteo and BigDataCloud are asked for place names in the active language.
+- The default weather city is a language-neutral constant instead of 北京.
+- The stock gain/loss colour and data-source preferences are stored as values
+  rather than as their display text, so changing language cannot invalidate a
+  saved choice.
 
 ## v1.1.2 - 2026-08-10
 
-### 改进
+### Improved
 
-- 安装包体积显著减小：单文件便携版从约 208MB 降至约 121MB。
-- 主题渲染引擎切换为 Skia，Windows 与 Mac 渲染统一；部分主题画面观感可能略有差异。
-- 内置 MiSans 字体并设为默认字体，中文与数字显示更统一。
+- Much smaller download: the single-file portable build went from roughly
+  208 MB to roughly 121 MB.
+- The theme renderer moved to Skia, so Windows and macOS render identically.
+  A few themes may look slightly different than before.
+- MiSans is bundled and used as the default font, for more consistent text and
+  numerals.
 
-### 修复
+### Fixed
 
-- 修复点阵系列主题（点阵时钟、点阵模拟时钟、点阵进度、点阵时钟天气）数字渲染成粘连方块的问题，恢复为独立圆点观感。
+- The dot-matrix themes (dot-matrix clock, dot-matrix analog clock, dot-matrix
+  progress, dot-matrix weather clock) rendered numerals as fused blocks
+  instead of separate dots.
 
 ## v1.1.0 - 2026-08-10
 
-### 新增
+### Added
 
-- 新增“性能可视化”主题：CPU、内存、网络上下行与 GPU 使用率的滚动曲线，五个模块均可单独开关。
-- 股票主题重构：支持订阅 2–5 只股票、每只可单独开关；行情改用分割线布局，超大幅涨跌不再溢出；恰好订阅 2 只且均有走势数据时，自动显示双股 5 日收盘价对比图。
-- 新增腾讯行情源（默认，国内可直连），雅虎 Finance 数据源保留，可在主题设置中切换。
-- 关于页新增“检查更新”：一键检测 GitHub 新版本，发现新版本时可跳转下载。
+- A "Performance graphs" theme: rolling curves for CPU, memory, network
+  download/upload and GPU usage, with each of the five modules switchable.
+- Rebuilt stock theme: subscribe to 2–5 symbols, each individually switchable.
+  Quotes use a divider layout so very large moves no longer overflow, and with
+  exactly two symbols that both have trend data, a five-day closing-price
+  comparison chart is drawn automatically.
+- A Tencent quote source (the default, reachable directly inside mainland
+  China). The Yahoo Finance source is kept and can be selected in the theme
+  settings.
+- "Check for updates" on the About page: one click looks for a newer GitHub
+  release and offers to open the download.
 
-### 改进
+### Improved
 
-- 定时推送间隔支持 1 秒 – 1 小时自由输入。
-- 窗口支持四边与四角拖拽缩放，保留无边框大圆角外观。
-- 音乐类主题状态文案统一（正在播放 / 已暂停 / 未在播放），不再显示 Windows Media、LIVE、PAUSED、ON AIR 等字样；海报封面 MUSIC 文字居中。
-- 统一各主题头部标题与时间的排版规范；音乐海报主题移除顶部标题。
-- 优化设置界面多处间距与对齐（字体按钮、股票行、定时刷新卡片）。
+- The scheduled push interval accepts any value from 1 second to 1 hour.
+- The window resizes from all four edges and corners while keeping its
+  borderless, large-radius look.
+- Music theme status wording is consistent (playing / paused / not playing);
+  "Windows Media", "LIVE", "PAUSED" and "ON AIR" are gone, and the MUSIC
+  placeholder on the poster artwork is centred.
+- Consistent header title and clock layout across themes; the music poster
+  theme no longer shows a header title.
+- Spacing and alignment cleanups in the settings UI (font buttons, stock rows,
+  the scheduled-refresh card).
 
-### 修复
+### Fixed
 
-- 修复性能可视化主题各模块开关不生效的问题。
-- 修复股票主题多股重叠显示、五日走势与涨幅文字交叉、双股走势不显示、各市场（A 股 / 港股 / 美股）走势数据获取等问题。
-- 修复定时刷新输入框聚焦样式、字体文件夹按钮间距等设置界面细节。
+- The performance-graph module switches had no effect.
+- Stock theme issues: overlapping rows with several symbols, the five-day trend
+  crossing the change-percent text, missing two-symbol trends, and trend data
+  not being fetched for some markets (A-shares / Hong Kong / US).
+- Settings UI details: the focus style on the scheduled-refresh input and the
+  spacing of the fonts-folder button.
 
 ## v1.0.2 - 2026-08-09
 
-- 修复首次启动（无配置文件）时引导窗口崩溃导致应用闪退的问题。
-- 修复开机自启动后点击托盘图标主界面闪现后消失、无法正常打开配置的问题。
-- 修复强调色取色窗口同类崩溃，并移除对编译期生成字段的依赖，本地 SDK 可直接构建。
+- Fixed a crash in the guide window on a first run with no settings file, which
+  made the application exit immediately.
+- Fixed the main window flashing and disappearing after launch at startup when
+  the tray icon was clicked, leaving the settings unreachable.
+- Fixed the same class of crash in the accent-colour picker, and removed the
+  dependency on compile-time generated fields so a local SDK can build directly.
 
 ## v1.0.1 - 2026-08-04
 
-- 桌面界面迁移至 Avalonia UI，Windows 继续作为正式支持平台。
-- 统一窗口、卡片、下拉菜单、弹窗、暗色模式与常用交互动效。
-- 新增并完善点阵模拟时钟、点阵进度、五日天气、股票和图片时间等主题。
-- AI 用量改为通用 Tokscale 数据接入，并标记为“开发中”。
-- 完善首次启动引导、自动化设置、托盘行为和设备地址配置。
-- 修复多处输入框、开关、滚动、圆角、预览安全区及主题数据串用问题。
-- macOS 项目已保留 Intel 与 Apple Silicon 构建路径，当前仍待真实设备测试。
+- The desktop interface moved to Avalonia UI; Windows remains the officially
+  supported platform.
+- Unified windows, cards, drop-downs, dialogs, dark mode and the common
+  interaction motion.
+- Added and refined the dot-matrix analog clock, dot-matrix progress, five-day
+  weather, stocks and picture-clock themes.
+- AI usage switched to a general Tokscale integration and is marked as in
+  development.
+- Improved the first-run guide, automation settings, tray behaviour and device
+  address configuration.
+- Fixed a range of issues with inputs, switches, scrolling, corner radii, the
+  preview safe area and theme data bleeding between themes.
+- The macOS project keeps Intel and Apple Silicon build paths; it still needs
+  testing on real hardware.

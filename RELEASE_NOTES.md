@@ -1,18 +1,24 @@
 # v1.1.2
 
-本版本修复点阵主题渲染、内置 MiSans 默认字体，并显著减小安装包体积。
+This release fixes dot-matrix theme rendering, bundles MiSans as the default
+font, and cuts the download size substantially.
 
-## 改进
+## Improved
 
-- 安装包体积显著减小：单文件便携版从约 208MB 降至约 121MB。
-- 主题渲染引擎切换为 Skia，Windows 与 Mac 渲染统一；部分主题画面观感可能略有差异。
-- 内置 MiSans 字体并设为默认字体，中文与数字显示更统一。
+- Much smaller download: the single-file portable build went from roughly
+  208 MB to roughly 121 MB.
+- The theme renderer moved to Skia, so Windows and macOS render identically.
+  A few themes may look slightly different than before.
+- MiSans is bundled and used as the default font, for more consistent text and
+  numerals.
 
-## 修复
+## Fixed
 
-- 修复点阵系列主题数字渲染成粘连方块的问题，恢复为独立圆点观感。
+- The dot-matrix themes rendered numerals as fused blocks instead of separate
+  dots.
 
-## 平台说明
+## Platforms
 
-- Windows x64：本次 Release 提供自包含绿色版本。
-- macOS：Intel 与 Apple Silicon 构建路径已准备，仍待真实设备验证，暂不随本次 Release 发布。
+- Windows x64: this release ships a self-contained portable build.
+- macOS: the Intel and Apple Silicon build paths are ready but still need
+  verification on real hardware, so they are not part of this release.
