@@ -27,7 +27,7 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme());
-Assert(themes.Count == 20, "built-in theme catalog should contain the 20 supported schemes");
+Assert(themes.Count == 21, "built-in theme catalog should contain the 21 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
@@ -40,6 +40,25 @@ Assert(themes.Single(theme => theme.Id == "image").DisplayName == "Image Clock",
 Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI Usage (Preview)", "AI quota theme must carry the development label");
 Assert(themes.Any(theme => theme.Id == "weather-five-day"), "five-day weather theme must be registered");
 Assert(themes.Any(theme => theme.Id == "stocks"), "stock theme must be registered");
+Assert(themes.Any(theme => theme.Id == "claude-usage"), "Claude usage theme must be registered");
+
+// The Claude usage theme has to survive both a full snapshot and no data at all:
+// the meters only appear once an account actually reports its limits.
+var claudeTheme = themes.Single(theme => theme.Id == "claude-usage");
+var claudeConnected = renderer.Render(claudeTheme, SystemSnapshot.DesignSample);
+Assert(claudeConnected.JpegBytes is [0xFF, 0xD8, ..], "connected Claude usage view did not render");
+var claudeMissing = renderer.Render(claudeTheme, SystemSnapshot.DesignSample with { ClaudeUsage = null });
+Assert(claudeMissing.JpegBytes is [0xFF, 0xD8, ..], "disconnected Claude usage view did not render");
+var claudeError = renderer.Render(
+    claudeTheme,
+    SystemSnapshot.DesignSample with { ClaudeUsage = ClaudeUsageSnapshot.Unavailable("no key") });
+Assert(claudeError.JpegBytes is [0xFF, 0xD8, ..], "errored Claude usage view did not render");
+Assert(SystemSnapshot.DesignSample.ClaudeUsage?.Windows.Count() == 3, "the sample should carry all three windows");
+Assert(ClaudeUsageTheme.FormatTokens(1_180_000) == "1.2M", "token formatting is incorrect");
+Assert(ClaudeUsageTheme.FormatTokens(940) == "940", "small token counts should stay plain");
+var expired = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
+Assert(expired.EffectivePercent == 0, "a window past its reset time reads as empty");
+Console.WriteLine("PASS Claude usage theme states and token formatting");
 Assert(themes.Select(theme => theme.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == themes.Count, "theme ids should be unique");
 
 var aiQuotaTheme = themes.Single(theme => theme.Id == "ai-quota");

@@ -45,6 +45,7 @@ public static class BuiltInThemes
 			Make("music-minimal", Loc.T("ThemeMusicMinimalName"), Loc.T("ThemeMusicMinimalDescription"), Loc.T("ThemeMusicMinimalDetails"), MusicMinimal),
 			Make("music-poster", Loc.T("ThemeMusicPosterName"), Loc.T("ThemeMusicPosterDescription"), Loc.T("ThemeMusicPosterDetails"), MusicPoster),
 			new AiQuotaTheme(),
+			new ClaudeUsageTheme(),
 			new StockTheme(),
 			imageTheme
 		};
