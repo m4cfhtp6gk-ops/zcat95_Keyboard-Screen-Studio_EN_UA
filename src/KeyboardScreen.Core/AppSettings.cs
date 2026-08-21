@@ -42,6 +42,8 @@ public sealed class AppSettings
 
 	public bool HasAcknowledgedAiUsageNotice { get; set; }
 
+	public bool HasAcknowledgedClaudeNotice { get; set; }
+
 	public bool AutoSwitchToMusic { get; set; }
 
 	public bool AutoMediaThemeSwitch { get; set; }

@@ -176,6 +176,10 @@ public sealed partial class MainWindow : Window
                     Loc.T("RiskAiTitle"),
                     Loc.T("RiskAiHeading"),
                     Loc.T("RiskAiBody")),
+                "claude-usage" => (
+                    Loc.T("RiskClaudeTitle"),
+                    Loc.T("RiskClaudeHeading"),
+                    Loc.T("RiskClaudeBody")),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
 

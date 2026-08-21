@@ -15,6 +15,8 @@ Assert(defaults.MinimizeToTray && defaults.CloseToTray, "first-run tray defaults
 Assert(defaults.Weather.UseAutomaticLocation, "first-run weather must use automatic location");
 Assert(defaults.Weather.LocationQuery == WeatherSettings.DefaultLocationQuery, "first-run weather city is incorrect");
 Assert(defaults.Language.Length == 0, "first-run language must defer to the operating system");
+Assert(defaults.ClaudeUsage.ModelScope == "Fable" && !defaults.ClaudeUsage.IsConfigured,
+    "Claude usage must start unconfigured with the Fable row");
 Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe area is incorrect");
 Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
 Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");
@@ -484,7 +486,7 @@ var settingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-settings-{
 try
 {
     var settingsStore = new JsonSettingsStore(settingsPath);
-    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
+    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", ClaudeUsage = new ClaudeUsageSettings { SessionKey = "sk-ant-persist", OrganizationId = "org-7", ModelScope = "Fable", CountLocalTokens = false }, HasAcknowledgedClaudeNotice = true, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
     await settingsStore.SaveAsync(settings);
     var loadedSettings = await settingsStore.LoadAsync();
     Assert(loadedSettings.SelectedThemeId == "music", "settings theme did not persist");
@@ -510,6 +512,11 @@ try
     Assert(!loadedSettings.IgnoreBrowserMediaSessions, "browser media filter setting did not persist");
     Assert(loadedSettings.UiThemeMode == UiThemeMode.Dark, "control UI theme mode did not persist");
     Assert(loadedSettings.Language == "uk" && AppLanguageInfo.Parse(loadedSettings.Language) == AppLanguage.Ukrainian, "language setting did not persist");
+    Assert(loadedSettings.ClaudeUsage.SessionKey == "sk-ant-persist"
+        && loadedSettings.ClaudeUsage.OrganizationId == "org-7"
+        && loadedSettings.ClaudeUsage.ModelScope == "Fable"
+        && !loadedSettings.ClaudeUsage.CountLocalTokens, "Claude usage settings did not persist");
+    Assert(loadedSettings.HasAcknowledgedClaudeNotice, "the Claude notice acknowledgement did not persist");
     Assert(loadedSettings.DotMatrixProgressPeriod == DotMatrixProgressPeriod.Quarter, "dot-matrix progress period did not persist");
     Assert(loadedSettings.DotMatrixProgressHeaderFontSize == 18, "dot-matrix progress header font size did not persist");
     Assert(loadedSettings.AutoMediaThemeSwitch, "media theme automation flag did not persist");

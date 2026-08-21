@@ -12,6 +12,12 @@
 - Switching language takes effect immediately — open windows, theme names, the
   font list and the rendered preview all update without a restart.
 
+- A Claude limits theme: the rolling session window, the weekly window across
+  every model, and the weekly window for one model, drawn as three horizontal
+  meters with a reset countdown and a token count on each row. It reads
+  claude.ai with a session cookie you paste in yourself, and shows a notice
+  explaining what is stored and sent before asking for it.
+
 ### Changed
 
 - Dates, weekday names and numbers follow the selected language.

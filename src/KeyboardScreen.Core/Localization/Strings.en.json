@@ -391,5 +391,19 @@
   "MacAiQuotaPendingHint": "Reading the signed-in account needs a browser session; it arrives with the Windows WebView work.",
   "MacAiQuotaPending": "MiMo sign-in reading arrives with the Windows WebView work",
   "MacRefreshHint": "The refresh interval is 1-30 seconds. Changes save and push immediately.",
-  "MacAboutDataSourcesNote": "Weather data comes from Open-Meteo; auto-detected city names are resolved by BigDataCloud. The Yahoo Finance quotes and Xiaomi MiMo usage are unofficial, experimental integrations that may be delayed, inaccurate or stop working; stock information is not investment advice. Keyboard Screen Studio is an independent personal project with no affiliation with, authorization from, endorsement by or sponsorship from the Linx68 device manufacturer or any of the platforms above. The app and tray icons are original AI-assisted visual assets - see ASSET_LICENSE.md."
+  "MacAboutDataSourcesNote": "Weather data comes from Open-Meteo; auto-detected city names are resolved by BigDataCloud. The Yahoo Finance quotes and Xiaomi MiMo usage are unofficial, experimental integrations that may be delayed, inaccurate or stop working; stock information is not investment advice. Keyboard Screen Studio is an independent personal project with no affiliation with, authorization from, endorsement by or sponsorship from the Linx68 device manufacturer or any of the platforms above. The app and tray icons are original AI-assisted visual assets - see ASSET_LICENSE.md.",
+  "ClaudeHeading": "Claude limits",
+  "ClaudeSessionKeyLabel": "Session key",
+  "ClaudeSessionKeyPlaceholder": "sessionKey cookie from claude.ai",
+  "ClaudeSessionKeyHint": "Open claude.ai signed in, copy the sessionKey cookie and paste it here. It is stored on this machine and sent to claude.ai only.",
+  "ClaudeModelScopeLabel": "Model row",
+  "ClaudeModelScopeHint": "Whose weekly window the third meter shows.",
+  "ClaudeCountTokensLabel": "Count local tokens",
+  "ClaudeCountTokensHint": "Sums the Claude Code transcripts on this computer. A floor on real usage, never the account total.",
+  "LoadingClaude": "Reading Claude limits…",
+  "SummaryClaudeNotConfigured": "Add a claude.ai session key",
+  "SummaryClaude": "Session {0}% · week {1}%",
+  "RiskClaudeTitle": "Claude limits: a note",
+  "RiskClaudeHeading": "Unofficial claude.ai integration",
+  "RiskClaudeBody": "This reads your limits from claude.ai with a session cookie you paste in yourself. The key is kept in this machine's settings file as plain text and is sent to claude.ai and nowhere else - treat it like a password, and clear it if anyone else uses this computer. The usage endpoint is unofficial and can change or stop working without notice. Token counts come from the Claude Code transcripts on this computer only, so they are a floor on your real usage, not your account total."
 }

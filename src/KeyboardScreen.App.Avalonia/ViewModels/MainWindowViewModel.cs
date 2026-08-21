@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly YahooStockSnapshotSource _yahooStockSource = new();
     private readonly TencentStockSnapshotSource _tencentStockSource = new();
     private readonly TokscaleDataSource _tokscaleSource = new();
+    private readonly ClaudeUsageSnapshotSource _claudeUsageSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -114,6 +115,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private UiThemeMode _uiThemeMode = UiThemeMode.System;
     private string _updateStatusText = string.Empty;
     private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
+    private string _claudeSessionKey = string.Empty;
+    private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
+    private bool _claudeCountLocalTokens = true;
+    private ClaudeUsageSnapshot? _claudeUsage;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -1101,6 +1106,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public int ThemeAccentColumnSpan => IsImageTheme || IsDotMatrixProgressTheme ? 1 : 3;
     public bool IsStockTheme => SelectedTheme?.Id == "stocks";
     public bool IsAiTheme => SelectedTheme?.Id == "ai-quota";
+
+    public bool IsClaudeTheme => SelectedTheme?.Id == "claude-usage";
+
+    /// <summary>
+    /// The claude.ai session cookie. It is written to this machine's settings
+    /// file and sent to claude.ai only; the risk notice says so before it is asked for.
+    /// </summary>
+    public string ClaudeSessionKey
+    {
+        get => _claudeSessionKey;
+        set
+        {
+            if (SetProperty(ref _claudeSessionKey, value))
+            {
+                // A different account means the cached organization is wrong.
+                _settings.ClaudeUsage.OrganizationId = string.Empty;
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string ClaudeModelScope
+    {
+        get => _claudeModelScope;
+        set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
+    }
+
+    public bool ClaudeCountLocalTokens
+    {
+        get => _claudeCountLocalTokens;
+        set { if (SetProperty(ref _claudeCountLocalTokens, value)) ScheduleCommit(); }
+    }
     public bool IsMusicTheme => SelectedTheme is not null &&
         MediaThemeAutomation.IsMusicThemeId(SelectedTheme.Id);
     public bool IsSystemTheme => SelectedTheme?.Id is
@@ -1111,6 +1148,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             "stocks" => !_settings.HasAcknowledgedStockNotice,
             "ai-quota" => !_settings.HasAcknowledgedAiUsageNotice,
+            "claude-usage" => !_settings.HasAcknowledgedClaudeNotice,
             _ => false
         };
 
@@ -1123,6 +1161,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
             case "ai-quota":
                 _settings.HasAcknowledgedAiUsageNotice = true;
+                break;
+            case "claude-usage":
+                _settings.HasAcknowledgedClaudeNotice = true;
                 break;
             default:
                 return;
@@ -1212,6 +1253,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _weatherSource.Dispose();
         _yahooStockSource.Dispose();
         _tencentStockSource.Dispose();
+        _claudeUsageSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -1340,6 +1382,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockAlias4 = stockItems[3].Alias;
         StockSymbol5 = stockItems[4].Symbol;
         StockAlias5 = stockItems[4].Alias;
+        _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
+        ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
+            ? ClaudeUsageSettings.DefaultModelScope
+            : _settings.ClaudeUsage.ModelScope;
+        ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockUseTencentSource = (_settings.Stocks?.SourceKind ?? StockSourceKind.Tencent) == StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1409,6 +1457,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(ThemeAccentColumnSpan));
         OnPropertyChanged(nameof(IsStockTheme));
         OnPropertyChanged(nameof(IsAiTheme));
+        OnPropertyChanged(nameof(IsClaudeTheme));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -1537,6 +1586,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather ??= new WeatherSettings();
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
+        _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        _settings.ClaudeUsage.SessionKey = ClaudeSessionKey.Trim();
+        _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
+            ? ClaudeUsageSettings.DefaultModelScope
+            : ClaudeModelScope.Trim();
+        _settings.ClaudeUsage.CountLocalTokens = ClaudeCountLocalTokens;
         _settings.Stocks = new StockSettings
         {
             SourceKind = StockUseTencentSource ? StockSourceKind.Tencent : StockSourceKind.Yahoo,
@@ -1632,6 +1687,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            ClaudeUsageSnapshot? claudeUsage = null;
+            if (requestedTheme.Id == "claude-usage" || theme.Id == "claude-usage")
+            {
+                claudeUsage = await _claudeUsageSource.ReadAsync(
+                    _settings.ClaudeUsage ?? new ClaudeUsageSettings(),
+                    cancellationToken);
+                _claudeUsage = claudeUsage;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -1654,7 +1718,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Music = music,
                 Weather = weather,
                 Stocks = stocks,
-                AiQuota = aiQuota
+                AiQuota = aiQuota,
+                ClaudeUsage = claudeUsage
             };
             _latestFrame = _renderer.Render(
                 theme,
@@ -1873,6 +1938,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 stocks is { Quotes.Count: > 0 }
                     ? Loc.T("SummaryStocks", stocks.Quotes.Count, stocks.UpdatedAt.ToString("HH:mm"))
                     : stocks?.ErrorMessage ?? Loc.T("SummaryConfigureStocks"),
+            "claude-usage" => _claudeUsage is { Available: true, Session: { } claudeSession, Week: { } claudeWeek }
+                ? Loc.T("SummaryClaude",
+                    claudeSession.EffectivePercent.ToString("0"),
+                    claudeWeek.EffectivePercent.ToString("0"))
+                : _claudeUsage?.ErrorMessage ?? Loc.T("SummaryClaudeNotConfigured"),
             "ai-quota" => aiQuota.Available
                 ? $"{aiQuota.PlatformName} · {aiQuota.PrimaryDisplay}"
                 : _tokscaleCatalog?.Message ?? Loc.T("SummaryNoTokscaleData"),
@@ -1887,6 +1957,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "clock-weather-dot" or "weather-five-day" => Loc.T("LoadingWeather"),
             "stocks" => Loc.T("LoadingStocks"),
             "ai-quota" => Loc.T("LoadingAiUsage"),
+            "claude-usage" => Loc.T("LoadingClaude"),
             _ => Loc.T("LoadingTheme")
         };
 }

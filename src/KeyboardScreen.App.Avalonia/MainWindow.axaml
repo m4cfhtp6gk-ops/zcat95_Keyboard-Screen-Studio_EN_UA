@@ -466,6 +466,35 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsClaudeTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyLabel}" />
+                          <TextBox PasswordChar="*"
+                                   PlaceholderText="{infra:Localize ClaudeSessionKeyPlaceholder}"
+                                   Text="{Binding ClaudeSessionKey, Mode=TwoWay}" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
+                          <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
+                          </StackPanel>
+                          <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeModelScopeHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeCountTokensLabel}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCountTokensHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ClaudeCountLocalTokens, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsStockTheme}" Classes="card">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
