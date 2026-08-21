@@ -23,7 +23,7 @@ public static class BuiltInThemes
 		}
 	}
 
-	public static IReadOnlyList<IScreenTheme> Create(ImageTheme imageTheme)
+	public static IReadOnlyList<IScreenTheme> Create(ImageTheme imageTheme, PomodoroTimer pomodoroTimer)
 	{
 		return new IScreenTheme[]
 		{
@@ -47,6 +47,9 @@ public static class BuiltInThemes
 			new AiQuotaTheme(),
 			new ClaudeUsageTheme(),
 			new StockTheme(),
+			new CurrencyTheme(),
+			new CryptoTheme(),
+			new PomodoroTheme(pomodoroTimer),
 			imageTheme
 		};
 	}

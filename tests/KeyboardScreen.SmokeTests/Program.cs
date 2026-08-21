@@ -28,8 +28,8 @@ Assert(profile.SafeArea.Top == 52, "keyboard firmware safe area must reserve the
 Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe area horizontal insets are invalid");
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
-var themes = BuiltInThemes.Create(new ImageTheme());
-Assert(themes.Count == 21, "built-in theme catalog should contain the 21 supported schemes");
+var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
+Assert(themes.Count == 24, "built-in theme catalog should contain the 24 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
@@ -43,6 +43,9 @@ Assert(themes.Single(theme => theme.Id == "ai-quota").DisplayName == "AI Usage (
 Assert(themes.Any(theme => theme.Id == "weather-five-day"), "five-day weather theme must be registered");
 Assert(themes.Any(theme => theme.Id == "stocks"), "stock theme must be registered");
 Assert(themes.Any(theme => theme.Id == "claude-usage"), "Claude usage theme must be registered");
+Assert(themes.Any(theme => theme.Id == "currency"), "currency rates theme must be registered");
+Assert(themes.Any(theme => theme.Id == "crypto"), "crypto theme must be registered");
+Assert(themes.Any(theme => theme.Id == "pomodoro"), "pomodoro theme must be registered");
 
 // The Claude usage theme has to survive both a full snapshot and no data at all:
 // the meters only appear once an account actually reports its limits.
@@ -810,6 +813,131 @@ using (var binanceSource = new BinanceStockSnapshotSource(binanceClient) { BaseU
 }
 Console.WriteLine("PASS Binance source: normalization, tickers, klines, cache");
 
+// ---- currency rates source -------------------------------------------------
+Assert(CurrencySnapshotSource.NormalizeCode(" uah ", "USD") == "UAH", "currency codes must trim and upper-case");
+Assert(CurrencySnapshotSource.NormalizeCode("x1", "USD") == "USD", "invalid currency codes must fall back");
+Assert(CurrencyTheme.FormatRate(41.327) == "41.33", "mid-size rates keep two decimals");
+Assert(CurrencyTheme.FormatRate(0.92141) == "0.9214", "sub-unit rates keep four decimals");
+Assert(CurrencyTheme.FormatRate(1523.4) == "1523", "large rates drop the fraction");
+
+var currencyResponses = new Queue<string>(new[]
+{
+    """{"result":"success","base_code":"USD","rates":{"USD":1,"EUR":0.9214,"UAH":41.32,"PLN":3.968}}"""
+});
+var currencyHandler = new ClaudeHandler(currencyResponses);
+using (var currencyClient = new HttpClient(currencyHandler))
+using (var currencySource = new CurrencySnapshotSource(currencyClient) { BaseUrl = "https://rates.test/v6/latest/" })
+{
+    // USD duplicates the base and "bad" is not a code: both must be dropped.
+    var currencySettings = new CurrencySettings { BaseCurrency = "usd", QuoteCurrencies = ["EUR", "uah", "PLN", "USD", "bad"] };
+    var currencySnapshot = await currencySource.ReadAsync(currencySettings);
+    Assert(currencyHandler.Requests[0] == "https://rates.test/v6/latest/USD", "the base currency must form the request path");
+    Assert(currencySnapshot.Available && currencySnapshot.Rates.Count == 3, "three valid quote currencies should parse");
+    Assert(currencySnapshot.Rates[1].Code == "UAH" && Math.Abs(currencySnapshot.Rates[1].Rate - 41.32) < 0.0001,
+        "the UAH rate was parsed incorrectly");
+    var currencyCached = await currencySource.ReadAsync(currencySettings);
+    Assert(ReferenceEquals(currencySnapshot, currencyCached), "currency reads inside the cache window must not call the API");
+    Assert(currencyHandler.Requests.Count == 1, "exactly one rates request expected");
+    var currencyTheme = themes.Single(theme => theme.Id == "currency");
+    var currencyFrame = renderer.Render(currencyTheme, SystemSnapshot.DesignSample with { Currency = currencySnapshot });
+    Assert(currencyFrame.JpegBytes is [0xFF, 0xD8, ..], "the currency view did not render");
+    var currencyEmpty = renderer.Render(currencyTheme, SystemSnapshot.DesignSample with { Currency = null });
+    Assert(currencyEmpty.JpegBytes is [0xFF, 0xD8, ..], "the empty currency view did not render");
+}
+
+using (var noQuotesClient = new HttpClient(new ClaudeHandler(new Queue<string>())))
+using (var noQuotesSource = new CurrencySnapshotSource(noQuotesClient))
+{
+    var noQuotes = await noQuotesSource.ReadAsync(new CurrencySettings { QuoteCurrencies = [] });
+    Assert(!noQuotes.Available && noQuotes.ErrorMessage is not null,
+        "no configured quotes must surface a message without a request");
+}
+Console.WriteLine("PASS currency source: normalization, parsing, cache");
+
+// ---- crypto source ---------------------------------------------------------
+Assert(BinanceStockSnapshotSource.TrimQuoteAsset("BTCUSDT") == "BTC", "BTCUSDT must display as BTC");
+Assert(BinanceStockSnapshotSource.TrimQuoteAsset("USDT") == "USDT", "the bare USDT symbol must survive trimming");
+
+var cryptoResponses = new Queue<string>(new[]
+{
+    """[{"symbol":"BTCUSDT","lastPrice":"97412.55","priceChangePercent":"2.41"},{"symbol":"ETHUSDT","lastPrice":"3412.08","priceChangePercent":"-1.27"}]""",
+    """[[0,"0","0","0","96100.0",0],[0,"0","0","0","96550.5",0],[0,"0","0","0","96900.0",0],[0,"0","0","0","97412.55",0]]""",
+    """[[0,"0","0","0","3450.0",0],[0,"0","0","0","3433.0",0],[0,"0","0","0","3420.0",0],[0,"0","0","0","3412.08",0]]"""
+});
+var cryptoHandler = new ClaudeHandler(cryptoResponses);
+using (var cryptoClient = new HttpClient(cryptoHandler))
+using (var cryptoSource = new BinanceStockSnapshotSource(cryptoClient) { BaseUrl = "https://binance.test" })
+{
+    var cryptoSettings = new CryptoSettings();
+    var cryptoSnapshot = await cryptoSource.ReadCryptoAsync(cryptoSettings);
+    Assert(cryptoSnapshot.Coins.Count == 2, "the two default pairs should load and empty slots must be skipped");
+    Assert(cryptoHandler.Requests[1].Contains("/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=24"),
+        "the sparkline must come from 24 hourly candles");
+    Assert(cryptoSnapshot.Coins[0].DisplayName == "BTC", "BTCUSDT should display as BTC without an alias");
+    Assert(Math.Abs(cryptoSnapshot.Coins[0].Price - 97412.55) < 0.001, "the BTC price was parsed incorrectly");
+    Assert(Math.Abs(cryptoSnapshot.Coins[1].ChangePercent24h - (-1.27)) < 0.001, "the ETH change was parsed incorrectly");
+    Assert(cryptoSnapshot.Coins[0].HourlyCloses.Count == 4 && Math.Abs(cryptoSnapshot.Coins[0].HourlyCloses[^1] - 97412.55) < 0.001,
+        "hourly closes must feed the sparkline");
+    var cryptoCached = await cryptoSource.ReadCryptoAsync(cryptoSettings);
+    Assert(ReferenceEquals(cryptoSnapshot, cryptoCached), "crypto reads inside the cache window must not call the API");
+    Assert(cryptoHandler.Requests.Count == 3, "one ticker call plus two klines calls expected");
+    var cryptoTheme = themes.Single(theme => theme.Id == "crypto");
+    var cryptoFrame = renderer.Render(cryptoTheme, SystemSnapshot.DesignSample with { Crypto = cryptoSnapshot });
+    Assert(cryptoFrame.JpegBytes is [0xFF, 0xD8, ..], "the crypto view did not render");
+    var cryptoEmpty = renderer.Render(cryptoTheme, SystemSnapshot.DesignSample with { Crypto = CryptoSnapshot.Empty });
+    Assert(cryptoEmpty.JpegBytes is [0xFF, 0xD8, ..], "the empty crypto view did not render");
+    var cryptoMissing = renderer.Render(cryptoTheme, SystemSnapshot.DesignSample with { Crypto = null });
+    Assert(cryptoMissing.JpegBytes is [0xFF, 0xD8, ..], "the missing crypto view did not render");
+}
+Console.WriteLine("PASS crypto source: trimming, tickers, hourly closes, cache");
+
+// ---- pomodoro timer --------------------------------------------------------
+// The phase is derived from the wall clock, so the test anchors t0 right before
+// Start and probes with explicit instants; the anchor drift is microseconds
+// against minute-scale boundaries.
+var pomodoro = new PomodoroTimer();
+Assert(!pomodoro.IsRunning && pomodoro.Read().Phase == PomodoroPhase.Idle, "a fresh pomodoro must be idle");
+int pomodoroChanges = 0;
+pomodoro.Changed += (_, _) => pomodoroChanges++;
+var pomodoroStart = DateTimeOffset.Now;
+pomodoro.Start(new PomodoroSettings { FocusMinutes = 25, BreakMinutes = 5, TargetCycles = 2 });
+Assert(pomodoroChanges == 1 && pomodoro.IsRunning, "starting must raise Changed and mark the timer running");
+
+var focusState = pomodoro.Read(pomodoroStart + TimeSpan.FromMinutes(10));
+Assert(focusState.Phase == PomodoroPhase.Focus && focusState.CompletedFocusCycles == 0,
+    "ten minutes in, the first focus block should be active");
+Assert(focusState.Remaining >= TimeSpan.FromMinutes(15) && focusState.Remaining < TimeSpan.FromMinutes(15.1),
+    "the focus countdown is off");
+Assert(Math.Abs(focusState.ElapsedFraction - 0.4) < 0.01, "the focus progress fraction is off");
+
+var breakState = pomodoro.Read(pomodoroStart + TimeSpan.FromMinutes(26));
+Assert(breakState.Phase == PomodoroPhase.Break && breakState.CompletedFocusCycles == 1,
+    "minute 26 falls in the first break with one focus block done");
+
+var secondFocus = pomodoro.Read(pomodoroStart + TimeSpan.FromMinutes(31));
+Assert(secondFocus.Phase == PomodoroPhase.Focus && secondFocus.CompletedFocusCycles == 1,
+    "minute 31 falls in the second focus block");
+
+var pomodoroDone = pomodoro.Read(pomodoroStart + TimeSpan.FromMinutes(56));
+Assert(pomodoroDone.Phase == PomodoroPhase.Idle && pomodoroDone.CompletedFocusCycles == 2,
+    "the run must complete when the final focus block ends, with no trailing break");
+Assert(!pomodoro.IsRunning, "a completed run must leave the timer stopped");
+Assert(pomodoroChanges == 2, "auto-completion must raise Changed exactly once");
+
+pomodoro.Start(new PomodoroSettings { FocusMinutes = 1, BreakMinutes = 1, TargetCycles = 1 });
+pomodoro.Stop();
+Assert(!pomodoro.IsRunning && pomodoro.Read().Phase == PomodoroPhase.Idle && pomodoroChanges == 4,
+    "stopping must return to idle and raise Changed");
+
+var pomodoroThemeTimer = new PomodoroTimer();
+var pomodoroTheme = new PomodoroTheme(pomodoroThemeTimer);
+var pomodoroIdleFrame = renderer.Render(pomodoroTheme, SystemSnapshot.DesignSample);
+Assert(pomodoroIdleFrame.JpegBytes is [0xFF, 0xD8, ..], "the idle pomodoro view did not render");
+pomodoroThemeTimer.Start(new PomodoroSettings());
+var pomodoroRunningFrame = renderer.Render(pomodoroTheme, SystemSnapshot.DesignSample with { Timestamp = DateTimeOffset.Now.AddMinutes(5) });
+Assert(pomodoroRunningFrame.JpegBytes is [0xFF, 0xD8, ..], "the running pomodoro view did not render");
+Console.WriteLine("PASS pomodoro timer: phases, cycle tally, auto-complete, renders");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");
@@ -848,7 +976,7 @@ foreach (AppLanguage language in shippedLanguages)
 foreach (AppLanguage language in shippedLanguages)
 {
     Loc.Instance.Initialize(language);
-    foreach (var theme in BuiltInThemes.Create(new ImageTheme()))
+    foreach (var theme in BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer()))
     {
         var localizedFrame = renderer.Render(theme, SystemSnapshot.DesignSample);
         Assert(localizedFrame.JpegBytes is [0xFF, 0xD8, ..], $"{language}/{theme.Id}: did not render");
