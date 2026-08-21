@@ -180,6 +180,10 @@ public sealed partial class MainWindow : Window
                     Loc.T("RiskClaudeTitle"),
                     Loc.T("RiskClaudeHeading"),
                     Loc.T("RiskClaudeBody")),
+                "github" => (
+                    Loc.T("RiskGitHubTitle"),
+                    Loc.T("RiskGitHubHeading"),
+                    Loc.T("RiskGitHubBody")),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
 

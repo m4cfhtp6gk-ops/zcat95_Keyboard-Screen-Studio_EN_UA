@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly YahooStockSnapshotSource _stockSource = new();
     private readonly BinanceStockSnapshotSource _binanceSource = new();
     private readonly CurrencySnapshotSource _currencySource = new();
+    private readonly GitHubContributionSource _gitHubSource = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
@@ -637,6 +638,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _stockSource.Dispose();
         _binanceSource.Dispose();
         _currencySource.Dispose();
+        _gitHubSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -706,7 +708,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -1001,6 +1003,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            GitHubContributionSnapshot? gitHub = null;
+            if (theme.Id == "github")
+            {
+                gitHub = await _gitHubSource.ReadAsync(
+                    _settings.GitHub ?? new GitHubSettings(),
+                    cancellationToken);
+            }
+
             SystemSnapshot snapshot = system with
             {
                 Music = music,
@@ -1008,7 +1018,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Stocks = stocks,
                 AiQuota = AiQuotaSnapshot.Empty,
                 Currency = currency,
-                Crypto = crypto
+                Crypto = crypto,
+                GitHub = gitHub
             };
             _latestFrame = _renderer.Render(
                 theme,

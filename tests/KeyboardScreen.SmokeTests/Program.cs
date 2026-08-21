@@ -29,7 +29,7 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
-Assert(themes.Count == 25, "built-in theme catalog should contain the 25 supported schemes");
+Assert(themes.Count == 26, "built-in theme catalog should contain the 26 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
@@ -47,6 +47,7 @@ Assert(themes.Any(theme => theme.Id == "currency"), "currency rates theme must b
 Assert(themes.Any(theme => theme.Id == "crypto"), "crypto theme must be registered");
 Assert(themes.Any(theme => theme.Id == "pomodoro"), "pomodoro theme must be registered");
 Assert(themes.Any(theme => theme.Id == "hardware"), "hardware monitor theme must be registered");
+Assert(themes.Any(theme => theme.Id == "github"), "GitHub activity theme must be registered");
 
 // The Claude usage theme has to survive both a full snapshot and no data at all:
 // the meters only appear once an account actually reports its limits.
@@ -1028,6 +1029,75 @@ var hwPartial = renderer.Render(hardwareTheme, SystemSnapshot.DesignSample with
 });
 Assert(hwPartial.JpegBytes is [0xFF, 0xD8, ..], "a partial hardware snapshot did not render");
 Console.WriteLine("PASS hardware monitor: page rotation, formatting, renders");
+
+// ---- GitHub contributions ---------------------------------------------------
+// Week grouping is Sunday-based like GitHub's calendar.
+Assert(GitHubContributionTheme.WeeksBack(new DateOnly(2026, 8, 21), new DateOnly(2026, 8, 17)) == 0,
+    "Friday and Monday of the same week must land in week 0");
+Assert(GitHubContributionTheme.WeeksBack(new DateOnly(2026, 8, 21), new DateOnly(2026, 8, 16)) == 0,
+    "Sunday starts the week that contains the following Friday");
+Assert(GitHubContributionTheme.WeeksBack(new DateOnly(2026, 8, 21), new DateOnly(2026, 8, 15)) == 1,
+    "Saturday belongs to the previous Sunday-based week");
+
+// Attribute order inside the td varies, and counts join through tool-tips.
+const string gitHubHtml = """
+    <table><tbody><tr>
+    <td id="contribution-day-component-0-1" data-level="2" class="ContributionCalendar-day" data-date="2026-08-17"></td>
+    <td class="ContributionCalendar-day" data-date="2026-08-18" id="contribution-day-component-1-1" data-level="0"></td>
+    <td data-date="2026-08-19" data-level="4" class="ContributionCalendar-day"></td>
+    </tr></tbody></table>
+    <tool-tip for="contribution-day-component-0-1" class="sr-only">1,205 contributions on August 17th.</tool-tip>
+    <tool-tip for="contribution-day-component-1-1" class="sr-only">No contributions on August 18th.</tool-tip>
+    """;
+var parsedDays = GitHubContributionSource.ParseContributionHtml(gitHubHtml);
+Assert(parsedDays.Count == 3, "all three calendar cells should parse");
+Assert(parsedDays[0].Date == new DateOnly(2026, 8, 17) && parsedDays[0].Level == 2 && parsedDays[0].Count == 1205,
+    "the tool-tip count must join its cell through the id");
+Assert(parsedDays[1].Count == 0, "'No contributions' must read as zero");
+Assert(parsedDays[2].Level == 4 && parsedDays[2].Count == -1, "a cell without a tool-tip keeps an unknown count");
+
+var gitHubHtmlHandler = new ClaudeHandler(new Queue<string>(new[] { gitHubHtml }));
+using (var gitHubClient = new HttpClient(gitHubHtmlHandler))
+using (var gitHubSource = new GitHubContributionSource(gitHubClient) { HtmlBaseUrl = "https://github.test/users/" })
+{
+    var gitHubSettings = new GitHubSettings { Username = "@ZCat95 " };
+    var gitHubSnapshot = await gitHubSource.ReadAsync(gitHubSettings);
+    Assert(gitHubHtmlHandler.Requests[0] == "https://github.test/users/ZCat95/contributions",
+        "the username must be trimmed of @ and whitespace before the request");
+    Assert(gitHubSnapshot.Available && gitHubSnapshot.Days.Count == 3 && gitHubSnapshot.Username == "ZCat95",
+        "the HTML snapshot did not load");
+    var gitHubCached = await gitHubSource.ReadAsync(gitHubSettings);
+    Assert(ReferenceEquals(gitHubSnapshot, gitHubCached), "GitHub reads inside the cache window must not call the API");
+    Assert(gitHubHtmlHandler.Requests.Count == 1, "exactly one contributions request expected");
+}
+
+const string gitHubGraphQl = """
+    {"data":{"user":{"contributionsCollection":{"contributionCalendar":{"weeks":[
+    {"contributionDays":[
+      {"date":"2026-08-16","contributionCount":0,"contributionLevel":"NONE"},
+      {"date":"2026-08-17","contributionCount":7,"contributionLevel":"THIRD_QUARTILE"}
+    ]}]}}}}}
+    """;
+var gitHubGraphQlHandler = new ClaudeHandler(new Queue<string>(new[] { gitHubGraphQl }));
+using (var gitHubGraphQlClient = new HttpClient(gitHubGraphQlHandler))
+using (var gitHubGraphQlSource = new GitHubContributionSource(gitHubGraphQlClient) { GraphQlUrl = "https://api.github.test/graphql" })
+{
+    var tokenSnapshot = await gitHubGraphQlSource.ReadAsync(new GitHubSettings { Username = "zcat95", Token = "github_pat_test" });
+    Assert(gitHubGraphQlHandler.Requests[0] == "https://api.github.test/graphql", "the token path must use GraphQL");
+    Assert(tokenSnapshot.Available && tokenSnapshot.Days.Count == 2, "the GraphQL snapshot did not load");
+    Assert(tokenSnapshot.Days[1].Level == 3 && tokenSnapshot.Days[1].Count == 7,
+        "GraphQL levels and counts were mapped incorrectly");
+}
+
+var gitHubTheme = themes.Single(theme => theme.Id == "github");
+var gitHubFrame = renderer.Render(gitHubTheme, SystemSnapshot.DesignSample);
+Assert(gitHubFrame.JpegBytes is [0xFF, 0xD8, ..], "the GitHub view did not render");
+var gitHubEmpty = renderer.Render(gitHubTheme, SystemSnapshot.DesignSample with { GitHub = null });
+Assert(gitHubEmpty.JpegBytes is [0xFF, 0xD8, ..], "the unconfigured GitHub view did not render");
+var gitHubError = renderer.Render(gitHubTheme,
+    SystemSnapshot.DesignSample with { GitHub = GitHubContributionSnapshot.Unavailable("GitHub returned 502") });
+Assert(gitHubError.JpegBytes is [0xFF, 0xD8, ..], "the errored GitHub view did not render");
+Console.WriteLine("PASS GitHub contributions: week math, HTML+GraphQL parsing, cache, renders");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();

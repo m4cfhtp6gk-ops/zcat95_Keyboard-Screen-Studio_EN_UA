@@ -14,7 +14,8 @@ public sealed record SystemSnapshot(
     ClaudeUsageSnapshot? ClaudeUsage = null,
     CurrencySnapshot? Currency = null,
     CryptoSnapshot? Crypto = null,
-    HardwareSnapshot? Hardware = null)
+    HardwareSnapshot? Hardware = null,
+    GitHubContributionSnapshot? GitHub = null)
 {
     public static SystemSnapshot DesignSample { get; } = new(
         DateTimeOffset.Now,
@@ -67,5 +68,21 @@ public sealed record SystemSnapshot(
             RamUsedGb: 20.1,
             RamTotalGb: 32.0,
             DiskUsedPercent: 71.0,
-            UpdatedAt: DateTimeOffset.Now));
+            UpdatedAt: DateTimeOffset.Now),
+        GitHub: SampleGitHub());
+
+    private static GitHubContributionSnapshot SampleGitHub()
+    {
+        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+        var days = new List<GitHubContributionDay>();
+        for (int back = 17 * 7 - 1; back >= 0; back--)
+        {
+            // A deterministic bumpy pattern: quiet weekends, active midweeks.
+            int wave = (back * 5 + back / 9) % 11;
+            int level = wave switch { < 3 => 0, < 6 => 1, < 8 => 2, < 10 => 3, _ => 4 };
+            days.Add(new GitHubContributionDay(today.AddDays(-back), level, level * 2));
+        }
+
+        return new GitHubContributionSnapshot(true, "zcat95", days, DateTimeOffset.Now);
+    }
 }
