@@ -26,6 +26,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly ClaudeUsageSnapshotSource _claudeUsageSource = new();
     private readonly CurrencySnapshotSource _currencySource = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
+    private readonly LibreHardwareMonitorSource _hardwareSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -142,6 +143,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _scheduleNightThemeId = "clock";
     private bool _scheduleDimAtNight = true;
     private int _scheduleNightBrightness = 60;
+    private int _hardwarePageSeconds = 5;
+    private HardwareSnapshot? _hardwareSnapshot;
+    private HardwareMonitorTheme? _hardwareTheme;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
     private byte[]? _lastPushedJpeg;
@@ -1240,6 +1244,23 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
     public bool IsCryptoTheme => SelectedTheme?.Id == "crypto";
     public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
+    public bool IsHardwareTheme => SelectedTheme?.Id == "hardware";
+
+    public int HardwarePageSeconds
+    {
+        get => _hardwarePageSeconds;
+        set
+        {
+            if (SetProperty(ref _hardwarePageSeconds, Math.Clamp(value, 3, 10)))
+            {
+                if (_hardwareTheme is not null)
+                {
+                    _hardwareTheme.PageSeconds = _hardwarePageSeconds;
+                }
+                ScheduleCommit();
+            }
+        }
+    }
 
     public string CurrencyBase
     {
@@ -1428,6 +1449,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _imageTheme.ImagePath = _settings.ImagePath;
         _themes = BuiltInThemes.Create(_imageTheme, _pomodoroTimer);
         _perfVisualTheme = (PerformanceVisualTheme?)_themes.FirstOrDefault(theme => theme.Id == "performance-visual");
+        _hardwareTheme = (HardwareMonitorTheme?)_themes.FirstOrDefault(theme => theme.Id == "hardware");
         BuildThemeGroups();
         ReloadFonts();
         ApplySettings();
@@ -1507,6 +1529,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _binanceStockSource.Dispose();
         _claudeUsageSource.Dispose();
         _currencySource.Dispose();
+        _hardwareSource.Dispose();
         _pomodoroTimer.Changed -= OnPomodoroChanged;
         _desktopServices.Dispose();
         _refreshLock.Dispose();
@@ -1574,7 +1597,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
-        AddGroup("ThemeGroupMonitoring", ["system", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
+        AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
         AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
@@ -1668,6 +1691,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             : _settings.Schedule.NightThemeId;
         ScheduleDimAtNight = _settings.Schedule.DimAtNight;
         ScheduleNightBrightness = _settings.Schedule.NightBrightnessPercent;
+        _settings.HardwareMonitor ??= new HardwareMonitorSettings();
+        HardwarePageSeconds = _settings.HardwareMonitor.PageSeconds;
+        if (_hardwareTheme is not null)
+        {
+            _hardwareTheme.PageSeconds = HardwarePageSeconds;
+        }
         StockRedForGain = _settings.Stocks?.RedForGain ?? true;
         StockSource = _settings.Stocks?.SourceKind ?? StockSourceKind.Tencent;
         StockEnabled1 = stockItems[0].Enabled;
@@ -1741,6 +1770,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsCurrencyTheme));
         OnPropertyChanged(nameof(IsCryptoTheme));
         OnPropertyChanged(nameof(IsPomodoroTheme));
+        OnPropertyChanged(nameof(IsHardwareTheme));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -1919,6 +1949,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             DimAtNight = ScheduleDimAtNight,
             NightBrightnessPercent = ScheduleNightBrightness
         };
+        _settings.HardwareMonitor = new HardwareMonitorSettings { PageSeconds = HardwarePageSeconds };
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2039,6 +2070,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _cryptoSnapshot = crypto;
             }
 
+            HardwareSnapshot? hardware = null;
+            if (requestedTheme.Id == "hardware" || theme.Id == "hardware")
+            {
+                hardware = await Task.Run(_hardwareSource.Read, cancellationToken);
+                _hardwareSnapshot = hardware;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -2064,7 +2102,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 AiQuota = aiQuota,
                 ClaudeUsage = claudeUsage,
                 Currency = currency,
-                Crypto = crypto
+                Crypto = crypto,
+                Hardware = hardware
             };
             _latestFrame = _renderer.Render(
                 theme,
@@ -2325,6 +2364,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 ? Loc.T("SummaryCrypto", cryptoSnapshot.Coins.Count, cryptoSnapshot.UpdatedAt.ToString("HH:mm"))
                 : _cryptoSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureCrypto"),
             "pomodoro" => BuildPomodoroSummary(),
+            "hardware" => _hardwareSnapshot is { Available: true } hardwareSnapshot
+                ? Loc.T("SummaryHardware",
+                    HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Cpu?.TemperatureC),
+                    HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Gpu?.TemperatureC),
+                    hardwareSnapshot.UpdatedAt.ToString("HH:mm"))
+                : _hardwareSnapshot?.ErrorMessage ?? Loc.T("SummaryLocalOnly"),
             _ => Loc.T("SummaryLocalOnly")
         };
 

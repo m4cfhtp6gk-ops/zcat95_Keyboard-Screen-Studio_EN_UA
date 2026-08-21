@@ -29,7 +29,7 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
-Assert(themes.Count == 24, "built-in theme catalog should contain the 24 supported schemes");
+Assert(themes.Count == 25, "built-in theme catalog should contain the 25 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
@@ -46,6 +46,7 @@ Assert(themes.Any(theme => theme.Id == "claude-usage"), "Claude usage theme must
 Assert(themes.Any(theme => theme.Id == "currency"), "currency rates theme must be registered");
 Assert(themes.Any(theme => theme.Id == "crypto"), "crypto theme must be registered");
 Assert(themes.Any(theme => theme.Id == "pomodoro"), "pomodoro theme must be registered");
+Assert(themes.Any(theme => theme.Id == "hardware"), "hardware monitor theme must be registered");
 
 // The Claude usage theme has to survive both a full snapshot and no data at all:
 // the meters only appear once an account actually reports its limits.
@@ -988,6 +989,45 @@ Assert(dimFrame.JpegBytes is [0xFF, 0xD8, ..], "the dimmed frame did not render"
 Assert(MeanLuma(dimFrame.JpegBytes) < MeanLuma(fullFrame.JpegBytes) * 0.75,
     "a 40 percent brightness render must be visibly darker");
 Console.WriteLine("PASS theme schedule: windows, night theme, brightness and dimmed render");
+
+// ---- hardware monitor theme ------------------------------------------------
+Assert(HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(0), 5, 2) == 0
+    && HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(4), 5, 2) == 0
+    && HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(5), 5, 2) == 1
+    && HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(10), 5, 2) == 0,
+    "pages must rotate on the wall clock at the configured dwell");
+Assert(HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(3), 0, 2) == 1,
+    "the dwell must clamp to the 3-second floor");
+Assert(HardwareMonitorTheme.FormatPercent(38.4) == "38%" && HardwareMonitorTheme.FormatPercent(null) == "—",
+    "percent formatting is wrong");
+Assert(HardwareMonitorTheme.FormatTemperature(62.4) == "62°" && HardwareMonitorTheme.FormatTemperature(null) == "—",
+    "temperature formatting is wrong");
+Assert(HardwareMonitorTheme.FormatClock(4.553) == "4.55" && HardwareMonitorTheme.FormatClock(null) == "—",
+    "clock formatting is wrong");
+Assert(HardwareMonitorTheme.FormatFan(1240) == "1240" && HardwareMonitorTheme.FormatFan(null) == "—",
+    "fan formatting is wrong");
+Assert(HardwareMonitorTheme.FormatVram(6_348, 12_288) == "6.2 / 12.0 GB" && HardwareMonitorTheme.FormatVram(null, 12_288) == "—",
+    "VRAM formatting is wrong");
+Assert(HardwareMonitorTheme.FormatRam(20.1, 32) == "20.1 / 32.0 GB" && HardwareMonitorTheme.FormatRam(null, null) == "",
+    "RAM formatting is wrong");
+
+var hardwareTheme = new HardwareMonitorTheme();
+var hwPageOne = renderer.Render(hardwareTheme,
+    SystemSnapshot.DesignSample with { Timestamp = DateTimeOffset.FromUnixTimeSeconds(0) });
+Assert(hwPageOne.JpegBytes is [0xFF, 0xD8, ..], "the hardware devices page did not render");
+var hwPageTwo = renderer.Render(hardwareTheme,
+    SystemSnapshot.DesignSample with { Timestamp = DateTimeOffset.FromUnixTimeSeconds(5) });
+Assert(hwPageTwo.JpegBytes is [0xFF, 0xD8, ..], "the hardware system page did not render");
+Assert(!hwPageOne.JpegBytes.AsSpan().SequenceEqual(hwPageTwo.JpegBytes), "the two hardware pages must differ");
+var hwFallback = renderer.Render(hardwareTheme, SystemSnapshot.DesignSample with { Hardware = null });
+Assert(hwFallback.JpegBytes is [0xFF, 0xD8, ..], "the counters-only hardware page did not render");
+var hwPartial = renderer.Render(hardwareTheme, SystemSnapshot.DesignSample with
+{
+    Timestamp = DateTimeOffset.FromUnixTimeSeconds(0),
+    Hardware = new HardwareSnapshot(true, new HardwareComponentSnapshot("CPU", 38.4), null, null, null, null, DateTimeOffset.Now)
+});
+Assert(hwPartial.JpegBytes is [0xFF, 0xD8, ..], "a partial hardware snapshot did not render");
+Console.WriteLine("PASS hardware monitor: page rotation, formatting, renders");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();

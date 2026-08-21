@@ -13,7 +13,8 @@ public sealed record SystemSnapshot(
     double? GpuPercent = null,
     ClaudeUsageSnapshot? ClaudeUsage = null,
     CurrencySnapshot? Currency = null,
-    CryptoSnapshot? Crypto = null)
+    CryptoSnapshot? Crypto = null,
+    HardwareSnapshot? Hardware = null)
 {
     public static SystemSnapshot DesignSample { get; } = new(
         DateTimeOffset.Now,
@@ -58,5 +59,13 @@ public sealed record SystemSnapshot(
                     [3_480, 3_465, 3_490, 3_450, 3_430, 3_455, 3_420, 3_405, 3_432, 3_418, 3_400, 3_412])
             ],
             DateTimeOffset.Now,
-            RedForGain: false));
+            RedForGain: false),
+        Hardware: new HardwareSnapshot(
+            Available: true,
+            Cpu: new HardwareComponentSnapshot("Desktop 8-core CPU", 38.4, 62.5, 4.55, 1240),
+            Gpu: new HardwareComponentSnapshot("Discrete GPU 12 GB", 45.0, 58.0, 2.31, 1680, 6_348, 12_288),
+            RamUsedGb: 20.1,
+            RamTotalGb: 32.0,
+            DiskUsedPercent: 71.0,
+            UpdatedAt: DateTimeOffset.Now));
 }

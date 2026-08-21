@@ -74,6 +74,8 @@ public sealed class AppSettings
 
 	public ThemeScheduleSettings Schedule { get; set; } = new();
 
+	public HardwareMonitorSettings HardwareMonitor { get; set; } = new();
+
 
 
 
