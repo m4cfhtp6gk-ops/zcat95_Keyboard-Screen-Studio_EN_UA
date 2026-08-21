@@ -32,7 +32,7 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
             primary);
 
         double dateTop = timeTop + 53;
-        canvas.AlignedText(snapshot.Timestamp.ToString("dddd"), 11, canvas.AccentColor,
+        canvas.AlignedText(Loc.DayName(snapshot.Timestamp), 11, canvas.AccentColor,
             new Rect(safe.Left, dateTop, safe.Width * 0.42, 18), FontWeights.SemiBold, TextAlignment.Left);
         canvas.AlignedText(Loc.ShortDate(snapshot.Timestamp), 11, primary,
             new Rect(safe.Left + safe.Width * 0.42, dateTop, safe.Width * 0.58, 18), FontWeights.SemiBold, TextAlignment.Right);

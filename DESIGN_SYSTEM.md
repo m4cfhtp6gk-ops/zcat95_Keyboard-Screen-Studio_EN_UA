@@ -332,10 +332,16 @@ and error messages — comes from the catalogue, never from a literal in code.
   `src/KeyboardScreen.Core/Localization/`. They are embedded rather than
   shipped as satellite assemblies so the single-file portable build keeps
   working.
-- Keys are PascalCase identifiers with no dots or spaces: the XAML binding
-  resolves them through an indexer, so a key must be a valid path segment.
+- Keys are PascalCase identifiers with no dots or spaces.
 - In XAML use `Text="{infra:Localize Key}"`. In code use `Loc.T("Key")`, or
   `Loc.T("Key", arg0, arg1)` when the string takes placeholders.
+- `{infra:Localize}` binds to `Loc.Instance.Observe(key).Value`, a plain
+  property on a cached per-key object. Binding to an indexer instead looks
+  tidier but does not refresh on a language change — the Avalonia smoke test
+  covers this.
+- Catalogue files must carry `WithCulture="false"` in the csproj. Without it,
+  the `.en` / `.uk` / `.zh-Hans` infix reads as a culture tag and MSBuild ships
+  the JSON in satellite assemblies, leaving every lookup empty.
 - Dates, weekday names and numbers are formatted with `Loc.Culture`, or through
   the `Loc.LongDate`, `Loc.ShortDate` and `Loc.DayName` helpers. Never rely on
   the ambient culture in rendering code.
@@ -357,9 +363,15 @@ truncates with an ellipsis; it does not wrap.
   looks. Where the full word does not fit, define a separate short key
   (`ScreenLabelMemoryShort`, `ScreenPeriodQuarter`) rather than shortening the
   one used in wider layouts.
-- The bundled MiSans covers Latin, Cyrillic and CJK. Doto, used by the
-  dot-matrix themes, covers digits and Latin only — those themes must therefore
-  keep passing digits to Doto and let labels fall to the user-selected font.
+- The bundled MiSans covers Latin, Cyrillic and CJK, but it has no glyph for
+  U+02BC, the apostrophe uk-UA culture data uses in weekday names. Format
+  dates through the `Loc` helpers, which fold it onto U+2019; calling
+  `ToString("dddd")` directly puts a tofu box on the screen.
+- Doto, used by the dot-matrix themes, covers digits and Latin only — those
+  themes must therefore keep passing digits to Doto and let labels fall to the
+  user-selected font.
+- `ThemeHeader` reserves the clock corner and truncates the title, so a long
+  translation can never run into the time.
 
 ### 9.2 Adding a language
 

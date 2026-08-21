@@ -48,7 +48,7 @@ var subscriptionQuota = AiQuotaSnapshot.ForSubscription(
     56,
     remainingCount: 1,
     resetPeriod: AiResetPeriod.Weekly);
-Assert(subscriptionQuota.RemainingDisplay == "56% / 1 left", "subscription quota display is incorrect");
+Assert(subscriptionQuota.RemainingDisplay == "56% / 1", "subscription quota display is incorrect");
 Assert(subscriptionQuota.ResetPeriod == AiResetPeriod.Weekly, "subscription reset period was not retained");
 
 var tokenBalance = new AiQuotaBalance(

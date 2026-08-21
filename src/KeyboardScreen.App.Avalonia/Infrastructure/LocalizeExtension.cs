@@ -29,8 +29,8 @@ public sealed class LocalizeExtension : MarkupExtension
     public override object ProvideValue(IServiceProvider serviceProvider) =>
         new Binding
         {
-            Path = $"[{Key}]",
-            Source = Loc.Instance,
+            Path = nameof(LocalizedString.Value),
+            Source = Loc.Instance.Observe(Key),
             Mode = BindingMode.OneWay,
             FallbackValue = Loc.T(Key)
         };

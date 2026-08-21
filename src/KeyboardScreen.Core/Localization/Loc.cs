@@ -17,17 +17,13 @@ namespace KeyboardScreen.Core;
 /// </summary>
 public sealed class Loc : INotifyPropertyChanged
 {
-    /// <summary>
-    /// Property name Avalonia's indexer bindings listen for. Raising it is what
-    /// makes every <c>{i18n:Localize}</c> binding re-read its string when the
-    /// language changes.
-    /// </summary>
-    private const string IndexerPropertyName = "Item[]";
-
     private static readonly IReadOnlyDictionary<string, string> EmptyCatalogue =
         new Dictionary<string, string>(0);
 
     private readonly Dictionary<AppLanguage, IReadOnlyDictionary<string, string>> _catalogues = new();
+
+    /// <summary>Bindable views onto the catalogue, one per key XAML asked for.</summary>
+    private readonly Dictionary<string, LocalizedString> _observed = new(StringComparer.Ordinal);
 
     private AppLanguage _language = AppLanguage.English;
     private CultureInfo _culture = AppLanguageInfo.For(AppLanguage.English).Culture;
@@ -70,14 +66,42 @@ public sealed class Loc : INotifyPropertyChanged
             _culture = AppLanguageInfo.For(value).Culture;
             ApplyCulture(_culture);
 
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(IndexerPropertyName));
+            LocalizedString[] observed;
+            lock (_observed)
+            {
+                observed = [.. _observed.Values];
+            }
+
+            foreach (LocalizedString entry in observed)
+            {
+                entry.Refresh();
+            }
+
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
             LanguageChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
-    /// <summary>Indexer the XAML <c>{i18n:Localize Key}</c> bindings resolve against.</summary>
+    /// <summary>Convenience indexer for code that already holds a key.</summary>
     public string this[string key] => Get(key);
+
+    /// <summary>
+    /// A bindable view onto one key. The same instance comes back every time,
+    /// so a window that stays open keeps its binding across language changes.
+    /// </summary>
+    public LocalizedString Observe(string key)
+    {
+        lock (_observed)
+        {
+            if (!_observed.TryGetValue(key, out LocalizedString? entry))
+            {
+                entry = new LocalizedString(key);
+                _observed[key] = entry;
+            }
+
+            return entry;
+        }
+    }
 
     public static string T(string key) => Instance.Get(key);
 
@@ -107,15 +131,27 @@ public sealed class Loc : INotifyPropertyChanged
 
     /// <summary>Day, month and year, e.g. "21 Aug 2026".</summary>
     public static string LongDate(DateTimeOffset value) =>
-        value.ToString(T("FormatLongDate"), Instance._culture);
+        Renderable(value.ToString(T("FormatLongDate"), Instance._culture));
 
     /// <summary>Day and month only, e.g. "21 Aug".</summary>
     public static string ShortDate(DateTimeOffset value) =>
-        value.ToString(T("FormatShortDate"), Instance._culture);
+        Renderable(value.ToString(T("FormatShortDate"), Instance._culture));
 
     /// <summary>Localised weekday name.</summary>
     public static string DayName(DateTimeOffset value) =>
-        value.ToString("dddd", Instance._culture);
+        Renderable(value.ToString("dddd", Instance._culture));
+
+    /// <summary>Localised abbreviated weekday name.</summary>
+    public static string ShortDayName(DateTime value) =>
+        Renderable(value.ToString("ddd", Instance._culture));
+
+    /// <summary>
+    /// Culture data spells the Ukrainian apostrophe U+02BC, which the bundled
+    /// MiSans has no glyph for — it would render as a tofu box on the keyboard
+    /// screen. Fold it onto the typographic apostrophe the font does carry.
+    /// </summary>
+    private static string Renderable(string value) =>
+        value.Replace('\u02bc', '\u2019').Replace('\u02bb', '\u2018');
 
     /// <summary>Every key defined for a language; the smoke tests use it to check parity.</summary>
     public IEnumerable<string> Keys(AppLanguage language) => Catalogue(language).Keys;

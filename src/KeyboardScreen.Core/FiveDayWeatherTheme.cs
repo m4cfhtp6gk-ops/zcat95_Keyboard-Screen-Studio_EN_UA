@@ -43,7 +43,7 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
             canvas.RoundedRect(row, 10, card, stroke);
             var dayLabel = index == 0
                 ? Loc.T("ScreenToday")
-                : day.Date.ToDateTime(TimeOnly.MinValue).ToString("ddd", Loc.Culture);
+                : Loc.ShortDayName(day.Date.ToDateTime(TimeOnly.MinValue));
             var content = new Rect(row.Left + 11, row.Top + 6, row.Width - 22, row.Height - 12);
             var textWidth = content.Width - 42;
             canvas.AlignedText(dayLabel, 10.5,

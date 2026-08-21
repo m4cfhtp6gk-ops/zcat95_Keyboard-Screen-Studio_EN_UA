@@ -51,7 +51,7 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         Push(snapshot);
         Rect safe = canvas.SafeBounds;
         canvas.Fill(Background);
-        ThemeHeader.Draw(canvas, snapshot, DisplayName);
+        ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitlePerformanceVisual"));
 
         bool[] enabled;
         lock (_sync)

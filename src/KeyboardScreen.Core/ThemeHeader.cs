@@ -17,12 +17,18 @@ public static class ThemeHeader
         bool showTime = true)
     {
         Rect safe = canvas.SafeBounds;
+
+        // Reserve the clock's corner so a long title truncates instead of
+        // running into it; translations are wider than the original Chinese.
+        const double clockReserve = 46;
         canvas.Text(
             title,
             12,
             titleColor ?? TitleColor,
             new Point(safe.Left, safe.Top + 7),
-            FontWeights.SemiBold);
+            FontWeights.SemiBold,
+            TextAlignment.Left,
+            showTime ? safe.Width - clockReserve : safe.Width);
         if (showTime)
         {
             canvas.Text(
