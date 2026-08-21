@@ -43,15 +43,20 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
         DrawMetric(canvas, new Rect(safe.Left, metricTop, safe.Width / 2 - 4, 48), "CPU", snapshot.CpuPercent, secondary, primary);
         DrawMetric(canvas, new Rect(safe.Left + safe.Width / 2 + 4, metricTop, safe.Width / 2 - 4, 48), "MEM", snapshot.MemoryPercent, secondary, primary);
 
+        // Both columns start on the same grid as the CPU / MEM row above, so the
+        // four readings line up in two left-aligned columns rather than being
+        // pushed out to opposite edges.
         double networkTop = metricTop + 58;
+        double columnWidth = safe.Width / 2 - 4;
+        double rightColumn = safe.Left + safe.Width / 2 + 4;
         canvas.AlignedText("DOWN", 9, secondary,
-            new Rect(safe.Left, networkTop, safe.Width * 0.5, 15), FontWeights.SemiBold, TextAlignment.Left);
+            new Rect(safe.Left, networkTop, columnWidth, 15), FontWeights.SemiBold, TextAlignment.Left);
         canvas.AlignedText($"{snapshot.DownloadMbps:0.0}M", 12, primary,
-            new Rect(safe.Left, networkTop + 16, safe.Width * 0.5, 19), FontWeights.Medium, TextAlignment.Left, Doto);
+            new Rect(safe.Left, networkTop + 16, columnWidth, 19), FontWeights.Medium, TextAlignment.Left, Doto);
         canvas.AlignedText("UP", 9, secondary,
-            new Rect(safe.Left + safe.Width * 0.5, networkTop, safe.Width * 0.5, 15), FontWeights.SemiBold, TextAlignment.Right);
+            new Rect(rightColumn, networkTop, columnWidth, 15), FontWeights.SemiBold, TextAlignment.Left);
         canvas.AlignedText($"{snapshot.UploadMbps:0.0}M", 12, primary,
-            new Rect(safe.Left + safe.Width * 0.5, networkTop + 16, safe.Width * 0.5, 19), FontWeights.Medium, TextAlignment.Right, Doto);
+            new Rect(rightColumn, networkTop + 16, columnWidth, 19), FontWeights.Medium, TextAlignment.Left, Doto);
 
         DrawSecondProgress(canvas, new Rect(safe.Left, safe.Bottom - 7, safe.Width, 4), snapshot.Timestamp.Second, idleDot);
     }
