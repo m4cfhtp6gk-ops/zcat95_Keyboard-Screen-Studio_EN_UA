@@ -50,7 +50,7 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
                 index == 0 ? canvas.AccentColor : secondary,
                 new Rect(content.Left, content.Top, textWidth, 16),
                 FontWeights.SemiBold, TextAlignment.Left);
-            canvas.AlignedText($"{day.MaximumTemperatureC:0}°", 15,
+            canvas.AlignedText(DisplayUnits.TemperatureShort(day.MaximumTemperatureC), 15,
                 Colors.White,
                 new Rect(content.Left, content.Top + 17, textWidth, content.Height - 17),
                 FontWeights.SemiBold, TextAlignment.Left);
@@ -62,7 +62,7 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
                 canvas.AccentColor);
         }
 
-        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", weather.UpdatedAt.ToString("HH:mm"));
+        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(weather.UpdatedAt));
         canvas.AlignedText(updateText, 9, secondary,
             new Rect(safe.Left, safe.Bottom - 18, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

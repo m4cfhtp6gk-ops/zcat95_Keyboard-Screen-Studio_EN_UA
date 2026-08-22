@@ -79,7 +79,7 @@ public sealed class StockTheme : IScreenTheme
             }
         }
 
-        var footer = stocks is { IsStale: true } ? Loc.T("ScreenStocksStale") : Loc.T("ScreenWeatherUpdated", stocks?.UpdatedAt.ToString("HH:mm"));
+        var footer = stocks is { IsStale: true } ? Loc.T("ScreenStocksStale") : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(stocks!.UpdatedAt));
         canvas.AlignedText(footer, 9, secondary,
             new Rect(safe.Left, safe.Bottom - 21, safe.Width, 14), FontWeights.Normal, TextAlignment.Center);
     }

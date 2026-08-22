@@ -171,7 +171,7 @@ public sealed class HardwareMonitorTheme : IScreenTheme
         value is { } percent ? $"{percent:0}%" : "—";
 
     public static string FormatTemperature(double? value) =>
-        value is { } celsius ? $"{celsius:0}°" : "—";
+        value is { } celsius ? DisplayUnits.TemperatureShort(celsius) : "—";
 
     /// <summary>The unit lives in the cell label, so the value stays narrow.</summary>
     public static string FormatClock(double? value) =>

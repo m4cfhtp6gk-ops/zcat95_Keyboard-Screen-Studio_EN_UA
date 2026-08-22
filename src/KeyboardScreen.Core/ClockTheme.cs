@@ -19,7 +19,7 @@ public sealed class ClockTheme : IScreenTheme
         canvas.Line(new Point(safe.Left, safe.Top + 38),
             new Point(safe.Left + 48, safe.Top + 38), Color.FromRgb(43, 50, 58), 2);
 
-        canvas.AlignedText(snapshot.Timestamp.ToString("HH:mm"), 39, Colors.White,
+        canvas.AlignedText(DisplayUnits.Time(snapshot.Timestamp), 39, Colors.White,
             new Rect(safe.Left + 12, safe.Top + 64, safe.Width - 12, 58),
             FontWeights.SemiBold, TextAlignment.Right);
         canvas.AlignedText(snapshot.Timestamp.ToString("ss"), 20, accent,

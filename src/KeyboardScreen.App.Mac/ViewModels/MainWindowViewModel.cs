@@ -735,6 +735,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private void ApplySettings()
     {
         _loading = true;
+        DisplayUnits.Use12HourClock = _settings.Use12HourClock;
+        DisplayUnits.UseFahrenheit = _settings.UseFahrenheit;
         DeviceIp = ExtractDeviceIp(_settings.DeviceEndpoint);
         AccentColor = string.IsNullOrWhiteSpace(_settings.AccentColor) ? "#E4694C" : _settings.AccentColor;
         SelectedFontId = _settings.SelectedFontId;

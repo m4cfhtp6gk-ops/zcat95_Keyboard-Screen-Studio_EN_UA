@@ -12,6 +12,10 @@ public sealed class AppSettings
 	/// <summary>Language identifier ("en", "uk", "zh-Hans"); empty means "ask the OS".</summary>
 	public string Language { get; set; } = string.Empty;
 
+	public bool Use12HourClock { get; set; }
+
+	public bool UseFahrenheit { get; set; }
+
 
 	public bool AutoPush { get; set; } = true;
 

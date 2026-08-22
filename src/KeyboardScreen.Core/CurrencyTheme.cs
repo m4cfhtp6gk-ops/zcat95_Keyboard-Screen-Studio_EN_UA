@@ -54,7 +54,7 @@ public sealed class CurrencyTheme : IScreenTheme
 
         string footer = currency.IsStale
             ? Loc.T("ScreenClaudeStale")
-            : Loc.T("ScreenWeatherUpdated", currency.UpdatedAt.ToString("HH:mm"));
+            : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(currency.UpdatedAt));
         canvas.AlignedText(footer, 9, Muted,
             new Rect(safe.Left, safe.Bottom - 14, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

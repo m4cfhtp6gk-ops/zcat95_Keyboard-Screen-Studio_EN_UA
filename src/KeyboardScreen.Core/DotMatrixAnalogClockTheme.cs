@@ -102,7 +102,7 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
         double centerX = bounds.Left + bounds.Width / 2;
         const double colonHalfGap = 7;
 
-        canvas.AlignedText(timestamp.ToString("HH"), 40, color,
+        canvas.AlignedText(DisplayUnits.Hours(timestamp), 40, color,
             new Rect(bounds.Left, bounds.Top, centerX - bounds.Left - colonHalfGap, bounds.Height),
             FontWeights.Medium, TextAlignment.Right, Doto);
         canvas.AlignedText(timestamp.ToString("mm"), 40, color,

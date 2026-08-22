@@ -163,6 +163,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private HardwareMonitorTheme? _hardwareTheme;
     private bool _carouselEnabled;
     private int _carouselIntervalSeconds = 30;
+    private bool _use12HourClock;
+    private bool _useFahrenheit;
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
@@ -1432,6 +1434,32 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _carouselIntervalSeconds, Math.Clamp(value, 10, 600))) ScheduleCommit(); }
     }
 
+    public bool Use12HourClock
+    {
+        get => _use12HourClock;
+        set
+        {
+            if (SetProperty(ref _use12HourClock, value))
+            {
+                DisplayUnits.Use12HourClock = value;
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool UseFahrenheit
+    {
+        get => _useFahrenheit;
+        set
+        {
+            if (SetProperty(ref _useFahrenheit, value))
+            {
+                DisplayUnits.UseFahrenheit = value;
+                ScheduleCommit();
+            }
+        }
+    }
+
     private CarouselSettings BuildCarouselSettings() => new()
     {
         Enabled = CarouselEnabled,
@@ -2235,6 +2263,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         TelegramPopupsEnabled = _settings.Telegram.PopupsEnabled;
         TelegramPrivacyMode = _settings.Telegram.PrivacyMode;
         TelegramPopupSeconds = _settings.Telegram.PopupSeconds;
+        Use12HourClock = _settings.Use12HourClock;
+        UseFahrenheit = _settings.UseFahrenheit;
         _settings.Carousel ??= new CarouselSettings();
         CarouselEnabled = _settings.Carousel.Enabled;
         CarouselIntervalSeconds = _settings.Carousel.IntervalSeconds;
@@ -2523,6 +2553,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
         _settings.Carousel = BuildCarouselSettings();
+        _settings.Use12HourClock = Use12HourClock;
+        _settings.UseFahrenheit = UseFahrenheit;
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }

@@ -1259,6 +1259,35 @@ Assert(ThemeCarousel.ResolveThemeId(null, "image", DateTimeOffset.FromUnixTimeSe
     "missing settings keep the selected theme");
 Console.WriteLine("PASS theme carousel: rotation, dedup, clamps");
 
+// ---- display units ----------------------------------------------------------
+var unitsStamp = new DateTimeOffset(2026, 8, 21, 21, 5, 0, TimeSpan.Zero);
+Assert(!DisplayUnits.Use12HourClock && !DisplayUnits.UseFahrenheit, "units must default to 24h and Celsius");
+Assert(DisplayUnits.Time(unitsStamp) == "21:05" && DisplayUnits.Hours(unitsStamp) == "21",
+    "24-hour formatting is wrong");
+Assert(DisplayUnits.TemperatureShort(26.4) == "26°" && DisplayUnits.TemperatureWithUnit(26.4) == "26°C",
+    "Celsius formatting is wrong");
+try
+{
+    DisplayUnits.Use12HourClock = true;
+    DisplayUnits.UseFahrenheit = true;
+    Assert(DisplayUnits.Time(unitsStamp) == "9:05" && DisplayUnits.Hours(unitsStamp) == "9",
+        "12-hour formatting is wrong");
+    Assert(DisplayUnits.Time(unitsStamp.AddHours(-12)) == "9:05", "9 AM and 9 PM share digits without a marker");
+    Assert(DisplayUnits.TemperatureShort(26.0) == "79°" && DisplayUnits.TemperatureWithUnit(0) == "32°F",
+        "Fahrenheit conversion is wrong");
+    Assert(HardwareMonitorTheme.FormatTemperature(62.0) == "144°",
+        "hardware temperatures must follow the Fahrenheit preference");
+    var units12Frame = renderer.Render(themes.Single(theme => theme.Id == "clock-flip"),
+        SystemSnapshot.DesignSample with { Timestamp = unitsStamp });
+    Assert(units12Frame.JpegBytes is [0xFF, 0xD8, ..], "the flip clock did not render in 12-hour mode");
+}
+finally
+{
+    DisplayUnits.Use12HourClock = false;
+    DisplayUnits.UseFahrenheit = false;
+}
+Console.WriteLine("PASS display units: 12/24-hour time and Celsius/Fahrenheit");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

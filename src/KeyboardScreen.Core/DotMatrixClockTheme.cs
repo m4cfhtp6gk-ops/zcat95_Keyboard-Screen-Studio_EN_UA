@@ -24,7 +24,7 @@ public sealed class DotMatrixClockTheme : IScreenTheme
 
         canvas.Fill(Colors.Black);
 
-        DrawTimeSection(canvas, safe, safe.Top + 10, Loc.T("ScreenLabelHours"), snapshot.Timestamp.ToString("HH"), 67, Colors.White, divider);
+        DrawTimeSection(canvas, safe, safe.Top + 10, Loc.T("ScreenLabelHours"), DisplayUnits.Hours(snapshot.Timestamp), 67, Colors.White, divider);
         DrawTimeSection(canvas, safe, safe.Top + 128, Loc.T("ScreenLabelMinutes"), snapshot.Timestamp.ToString("mm"), 67, Colors.White, divider);
 
         canvas.AlignedText(Loc.T("ScreenLabelSecondsShort"), 10, label,

@@ -913,6 +913,26 @@
                         </ComboBox>
                       </Grid>
                     </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize UnitsHeading}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize Units12Hour}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize Units12HourHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding Use12HourClock, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize UnitsFahrenheit}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize UnitsFahrenheitHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding UseFahrenheit, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
 <Border Classes="card" Padding="16">
                       <Grid ColumnDefinitions="92,*">
                         <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DeviceAddress}" />
