@@ -587,6 +587,8 @@
   "Units12HourHint": "小屏不显示 AM/PM 标记 - 仅数字变化。",
   "UnitsFahrenheit": "华氏度",
   "UnitsFahrenheitHint": "适用于天气与硬件温度。",
+  "ThemeRefreshHeading": "刷新间隔（秒）",
+  "ThemeRefreshHint": "此主题重绘并推送的频率。时钟需要每秒刷新；数据屏默认较慢，标题栏时钟仍会准点跳分。",
   "RiskTelegramTitle": "Telegram 登录提示",
   "RiskTelegramHeading": "会话密钥仅保存在本机",
   "RiskTelegramBody": "您通过官方 MTProto API（开源库 WTelegramClient）登录自己的 Telegram 账号。登录会生成会话密钥 - 这是本应用存储的最敏感数据。它保存在本机文件中，只发送到 Telegram 服务器，点击“退出”即会清除。api_id、api_hash 和手机号以明文保存在设置文件中。消息弹窗只绘制在键盘屏上，不会转发到任何地方。若他人也使用这台电脑，建议选择“仅显示数量”模式并在用完后退出。",

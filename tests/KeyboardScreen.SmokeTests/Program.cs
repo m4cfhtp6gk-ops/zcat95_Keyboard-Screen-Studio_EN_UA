@@ -1288,6 +1288,38 @@ finally
 }
 Console.WriteLine("PASS display units: 12/24-hour time and Celsius/Fahrenheit");
 
+// ---- per-theme refresh cadence ----------------------------------------------
+var refreshSettings = new AppSettings();
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 1) == 1
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 5) == 5,
+    "live themes must follow the global refresh setting");
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "currency", 1) == 60
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "weather-five-day", 1) == 60
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "crypto", 1) == 30
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "github", 1) == 300,
+    "data themes must default to their built-in slower cadence");
+refreshSettings.ThemeRefreshOverrides["currency"] = 10;
+refreshSettings.ThemeRefreshOverrides["clock"] = 5;
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "currency", 1) == 10
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 1) == 5,
+    "a per-theme override must win over the default and the global setting");
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, null, 3) == 3,
+    "no theme id falls back to the global setting");
+
+var refreshNow = new DateTimeOffset(2026, 8, 22, 10, 0, 12, TimeSpan.Zero);
+Assert(ThemeRefreshPolicy.NextDelay(refreshNow, 1) == TimeSpan.FromSeconds(1),
+    "a live theme sleeps exactly its interval");
+TimeSpan slowDelay = ThemeRefreshPolicy.NextDelay(refreshNow, 60);
+Assert(slowDelay > TimeSpan.FromSeconds(40) && slowDelay < TimeSpan.FromSeconds(50),
+    "a slow theme must wake right after the next minute flip");
+TimeSpan carouselDelay = ThemeRefreshPolicy.NextDelay(
+    refreshNow, 600, new CarouselSettings { Enabled = true, IntervalSeconds = 30, ThemeIds = ["clock", "system"] });
+Assert(carouselDelay <= TimeSpan.FromSeconds(31),
+    "a running carousel must cap the sleep at its next boundary");
+Assert(ThemeRefreshPolicy.NextDelay(refreshNow, 60, pollCapSeconds: 1) == TimeSpan.FromSeconds(1),
+    "media polling must cap the sleep");
+Console.WriteLine("PASS refresh cadence: defaults, overrides, minute alignment, carousel cap");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

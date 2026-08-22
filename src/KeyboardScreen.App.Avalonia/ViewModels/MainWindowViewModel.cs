@@ -165,6 +165,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _carouselIntervalSeconds = 30;
     private bool _use12HourClock;
     private bool _useFahrenheit;
+    private string? _lastEffectiveThemeId;
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
@@ -630,6 +631,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             if (SetProperty(ref _refreshSeconds, value))
             {
                 OnPropertyChanged(nameof(RefreshDurationText));
+                OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
                 ScheduleCommit();
             }
         }
@@ -1432,6 +1434,33 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         get => _carouselIntervalSeconds;
         set { if (SetProperty(ref _carouselIntervalSeconds, Math.Clamp(value, 10, 600))) ScheduleCommit(); }
+    }
+
+    /// <summary>
+    /// The refresh interval of the currently selected theme. Reading resolves
+    /// override -> built-in default -> the global setting; writing stores a
+    /// per-theme override straight into the settings.
+    /// </summary>
+    public int CurrentThemeRefreshSeconds
+    {
+        get => ThemeRefreshPolicy.EffectiveSeconds(_settings, SelectedTheme?.Id, RefreshSeconds);
+        set
+        {
+            if (SelectedTheme?.Id is not { } themeId)
+            {
+                return;
+            }
+
+            int clamped = Math.Clamp(value, 1, ThemeRefreshPolicy.MaxSeconds);
+            if (clamped == CurrentThemeRefreshSeconds)
+            {
+                return;
+            }
+
+            (_settings.ThemeRefreshOverrides ??= new Dictionary<string, int>())[themeId] = clamped;
+            OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
+            ScheduleCommit();
+        }
     }
 
     public bool Use12HourClock
@@ -2366,6 +2395,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsHardwareTheme));
         OnPropertyChanged(nameof(IsGitHubTheme));
+        OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -2565,7 +2595,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
+                int themeSeconds = ThemeRefreshPolicy.EffectiveSeconds(
+                    _settings,
+                    _lastEffectiveThemeId ?? SelectedTheme?.Id,
+                    RefreshSeconds);
+                // Media automation watches for playback outside the theme, so
+                // it keeps the poll fast even under a slow data theme.
+                int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                await Task.Delay(
+                    ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
+                    cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
                 if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true ||
                     _settings.Carousel?.Enabled == true)
@@ -2635,6 +2674,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
                 ?? requestedTheme;
+            _lastEffectiveThemeId = theme.Id;
 
             WeatherSnapshot? weather = null;
             StockSnapshot? stocks = null;

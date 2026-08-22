@@ -920,7 +920,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
+                int themeSeconds = ThemeRefreshPolicy.EffectiveSeconds(_settings, SelectedTheme?.Id, RefreshSeconds);
+                int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                await Task.Delay(
+                    ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
+                    cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
                 if (!staticImage || AutoMediaThemeSwitch)
                 {

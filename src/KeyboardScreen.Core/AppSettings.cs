@@ -92,6 +92,9 @@ public sealed class AppSettings
 
 	public CarouselSettings Carousel { get; set; } = new();
 
+	/// <summary>Per-theme refresh intervals in seconds; themes not listed use their built-in cadence.</summary>
+	public Dictionary<string, int> ThemeRefreshOverrides { get; set; } = new();
+
 
 
 

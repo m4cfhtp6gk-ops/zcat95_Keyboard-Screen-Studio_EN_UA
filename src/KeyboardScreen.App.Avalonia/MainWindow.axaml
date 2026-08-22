@@ -269,6 +269,18 @@
 
                   <StackPanel x:Name="ThemePage" Classes="page-content" IsVisible="{Binding IsThemePage}" Spacing="16" x:CompileBindings="False">
                     <Border Classes="card">
+                      <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,72" ColumnSpacing="12">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ThemeRefreshHeading}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ThemeRefreshHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <NumericUpDown Grid.Column="1" VerticalAlignment="Center" Classes="compact-value" Minimum="1" Maximum="600" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding CurrentThemeRefreshSeconds, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card">
                       <StackPanel Spacing="16">
                         <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ScreenFontHeading}" />
                         <Grid ColumnDefinitions="*,12,Auto">
