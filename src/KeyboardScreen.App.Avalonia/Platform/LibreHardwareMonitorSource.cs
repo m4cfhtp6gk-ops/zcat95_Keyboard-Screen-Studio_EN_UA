@@ -26,6 +26,13 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
 
     private static readonly bool IsAdministrator = DetectAdministrator();
 
+    /// <summary>True when the process could load the driver by being restarted elevated.</summary>
+    public static bool CanElevateForSensors => !IsAdministrator;
+
+    /// <summary>Why a driver-backed reading is missing once we know it is missing.</summary>
+    private static HardwareSensorAccess BlockedAccess =>
+        IsAdministrator ? HardwareSensorAccess.Unsupported : HardwareSensorAccess.NeedsAdministrator;
+
     private static bool DetectAdministrator()
     {
         try
@@ -45,7 +52,7 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
         {
             if (_openFailed)
             {
-                return HardwareSnapshot.Unavailable(_openError);
+                return HardwareSnapshot.Unavailable(_openError, BlockedAccess);
             }
 
             DateTimeOffset now = DateTimeOffset.Now;
@@ -82,7 +89,7 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
                     _openFailed = true;
                     _openError = ex.Message;
                     TryClose();
-                    return HardwareSnapshot.Unavailable(ex.Message);
+                    return HardwareSnapshot.Unavailable(ex.Message, BlockedAccess);
                 }
 
                 return _cached with { ErrorMessage = ex.Message };
@@ -148,9 +155,17 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
             cpu = cpu with { ClockGhz = fallbackGhz };
         }
 
-        string? limitedHint = !IsAdministrator && cpu is { TemperatureC: null }
-            ? Loc.T("HardwareLimitedSensors")
-            : null;
+        // A CPU temperature is the one reading that only ever arrives through the
+        // kernel driver, so its absence is what tells the two failures apart.
+        HardwareSensorAccess access = cpu is { TemperatureC: not null }
+            ? HardwareSensorAccess.Full
+            : BlockedAccess;
+        string? limitedHint = access switch
+        {
+            HardwareSensorAccess.NeedsAdministrator => Loc.T("HardwareLimitedSensors"),
+            HardwareSensorAccess.Unsupported => Loc.T("HardwareSensorsUnsupported"),
+            _ => null
+        };
 
         return new HardwareSnapshot(
             cpu is not null || gpu is not null || ramTotal is not null,
@@ -160,7 +175,8 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
             ramTotal,
             diskUsed,
             now,
-            ErrorMessage: limitedHint);
+            ErrorMessage: limitedHint,
+            SensorAccess: access);
     }
 
     private static HardwareComponentSnapshot ReadCpu(IHardware hardware)

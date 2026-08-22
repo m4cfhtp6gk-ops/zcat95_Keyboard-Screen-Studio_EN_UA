@@ -158,4 +158,6 @@ public sealed class AppSettings
 	public bool PerfVisualUploadEnabled { get; set; } = true;
 
 	public bool PerfVisualGpuEnabled { get; set; } = true;
+
+	public bool PerfVisualValuesEnabled { get; set; } = true;
 }

@@ -5,6 +5,9 @@ namespace KeyboardScreen.App.Avalonia;
 
 internal static class Program
 {
+    /// <summary>Marks the process that a "restart as administrator" started.</summary>
+    internal const string ElevatedRestartArgument = "--restart-elevated";
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -13,7 +16,15 @@ internal static class Program
 
         Loc.Instance.Initialize(ResolveStartupLanguage());
 
-        if (!SingleInstance.TryAcquire())
+        // Started by "restart as administrator": the instance that asked for the
+        // elevation is still shutting down, so wait for it instead of bouncing off
+        // its mutex and handing the window straight back to the unelevated process.
+        bool elevatedRestart = args.Any(argument =>
+            string.Equals(argument, ElevatedRestartArgument, StringComparison.OrdinalIgnoreCase));
+        bool acquired = elevatedRestart
+            ? SingleInstance.TryAcquire(TimeSpan.FromSeconds(20))
+            : SingleInstance.TryAcquire();
+        if (!acquired)
         {
             SingleInstance.SignalShowWindow();
             return;

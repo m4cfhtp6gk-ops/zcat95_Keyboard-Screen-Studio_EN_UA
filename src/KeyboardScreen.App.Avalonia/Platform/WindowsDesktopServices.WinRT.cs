@@ -76,6 +76,38 @@ public sealed class WindowsDesktopServices : IWindowsDesktopServices
         });
     }
 
+    /// <summary>
+    /// Temperatures and fan speeds come from a kernel driver that only an elevated
+    /// process can load, so the one thing that turns those dashes into readings is
+    /// starting over with the "runas" verb. The new process waits for this one to
+    /// release the single-instance mutex.
+    /// </summary>
+    public bool TryRestartElevated()
+    {
+        string? executable = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(executable))
+        {
+            return false;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = Program.ElevatedRestartArgument,
+                UseShellExecute = true,
+                Verb = "runas"
+            });
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // ERROR_CANCELLED: the user dismissed the elevation prompt.
+            return false;
+        }
+    }
+
     public void OpenUrl(string url) =>
         Process.Start(new ProcessStartInfo
         {

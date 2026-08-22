@@ -28,6 +28,7 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         new List<double?>()
     ];
     private readonly bool[] _enabled = [true, true, true, true, true];
+    private bool _showValues = true;
 
     public string Id => "performance-visual";
     public string DisplayName => Loc.T("ThemePerformanceVisualName");
@@ -46,6 +47,15 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         }
     }
 
+    /// <summary>Numeric readout per panel; the label and the curve stay either way.</summary>
+    public void SetValuesVisible(bool visible)
+    {
+        lock (_sync)
+        {
+            _showValues = visible;
+        }
+    }
+
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
         Push(snapshot);
@@ -54,9 +64,11 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         ThemeHeader.Draw(canvas, snapshot, Loc.T("ScreenTitlePerformanceVisual"));
 
         bool[] enabled;
+        bool showValues;
         lock (_sync)
         {
             enabled = (bool[])_enabled.Clone();
+            showValues = _showValues;
         }
 
         var panels = new List<(string Label, string Value, IReadOnlyList<double?> Samples, Color Line, double Max)>();
@@ -96,7 +108,8 @@ public sealed class PerformanceVisualTheme : IScreenTheme
                 samples,
                 line,
                 max,
-                new Rect(safe.Left, y, safe.Width, panelHeight));
+                new Rect(safe.Left, y, safe.Width, panelHeight),
+                showValues);
             y += panelHeight + gap;
         }
     }
@@ -129,17 +142,25 @@ public sealed class PerformanceVisualTheme : IScreenTheme
         IReadOnlyList<double?> samples,
         Color line,
         double maxValue,
-        Rect bounds)
+        Rect bounds,
+        bool showValue)
     {
         canvas.RoundedRect(bounds, 6, PanelBackground);
         canvas.Text(label, 10.5, LabelColor, new Point(bounds.Left + 6, bounds.Top + 4), FontWeights.Medium);
-        canvas.Text(
-            valueText,
-            12.0,
-            Colors.White,
-            new Point(bounds.Right - 6, bounds.Top + 4),
-            FontWeights.SemiBold,
-            TextAlignment.Right);
+        if (showValue)
+        {
+            // Right alignment needs the box it aligns in, and the box also keeps a
+            // long reading from running back over the label.
+            double valueBox = bounds.Width * 0.55;
+            canvas.Text(
+                valueText,
+                12.0,
+                Colors.White,
+                new Point(bounds.Right - 6 - valueBox, bounds.Top + 4),
+                FontWeights.SemiBold,
+                TextAlignment.Right,
+                valueBox);
+        }
         DrawSparkline(
             canvas,
             new Rect(bounds.Left + 6, bounds.Top + 22, bounds.Width - 12, bounds.Height - 28),

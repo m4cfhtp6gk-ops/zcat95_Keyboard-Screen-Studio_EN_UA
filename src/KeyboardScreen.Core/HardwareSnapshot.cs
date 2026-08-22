@@ -6,6 +6,22 @@ public sealed class HardwareMonitorSettings
     public int PageSeconds { get; set; } = 5;
 }
 
+/// <summary>
+/// Why the driver-backed readings - CPU temperature and fan speed - are missing.
+/// The two failures need different words: one the user can act on, one they cannot.
+/// </summary>
+public enum HardwareSensorAccess
+{
+    /// <summary>The sensor driver answered; the readings are real.</summary>
+    Full,
+
+    /// <summary>The driver needs administrator rights and this process has none.</summary>
+    NeedsAdministrator,
+
+    /// <summary>Already elevated, and the board still exposes no temperature.</summary>
+    Unsupported
+}
+
 /// <summary>One monitored device; any reading the platform cannot provide is null and draws as "—".</summary>
 public sealed record HardwareComponentSnapshot(
     string Name,
@@ -24,10 +40,13 @@ public sealed record HardwareSnapshot(
     double? RamTotalGb,
     double? DiskUsedPercent,
     DateTimeOffset UpdatedAt,
-    string? ErrorMessage = null)
+    string? ErrorMessage = null,
+    HardwareSensorAccess SensorAccess = HardwareSensorAccess.Full)
 {
-    public static HardwareSnapshot Unavailable(string? message = null) =>
-        new(false, null, null, null, null, null, DateTimeOffset.MinValue, message);
+    public static HardwareSnapshot Unavailable(
+        string? message = null,
+        HardwareSensorAccess access = HardwareSensorAccess.Full) =>
+        new(false, null, null, null, null, null, DateTimeOffset.MinValue, message, access);
 }
 
 public interface IHardwareSnapshotSource

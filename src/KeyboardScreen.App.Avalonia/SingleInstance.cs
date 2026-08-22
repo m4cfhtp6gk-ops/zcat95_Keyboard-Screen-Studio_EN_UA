@@ -27,6 +27,30 @@ public static class SingleInstance
         return true;
     }
 
+    /// <summary>
+    /// Waits for the running instance to let go of the mutex. An elevated restart
+    /// launches the new process while the old one is still closing, so the handover
+    /// needs a window rather than a single attempt.
+    /// </summary>
+    public static bool TryAcquire(TimeSpan timeout)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        while (true)
+        {
+            if (TryAcquire())
+            {
+                return true;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            Thread.Sleep(200);
+        }
+    }
+
     public static void SignalShowWindow()
     {
         try
