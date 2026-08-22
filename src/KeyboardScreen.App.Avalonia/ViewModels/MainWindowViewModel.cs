@@ -211,6 +211,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SubmitTelegramCodeCommand = new RelayCommand(SubmitTelegramCode);
         SubmitTelegramPasswordCommand = new RelayCommand(SubmitTelegramPassword);
         TelegramLogoutCommand = new AsyncCommand(TelegramLogoutAsync);
+        ExportSettingsCommand = new AsyncCommand(ExportSettingsAsync);
+        ImportSettingsCommand = new AsyncCommand(ImportSettingsAsync);
         CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
         OpenLatestReleaseCommand = new RelayCommand(() =>
         {
@@ -246,9 +248,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand SubmitTelegramCodeCommand { get; }
     public ICommand SubmitTelegramPasswordCommand { get; }
     public ICommand TelegramLogoutCommand { get; }
+    public ICommand ExportSettingsCommand { get; }
+    public ICommand ImportSettingsCommand { get; }
 
     /// <summary>Set by the window: shows the Telegram risk notice dialog once.</summary>
     public Func<Task>? ShowTelegramNoticeAsync { get; set; }
+
+    /// <summary>Set by the window: file pickers for the settings backup card.</summary>
+    public Func<Task<string?>>? PickExportPathAsync { get; set; }
+
+    public Func<Task<string?>>? PickImportPathAsync { get; set; }
     public ICommand CheckForUpdatesCommand { get; }
     public ICommand OpenLatestReleaseCommand { get; }
 
@@ -1790,6 +1799,68 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             // A failed sweep tries again on the next tick; alerts must never
             // break the render loop.
+        }
+    }
+
+    private string _portStatusText = string.Empty;
+
+    public string PortStatusText
+    {
+        get => _portStatusText;
+        set => SetProperty(ref _portStatusText, value);
+    }
+
+    private async Task ExportSettingsAsync()
+    {
+        if (PickExportPathAsync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string? path = await PickExportPathAsync();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            // Persist the current UI state first so the export matches what is on screen.
+            await SaveSettingsAsync(CancellationToken.None);
+            await File.WriteAllTextAsync(path, SettingsPorter.ExportJson(_settings));
+            PortStatusText = Loc.T("PortExportedTo", path);
+        }
+        catch (Exception ex)
+        {
+            PortStatusText = Loc.T("PortFailed", ex.Message);
+        }
+    }
+
+    private async Task ImportSettingsAsync()
+    {
+        if (PickImportPathAsync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string? path = await PickImportPathAsync();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            string json = await File.ReadAllTextAsync(path);
+            _settings = SettingsPorter.ImportJson(json, _settings);
+            ApplySettings();
+            await _settingsStore.SaveAsync(_settings);
+            PortStatusText = Loc.T("PortImportDone");
+            await RefreshAndPushAsync(AutoPush, forcePush: true);
+        }
+        catch (Exception ex)
+        {
+            PortStatusText = Loc.T("PortFailed", ex.Message);
         }
     }
 

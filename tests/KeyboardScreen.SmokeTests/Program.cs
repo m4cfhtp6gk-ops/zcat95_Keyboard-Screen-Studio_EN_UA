@@ -1196,6 +1196,52 @@ Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: pric
     "a re-armed alert must fire on the next crossing");
 Console.WriteLine("PASS notification engine: thresholds, offline transition, price re-arm, cooldowns");
 
+// ---- settings export/import -------------------------------------------------
+var portSource = new AppSettings
+{
+    AccentColor = "#123456",
+    SelectedThemeId = "hardware",
+    ClaudeUsage = new ClaudeUsageSettings { SessionKey = "sk-ant-sid01-secret", OrganizationId = "org-1", ModelScope = "Fable" },
+    GitHub = new GitHubSettings { Username = "zcat95", Token = "github_pat_secret" },
+    Telegram = new TelegramSettings { ApiId = "12345", ApiHash = "hash-secret", PhoneNumber = "+380501234567", PopupSeconds = 9 },
+    Notifications = new NotificationSettings { Enabled = true, PriceAlerts = [new PriceAlertSettings { Symbol = "BTCUSDT", Above = 100_000 }] }
+};
+string exported = SettingsPorter.ExportJson(portSource);
+Assert(!exported.Contains("sk-ant-sid01-secret") && !exported.Contains("github_pat_secret")
+    && !exported.Contains("hash-secret") && !exported.Contains("+380501234567") && !exported.Contains("org-1"),
+    "an export must never carry credentials");
+Assert(exported.Contains("#123456") && exported.Contains("\"hardware\"") && exported.Contains("zcat95")
+    && exported.Contains("BTCUSDT") && exported.Contains("Fable"),
+    "an export must keep the non-secret settings");
+Assert(portSource.ClaudeUsage.SessionKey == "sk-ant-sid01-secret",
+    "exporting must not touch the live settings object");
+
+var portImported = SettingsPorter.ImportJson(exported, portSource);
+Assert(portImported.ClaudeUsage.SessionKey == "sk-ant-sid01-secret"
+    && portImported.ClaudeUsage.OrganizationId == "org-1"
+    && portImported.GitHub.Token == "github_pat_secret"
+    && portImported.Telegram.ApiHash == "hash-secret"
+    && portImported.Telegram.PhoneNumber == "+380501234567",
+    "importing a stripped file must keep the secrets already on this machine");
+Assert(portImported.AccentColor == "#123456" && portImported.Telegram.PopupSeconds == 9
+    && portImported.Notifications.PriceAlerts.Count == 1,
+    "importing must carry the non-secret values through");
+var portForeign = SettingsPorter.ImportJson(
+    """{"AccentColor":"#ABCDEF","ClaudeUsage":{"SessionKey":"sk-other"}}""", portSource);
+Assert(portForeign.ClaudeUsage.SessionKey == "sk-other" && portForeign.AccentColor == "#ABCDEF",
+    "a file that does carry a secret must win over the local one");
+bool portThrew = false;
+try
+{
+    SettingsPorter.ImportJson("{not json", portSource);
+}
+catch (InvalidOperationException)
+{
+    portThrew = true;
+}
+Assert(portThrew, "invalid JSON must be rejected with the localized message");
+Console.WriteLine("PASS settings porter: secrets stripped, merge on import, invalid input");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

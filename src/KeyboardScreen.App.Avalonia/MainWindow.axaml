@@ -1029,6 +1029,20 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize PortHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize PortHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Button Command="{Binding ExportSettingsCommand}" Content="{infra:Localize PortExport}" />
+                          <Button Command="{Binding ImportSettingsCommand}" Content="{infra:Localize PortImport}" />
+                        </StackPanel>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding PortStatusText}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border Classes="card" Padding="16">
                       <Grid ColumnDefinitions="92,*">
                         <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize SafeAreaHeading}" />
