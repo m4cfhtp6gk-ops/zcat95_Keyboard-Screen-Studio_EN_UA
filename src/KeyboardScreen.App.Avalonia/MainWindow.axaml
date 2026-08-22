@@ -608,9 +608,33 @@
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize AlertsTokenHint}" TextWrapping="Wrap" />
                         <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsLocationLabel}" />
-                          <TextBox Grid.Column="1" MaxLength="48" PlaceholderText="Київ" Text="{Binding AlertsLocation, Mode=TwoWay}" />
+                          <ComboBox
+                              Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AlertsRegionOptions}"
+                              SelectedItem="{Binding AlertsRegionSelection, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize AlertsLocationHint}" TextWrapping="Wrap" />
+                        <StackPanel Spacing="6">
+                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize AlertsTakeoverHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize AlertsTakeoverHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsTakeoverModeLabel}" />
+                          <ComboBox
+                              Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AlertsTakeoverOptions}"
+                              SelectedItem="{Binding AlertsTakeoverPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsTakeoverUntilClearLabel}" />
+                          <ToggleSwitch Grid.Column="1" MinWidth="58" OnContent="" OffContent="" IsChecked="{Binding AlertsTakeoverUntilClear, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,120" IsEnabled="{Binding AlertsTakeoverMinutesEnabled}">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsTakeoverMinutesLabel}" />
+                          <NumericUpDown Grid.Column="1" Minimum="1" Maximum="180" Increment="1" FormatString="0" Value="{Binding AlertsTakeoverMinutes, Mode=TwoWay}" />
+                        </Grid>
                         <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>

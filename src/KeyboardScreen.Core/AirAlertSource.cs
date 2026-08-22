@@ -4,6 +4,13 @@ using System.Text.Json;
 
 namespace KeyboardScreen.Core;
 
+public enum AirAlertTakeoverMode
+{
+    Off = 0,
+    FullScreen = 1,
+    Popup = 2
+}
+
 public sealed class AirAlertSettings
 {
     /// <summary>API token from alerts.in.ua; the card links to where to get one.</summary>
@@ -11,15 +18,67 @@ public sealed class AirAlertSettings
 
     /// <summary>
     /// Location to watch, matched case-insensitively against the feed's
-    /// location titles (e.g. "Київ" matches both "м. Київ" and
+    /// location titles and oblasts (e.g. "Київ" matches both "м. Київ" and
     /// "Київська область"). Empty shows the whole-country summary.
     /// </summary>
     public string Location { get; set; } = string.Empty;
 
+    /// <summary>
+    /// How an alert in the watched location takes over the screen while some
+    /// other theme is showing: not at all, as a full-screen switch to the
+    /// alerts theme, or as a popup banner over the current theme.
+    /// </summary>
+    public AirAlertTakeoverMode Takeover { get; set; } = AirAlertTakeoverMode.Off;
+
+    /// <summary>Keep the takeover up until the all-clear (otherwise <see cref="TakeoverMinutes"/>).</summary>
+    public bool TakeoverUntilClear { get; set; } = true;
+
+    /// <summary>Takeover duration in minutes when not holding until the all-clear.</summary>
+    public int TakeoverMinutes { get; set; } = 5;
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Token);
 }
 
-public sealed record AirAlertInfo(string LocationTitle, string AlertType, DateTimeOffset? StartedAt);
+/// <summary>The region names alerts.in.ua reports at oblast level, for the settings dropdown.</summary>
+public static class AirAlertRegions
+{
+    public static readonly IReadOnlyList<string> All =
+    [
+        "м. Київ",
+        "Київська область",
+        "Вінницька область",
+        "Волинська область",
+        "Дніпропетровська область",
+        "Донецька область",
+        "Житомирська область",
+        "Закарпатська область",
+        "Запорізька область",
+        "Івано-Франківська область",
+        "Кіровоградська область",
+        "Луганська область",
+        "Львівська область",
+        "Миколаївська область",
+        "Одеська область",
+        "Полтавська область",
+        "Рівненська область",
+        "Сумська область",
+        "Тернопільська область",
+        "Харківська область",
+        "Херсонська область",
+        "Хмельницька область",
+        "Черкаська область",
+        "Чернівецька область",
+        "Чернігівська область",
+        "Автономна Республіка Крим",
+        "м. Севастополь"
+    ];
+}
+
+public sealed record AirAlertInfo(
+    string LocationTitle,
+    string AlertType,
+    DateTimeOffset? StartedAt,
+    string LocationOblast = "");
 
 public sealed record AirAlertSnapshot(
     bool Available,
@@ -28,7 +87,9 @@ public sealed record AirAlertSnapshot(
     string Location,
     DateTimeOffset UpdatedAt,
     bool IsStale = false,
-    string? ErrorMessage = null)
+    string? ErrorMessage = null,
+    DateTimeOffset? LastAlertStartedAt = null,
+    DateTimeOffset? LastAlertEndedAt = null)
 {
     public static AirAlertSnapshot Unavailable(string? message = null) =>
         new(false, false, [], string.Empty, DateTimeOffset.MinValue, false, message);
@@ -42,13 +103,19 @@ public sealed record AirAlertSnapshot(
 /// </summary>
 public sealed class AirAlertSource : IDisposable
 {
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
-
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
     private AirAlertSnapshot? _cached;
     private string _cachedKey = string.Empty;
     private DateTimeOffset _lastFetch;
+
+    // The location's alert history, so the clear screen can say how long the
+    // last alert lasted. In-memory only: after a restart during quiet skies
+    // there is nothing to show, because the API lists active alerts only.
+    private string _trackedKey = string.Empty;
+    private DateTimeOffset? _activeSince;
+    private DateTimeOffset? _lastAlertStartedAt;
+    private DateTimeOffset? _lastAlertEndedAt;
 
     public AirAlertSource(HttpClient? client = null)
     {
@@ -59,6 +126,9 @@ public sealed class AirAlertSource : IDisposable
 
     /// <summary>Overridable for tests.</summary>
     public string BaseUrl { get; init; } = "https://api.alerts.in.ua/v1/alerts/active.json";
+
+    /// <summary>Thirty seconds in production (their polling guidance); tests shorten it.</summary>
+    public TimeSpan CacheDuration { get; init; } = TimeSpan.FromSeconds(30);
 
     public async Task<AirAlertSnapshot> ReadAsync(AirAlertSettings settings, CancellationToken cancellationToken = default)
     {
@@ -96,12 +166,17 @@ public sealed class AirAlertSource : IDisposable
             using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             List<AirAlertInfo> alerts = ParseAlerts(document.RootElement);
 
+            bool active = location.Length > 0 && alerts.Any(alert => Matches(alert, location));
+            TrackLastAlert(key, location, active, alerts, now);
+
             _cached = new AirAlertSnapshot(
                 true,
-                location.Length > 0 && alerts.Any(alert => MatchesLocation(alert.LocationTitle, location)),
+                active,
                 alerts,
                 location,
-                now);
+                now,
+                LastAlertStartedAt: _lastAlertStartedAt,
+                LastAlertEndedAt: _lastAlertEndedAt);
             _cachedKey = key;
             _lastFetch = now;
             return _cached;
@@ -139,15 +214,64 @@ public sealed class AirAlertSource : IDisposable
                 && DateTimeOffset.TryParse(startedValue.GetString(), out DateTimeOffset parsed)
                 ? parsed
                 : null;
-            alerts.Add(new AirAlertInfo(title, type, startedAt));
+            string oblast = alert.TryGetProperty("location_oblast", out JsonElement oblastValue)
+                && oblastValue.ValueKind == JsonValueKind.String
+                ? oblastValue.GetString() ?? string.Empty
+                : string.Empty;
+            alerts.Add(new AirAlertInfo(title, type, startedAt, oblast));
         }
 
         return alerts;
     }
 
+    /// <summary>
+    /// Remembers when the location's alert began and, once the feed goes
+    /// quiet again, how long it lasted. A new alert clears the record.
+    /// </summary>
+    private void TrackLastAlert(string key, string location, bool active, List<AirAlertInfo> alerts, DateTimeOffset now)
+    {
+        if (_trackedKey != key)
+        {
+            _trackedKey = key;
+            _activeSince = null;
+            _lastAlertStartedAt = null;
+            _lastAlertEndedAt = null;
+        }
+
+        if (active)
+        {
+            _activeSince = EarliestStart(alerts, location) ?? _activeSince ?? now;
+            _lastAlertStartedAt = null;
+            _lastAlertEndedAt = null;
+        }
+        else if (_activeSince is { } started)
+        {
+            _lastAlertStartedAt = started;
+            _lastAlertEndedAt = now;
+            _activeSince = null;
+        }
+    }
+
+    /// <summary>The start time of the location's alert: the earliest among the matching entries.</summary>
+    public static DateTimeOffset? EarliestStart(IEnumerable<AirAlertInfo> alerts, string location) =>
+        alerts
+            .Where(alert => Matches(alert, location))
+            .Select(alert => alert.StartedAt)
+            .Where(startedAt => startedAt is not null)
+            .OrderBy(startedAt => startedAt)
+            .FirstOrDefault();
+
     public static bool MatchesLocation(string locationTitle, string query) =>
         locationTitle.Contains(query, StringComparison.OrdinalIgnoreCase) ||
         query.Contains(locationTitle, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A raion or hromada alert also counts for its oblast, so picking
+    /// "Харківська область" from the dropdown reacts to "Куп'янський район".
+    /// </summary>
+    public static bool Matches(AirAlertInfo alert, string query) =>
+        MatchesLocation(alert.LocationTitle, query) ||
+        (alert.LocationOblast.Length > 0 && MatchesLocation(alert.LocationOblast, query));
 
     public void Dispose()
     {

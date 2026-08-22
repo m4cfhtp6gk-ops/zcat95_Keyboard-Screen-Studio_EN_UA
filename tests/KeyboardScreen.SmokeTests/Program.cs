@@ -1205,11 +1205,13 @@ var portSource = new AppSettings
     ClaudeUsage = new ClaudeUsageSettings { SessionKey = "sk-ant-sid01-secret", OrganizationId = "org-1", ModelScope = "Fable" },
     GitHub = new GitHubSettings { Username = "zcat95", Token = "github_pat_secret" },
     Telegram = new TelegramSettings { ApiId = "12345", ApiHash = "hash-secret", PhoneNumber = "+380501234567", PopupSeconds = 9 },
-    Notifications = new NotificationSettings { Enabled = true, PriceAlerts = [new PriceAlertSettings { Symbol = "BTCUSDT", Above = 100_000 }] }
+    Notifications = new NotificationSettings { Enabled = true, PriceAlerts = [new PriceAlertSettings { Symbol = "BTCUSDT", Above = 100_000 }] },
+    AirAlerts = new AirAlertSettings { Token = "alerts-token-secret", Location = "м. Київ", Takeover = AirAlertTakeoverMode.Popup }
 };
 string exported = SettingsPorter.ExportJson(portSource);
 Assert(!exported.Contains("sk-ant-sid01-secret") && !exported.Contains("github_pat_secret")
-    && !exported.Contains("hash-secret") && !exported.Contains("+380501234567") && !exported.Contains("org-1"),
+    && !exported.Contains("hash-secret") && !exported.Contains("+380501234567") && !exported.Contains("org-1")
+    && !exported.Contains("alerts-token-secret"),
     "an export must never carry credentials");
 Assert(exported.Contains("#123456") && exported.Contains("\"hardware\"") && exported.Contains("zcat95")
     && exported.Contains("BTCUSDT") && exported.Contains("Fable"),
@@ -1222,10 +1224,13 @@ Assert(portImported.ClaudeUsage.SessionKey == "sk-ant-sid01-secret"
     && portImported.ClaudeUsage.OrganizationId == "org-1"
     && portImported.GitHub.Token == "github_pat_secret"
     && portImported.Telegram.ApiHash == "hash-secret"
-    && portImported.Telegram.PhoneNumber == "+380501234567",
+    && portImported.Telegram.PhoneNumber == "+380501234567"
+    && portImported.AirAlerts.Token == "alerts-token-secret",
     "importing a stripped file must keep the secrets already on this machine");
 Assert(portImported.AccentColor == "#123456" && portImported.Telegram.PopupSeconds == 9
-    && portImported.Notifications.PriceAlerts.Count == 1,
+    && portImported.Notifications.PriceAlerts.Count == 1
+    && portImported.AirAlerts.Location == "м. Київ"
+    && portImported.AirAlerts.Takeover == AirAlertTakeoverMode.Popup,
     "importing must carry the non-secret values through");
 var portForeign = SettingsPorter.ImportJson(
     """{"AccentColor":"#ABCDEF","ClaudeUsage":{"SessionKey":"sk-other"}}""", portSource);
@@ -1375,6 +1380,119 @@ using (var badTokenSource = new AirAlertSource(badTokenClient) { BaseUrl = "http
         "a rejected token must surface the localized message");
 }
 Console.WriteLine("PASS air alerts: parsing, location match, cache, renders, bad token");
+
+// ---- air alerts: oblast matching, alert duration, takeover ------------------
+var raionAlert = new AirAlertInfo("Куп'янський район", "air_raid", null, "Харківська область");
+Assert(AirAlertSource.Matches(raionAlert, "Харківська область") && !AirAlertSource.Matches(raionAlert, "Львівська область"),
+    "a raion alert must count for its oblast and only its oblast");
+Assert(AirAlertRegions.All.Count == 27 && AirAlertRegions.All[0] == "м. Київ"
+    && AirAlertRegions.All.Contains("Харківська область"),
+    "the region dropdown list must carry the 27 oblast-level entries");
+
+const string alertsOblastJson = """
+    {"alerts":[
+      {"id":3,"location_title":"Куп'янський район","location_type":"raion","location_oblast":"Харківська область","started_at":"2026-08-22T03:10:00.000Z","alert_type":"air_raid"},
+      {"id":4,"location_title":"м. Харків","location_type":"city","location_oblast":"Харківська область","started_at":"2026-08-22T02:55:00.000Z","alert_type":"air_raid"}
+    ]}
+    """;
+const string alertsQuietJson = """{"alerts":[]}""";
+var lastedHandler = new ClaudeHandler(new Queue<string>(new[] { alertsOblastJson, alertsQuietJson }));
+using (var lastedClient = new HttpClient(lastedHandler))
+using (var lastedSource = new AirAlertSource(lastedClient)
+{
+    BaseUrl = "https://alerts.test/v1/alerts/active.json",
+    CacheDuration = TimeSpan.Zero
+})
+{
+    var lastedSettings = new AirAlertSettings { Token = "test-token", Location = "Харківська область" };
+    var duringAlert = await lastedSource.ReadAsync(lastedSettings);
+    Assert(duringAlert.AlertActiveAtLocation, "the oblast must match its raion and city alerts");
+    Assert(AirAlertSource.EarliestStart(duringAlert.ActiveAlerts, "Харківська область")
+        == DateTimeOffset.Parse("2026-08-22T02:55:00.000Z"),
+        "the alert start must be the earliest matching entry");
+    var afterClear = await lastedSource.ReadAsync(lastedSettings);
+    Assert(!afterClear.AlertActiveAtLocation
+        && afterClear.LastAlertStartedAt == DateTimeOffset.Parse("2026-08-22T02:55:00.000Z")
+        && afterClear.LastAlertEndedAt is not null,
+        "going quiet must record how long the alert lasted");
+
+    var alertsThemeAgain = themes.Single(theme => theme.Id == "alerts");
+    var clearPlain = renderer.Render(alertsThemeAgain, SystemSnapshot.DesignSample with
+    {
+        AirAlerts = new AirAlertSnapshot(true, false, [], "Харківська область", DateTimeOffset.Now)
+    });
+    var clearWithLasted = renderer.Render(alertsThemeAgain, SystemSnapshot.DesignSample with
+    {
+        AirAlerts = afterClear with { UpdatedAt = DateTimeOffset.Now }
+    });
+    Assert(clearWithLasted.JpegBytes is [0xFF, 0xD8, ..]
+        && !clearWithLasted.JpegBytes.AsSpan().SequenceEqual(clearPlain.JpegBytes),
+        "the clear screen must show how long the alert lasted");
+}
+
+var takeoverSettings = new AirAlertSettings
+{
+    Token = "t",
+    Location = "м. Київ",
+    Takeover = AirAlertTakeoverMode.FullScreen,
+    TakeoverUntilClear = true
+};
+var takeoverState = new AirAlertTakeoverState();
+var takeoverT0 = new DateTimeOffset(2026, 8, 22, 4, 0, 0, TimeSpan.Zero);
+var activeSnapshot = new AirAlertSnapshot(true, true,
+    [new AirAlertInfo("м. Київ", "air_raid", takeoverT0.AddMinutes(-2))], "м. Київ", takeoverT0);
+var quietSnapshot = new AirAlertSnapshot(true, false, [], "м. Київ", takeoverT0);
+
+Assert(!AirAlertTakeover.IsArmed(new AirAlertSettings { Token = "t", Location = "м. Київ" }),
+    "takeover must stay off by default");
+Assert(!AirAlertTakeover.IsArmed(new AirAlertSettings { Token = "t", Takeover = AirAlertTakeoverMode.FullScreen }),
+    "takeover without a picked region must stay unarmed");
+Assert(AirAlertTakeover.IsArmed(takeoverSettings),
+    "a mode plus token plus location arms the takeover");
+Assert(!AirAlertTakeover.Decide(takeoverSettings, quietSnapshot, takeoverState, takeoverT0).Active,
+    "quiet skies must not take over");
+var engaged = AirAlertTakeover.Decide(takeoverSettings, activeSnapshot, takeoverState, takeoverT0);
+Assert(engaged.ShowFullScreen && !engaged.IsAllClear, "an active alert must take over full screen");
+Assert(AirAlertTakeover.Decide(takeoverSettings, null, takeoverState, takeoverT0.AddMinutes(1)).Active == false
+    && takeoverState.EngagedAt is not null,
+    "a transient outage must neither release nor reset the takeover");
+Assert(AirAlertTakeover.Decide(takeoverSettings, activeSnapshot, takeoverState, takeoverT0.AddHours(3)).ShowFullScreen,
+    "until-the-all-clear must hold for the whole alert");
+var allClear = AirAlertTakeover.Decide(takeoverSettings, quietSnapshot, takeoverState, takeoverT0.AddHours(3).AddMinutes(1));
+Assert(allClear.ShowFullScreen && allClear.IsAllClear, "the all-clear must linger on screen");
+Assert(!AirAlertTakeover.Decide(takeoverSettings, quietSnapshot, takeoverState,
+        takeoverT0.AddHours(3).AddMinutes(2).AddSeconds(5)).Active
+    && takeoverState.EngagedAt is null,
+    "after the linger the takeover must release and reset");
+
+var timedSettings = new AirAlertSettings
+{
+    Token = "t",
+    Location = "м. Київ",
+    Takeover = AirAlertTakeoverMode.Popup,
+    TakeoverUntilClear = false,
+    TakeoverMinutes = 5
+};
+var timedState = new AirAlertTakeoverState();
+Assert(AirAlertTakeover.Decide(timedSettings, activeSnapshot, timedState, takeoverT0).ShowPopup,
+    "the popup mode must surface the banner");
+Assert(!AirAlertTakeover.Decide(timedSettings, activeSnapshot, timedState, takeoverT0.AddMinutes(6)).Active,
+    "a timed takeover must step aside after its minutes run out");
+var timedClear = AirAlertTakeover.Decide(timedSettings, quietSnapshot, timedState, takeoverT0.AddMinutes(20));
+Assert(timedClear.ShowPopup && timedClear.IsAllClear, "the all-clear banner must still appear after a timed hold");
+
+var bannerTheme = themes.Single(theme => theme.Id == "clock-dot-matrix");
+var noBanner = renderer.Render(bannerTheme, SystemSnapshot.DesignSample);
+var alertBanner = renderer.Render(bannerTheme, SystemSnapshot.DesignSample,
+    overlay: c => AirAlertPopupOverlay.Draw(c, false, "м. Київ"));
+var clearBanner = renderer.Render(bannerTheme, SystemSnapshot.DesignSample,
+    overlay: c => AirAlertPopupOverlay.Draw(c, true, "м. Київ"));
+Assert(alertBanner.JpegBytes is [0xFF, 0xD8, ..] && clearBanner.JpegBytes is [0xFF, 0xD8, ..],
+    "the alert banners did not render");
+Assert(!alertBanner.JpegBytes.AsSpan().SequenceEqual(noBanner.JpegBytes)
+    && !alertBanner.JpegBytes.AsSpan().SequenceEqual(clearBanner.JpegBytes),
+    "the banner must draw over the theme and differ between states");
+Console.WriteLine("PASS air alerts: oblast match, alert duration, takeover state machine, banners");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();

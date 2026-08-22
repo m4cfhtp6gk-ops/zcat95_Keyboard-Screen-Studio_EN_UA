@@ -173,6 +173,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _alertsToken = string.Empty;
     private string _alertsLocation = string.Empty;
     private AirAlertSnapshot? _alertsSnapshot;
+    private AirAlertTakeoverMode _alertsTakeoverMode;
+    private bool _alertsTakeoverUntilClear = true;
+    private int _alertsTakeoverMinutes = 5;
+    private readonly AirAlertTakeoverState _alertTakeoverState = new();
     private TelegramService? _telegramService;
     private string _telegramApiId = string.Empty;
     private string _telegramApiHash = string.Empty;
@@ -1336,7 +1340,95 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public string AlertsLocation
     {
         get => _alertsLocation;
-        set { if (SetProperty(ref _alertsLocation, value)) ScheduleCommit(); }
+        set
+        {
+            if (SetProperty(ref _alertsLocation, value))
+            {
+                OnPropertyChanged(nameof(AlertsRegionOptions));
+                OnPropertyChanged(nameof(AlertsRegionSelection));
+                ScheduleCommit();
+            }
+        }
+    }
+
+    /// <summary>The dropdown items: whole-country first, then the oblast-level regions.</summary>
+    public IReadOnlyList<string> AlertsRegionOptions
+    {
+        get
+        {
+            var options = new List<string>(AirAlertRegions.All.Count + 2) { Loc.T("AlertsRegionWholeCountry") };
+            options.AddRange(AirAlertRegions.All);
+            if (_alertsLocation.Length > 0 &&
+                !options.Contains(_alertsLocation, StringComparer.OrdinalIgnoreCase))
+            {
+                options.Add(_alertsLocation);
+            }
+            return options;
+        }
+    }
+
+    public string AlertsRegionSelection
+    {
+        get => _alertsLocation.Length == 0 ? Loc.T("AlertsRegionWholeCountry") : _alertsLocation;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+            AlertsLocation = string.Equals(value, Loc.T("AlertsRegionWholeCountry"), StringComparison.Ordinal)
+                ? string.Empty
+                : value;
+        }
+    }
+
+    /// <summary>Display-text picker over the stored enum, like <see cref="StockSourcePreference"/>.</summary>
+    public string AlertsTakeoverPreference
+    {
+        get => AlertsTakeoverOptions[Math.Clamp((int)_alertsTakeoverMode, 0, AlertsTakeoverOptions.Count - 1)];
+        set
+        {
+            IReadOnlyList<string> options = AlertsTakeoverOptions;
+            for (int index = 0; index < options.Count; index++)
+            {
+                if (string.Equals(options[index], value, StringComparison.Ordinal))
+                {
+                    if (SetProperty(ref _alertsTakeoverMode, (AirAlertTakeoverMode)index, nameof(AlertsTakeoverPreference)))
+                    {
+                        ScheduleCommit();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    public IReadOnlyList<string> AlertsTakeoverOptions =>
+        [Loc.T("AlertsTakeoverOff"), Loc.T("AlertsTakeoverFullScreen"), Loc.T("AlertsTakeoverPopup")];
+
+    public bool AlertsTakeoverUntilClear
+    {
+        get => _alertsTakeoverUntilClear;
+        set
+        {
+            if (SetProperty(ref _alertsTakeoverUntilClear, value))
+            {
+                OnPropertyChanged(nameof(AlertsTakeoverMinutesEnabled));
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool AlertsTakeoverMinutesEnabled => !_alertsTakeoverUntilClear;
+
+    public int AlertsTakeoverMinutes
+    {
+        get => _alertsTakeoverMinutes;
+        set
+        {
+            int clamped = Math.Clamp(value, AirAlertTakeover.MinMinutes, AirAlertTakeover.MaxMinutes);
+            if (SetProperty(ref _alertsTakeoverMinutes, clamped)) ScheduleCommit();
+        }
     }
 
     public string GitHubUsername
@@ -2312,6 +2404,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.AirAlerts ??= new AirAlertSettings();
         AlertsToken = _settings.AirAlerts.Token;
         AlertsLocation = _settings.AirAlerts.Location;
+        AlertsTakeoverUntilClear = _settings.AirAlerts.TakeoverUntilClear;
+        AlertsTakeoverMinutes = _settings.AirAlerts.TakeoverMinutes;
+        _alertsTakeoverMode = _settings.AirAlerts.Takeover;
+        OnPropertyChanged(nameof(AlertsTakeoverPreference));
         _settings.Telegram ??= new TelegramSettings();
         TelegramApiId = _settings.Telegram.ApiId;
         TelegramApiHash = _settings.Telegram.ApiHash;
@@ -2611,7 +2707,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.AirAlerts = new AirAlertSettings
         {
             Token = AlertsToken.Trim(),
-            Location = AlertsLocation.Trim()
+            Location = AlertsLocation.Trim(),
+            Takeover = _alertsTakeoverMode,
+            TakeoverUntilClear = AlertsTakeoverUntilClear,
+            TakeoverMinutes = AlertsTakeoverMinutes
         };
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
@@ -2635,11 +2734,18 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 // Media automation watches for playback outside the theme, so
                 // it keeps the poll fast even under a slow data theme.
                 int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                bool alertTakeoverArmed = AirAlertTakeover.IsArmed(_settings.AirAlerts);
+                if (alertTakeoverArmed)
+                {
+                    // An armed takeover has to notice a new alert promptly.
+                    pollCap = Math.Min(pollCap ?? AirAlertTakeover.PollCapSeconds, AirAlertTakeover.PollCapSeconds);
+                }
                 await Task.Delay(
                     ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
                     cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true ||
+                if (!staticImage || AutoMediaThemeSwitch || alertTakeoverArmed ||
+                    _settings.Schedule?.Enabled == true ||
                     _settings.Carousel?.Enabled == true)
                 {
                     await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
@@ -2691,8 +2797,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            // An armed alert takeover needs the feed before theme layering,
+            // whatever theme is on screen.
+            AirAlertSnapshot? airAlerts = null;
+            if (AirAlertTakeover.IsArmed(_settings.AirAlerts) || requestedTheme.Id == "alerts")
+            {
+                airAlerts = await _airAlertSource.ReadAsync(
+                    _settings.AirAlerts ?? new AirAlertSettings(),
+                    cancellationToken);
+                _alertsSnapshot = airAlerts;
+            }
             // Layering, lowest first: carousel substitutes the selected theme,
-            // media automation may override it, the night theme wins at idle.
+            // media automation may override it, the night theme wins at idle,
+            // and an alert takeover outranks everything.
             string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
@@ -2703,6 +2820,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
             {
                 effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);
+            }
+            AirAlertTakeoverDecision alertTakeover = AirAlertTakeover.Decide(
+                _settings.AirAlerts, airAlerts, _alertTakeoverState, scheduleNow);
+            if (alertTakeover.ShowFullScreen)
+            {
+                effectiveId = "alerts";
             }
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
@@ -2770,9 +2893,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _gitHubSnapshot = gitHub;
             }
 
-            AirAlertSnapshot? airAlerts = null;
-            if (requestedTheme.Id == "alerts" || theme.Id == "alerts")
+            if (airAlerts is null && theme.Id == "alerts")
             {
+                // The carousel or schedule landed on the alerts theme without
+                // an armed takeover; fetch for the render.
                 airAlerts = await _airAlertSource.ReadAsync(
                     _settings.AirAlerts ?? new AirAlertSettings(),
                     cancellationToken);
@@ -2811,7 +2935,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             };
 
             Action<ScreenCanvas>? popupOverlay = null;
-            if (_telegramPopup is { } telegramPopup && DateTimeOffset.Now < _telegramPopupUntil)
+            if (alertTakeover.ShowPopup)
+            {
+                bool popupAllClear = alertTakeover.IsAllClear;
+                string popupLocation = _settings.AirAlerts?.Location?.Trim() ?? string.Empty;
+                popupOverlay = overlayCanvas =>
+                    AirAlertPopupOverlay.Draw(overlayCanvas, popupAllClear, popupLocation);
+            }
+            else if (_telegramPopup is { } telegramPopup && DateTimeOffset.Now < _telegramPopupUntil)
             {
                 (string popupTitle, string? popupPreview) = FormatTelegramPopup(telegramPopup);
                 popupOverlay = overlayCanvas =>
@@ -2840,7 +2971,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     ImageAnalogOrder,
                     ImageFlipTimeFontSize,
                     DotMatrixProgressHeaderFontSize),
-                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow),
+                // An active alert must not hide behind night dimming.
+                alertTakeover.Active ? 100 : ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow),
                 popupOverlay);
 
             using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
