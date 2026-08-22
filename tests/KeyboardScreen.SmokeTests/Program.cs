@@ -1805,6 +1805,58 @@ Assert(accentImported.ThemeAccentOverrides["clock"] == "#3366FF",
     "accent overrides must round-trip through the porter");
 Console.WriteLine("PASS per-theme accent and calendar-link stripping");
 
+// ---- knob theme switching: the pure half --------------------------------------
+string[] knobIds = ["clock", "weather-five-day", "stocks"];
+Assert(KnobControl.Next(knobIds, "clock", 1) == "weather-five-day", "the knob must step to the next theme");
+Assert(KnobControl.Next(knobIds, "stocks", 1) == "clock", "the knob must wrap forward past the end");
+Assert(KnobControl.Next(knobIds, "clock", -1) == "stocks", "the knob must wrap backward past the start");
+Assert(KnobControl.Next(knobIds, "CLOCK", 1) == "weather-five-day", "theme ids must match case-insensitively");
+Assert(KnobControl.Next(knobIds, "unknown", 1) == "clock", "an unknown current theme must land on the first");
+Assert(KnobControl.Next(knobIds, null, -1) == "clock", "no current theme must land on the first");
+Assert(KnobControl.Next([], "clock", 1) is null, "an empty cycle must produce nothing to do");
+Assert(KnobControl.Next(["solo"], "solo", 1) == "solo", "a single-entry cycle must stay put");
+
+Assert(KnobControl.ResolveCycleList(
+        new CarouselSettings { ThemeIds = ["clock", "stocks", "clock"] },
+        ["a", "b", "c"]).SequenceEqual(["clock", "stocks"]),
+    "a configured carousel must drive the cycle, deduplicated");
+Assert(KnobControl.ResolveCycleList(
+        new CarouselSettings { ThemeIds = ["clock"] },
+        ["a", "b", "c"]).SequenceEqual(["a", "b", "c"]),
+    "fewer than two carousel entries must fall back to the catalog");
+Assert(KnobControl.ResolveCycleList(null, ["a", "b"]).SequenceEqual(["a", "b"]),
+    "no carousel settings must fall back to the catalog");
+
+Assert(KnobControl.TryParseVidPid("3151:4015", out ushort knobVid, out ushort knobPid)
+    && knobVid == 0x3151 && knobPid == 0x4015,
+    "colon-separated VID:PID must parse as hex");
+Assert(KnobControl.TryParseVidPid("vid_046d&pid_c52b", out knobVid, out knobPid)
+    && knobVid == 0x046D && knobPid == 0xC52B,
+    "device-manager style VID_/PID_ ids must parse");
+Assert(!KnobControl.TryParseVidPid("porridge", out _, out _)
+    && !KnobControl.TryParseVidPid("", out _, out _)
+    && !KnobControl.TryParseVidPid("1234", out _, out _),
+    "junk VID:PID input must be rejected");
+
+Assert(KnobControl.DevicePathMatches(@"\\?\HID#VID_3151&PID_4015&MI_02#8&2f5c8e0&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}", 0x3151, 0x4015),
+    "a real raw-input device path must match its VID/PID");
+Assert(!KnobControl.DevicePathMatches(@"\\?\HID#VID_046D&PID_C52B#7&1f6a&0&0000#{884b96c3}", 0x3151, 0x4015),
+    "a different device must not match");
+Assert(!KnobControl.DevicePathMatches(null, 0x3151, 0x4015), "a missing path must not match");
+
+Assert(KnobControl.HotKeyToVirtualKey("F13") == 0x7C && KnobControl.HotKeyToVirtualKey("f24") == 0x87,
+    "F13-F24 must map onto their virtual keys");
+Assert(KnobControl.HotKeyToVirtualKey("F12") is null && KnobControl.HotKeyToVirtualKey("Q") is null
+    && KnobControl.HotKeyToVirtualKey(null) is null,
+    "keys outside F13-F24 must be rejected");
+Assert(KnobControl.HotKeyNames.Count == 12 && KnobControl.HotKeyNames[0] == "F13" && KnobControl.HotKeyNames[^1] == "F24",
+    "the hot-key list must span F13 through F24");
+
+var knobDefaults = new KnobSettings();
+Assert(!knobDefaults.Enabled && knobDefaults.SuppressVolume && knobDefaults.Mode == KnobMode.VolumeKnob,
+    "the knob feature must ship disabled with volume suppression preferred");
+Console.WriteLine("PASS knob switching: circular cycle, carousel fallback, VID/PID, hot keys");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

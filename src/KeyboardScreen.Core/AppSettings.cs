@@ -113,6 +113,8 @@ public sealed class AppSettings
 
 	public CalendarSettings Calendar { get; set; } = new();
 
+	public KnobSettings Knob { get; set; } = new();
+
 
 
 
