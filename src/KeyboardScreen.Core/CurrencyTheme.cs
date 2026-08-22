@@ -52,9 +52,14 @@ public sealed class CurrencyTheme : IScreenTheme
             top += rowHeight + gap;
         }
 
+        // The provider's own data date makes a stale feed visible.
         string footer = currency.IsStale
             ? Loc.T("ScreenClaudeStale")
-            : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(currency.UpdatedAt));
+            : currency.DataDate is { } dataDate
+                ? Loc.T("ScreenCurrencyDataDate",
+                    Loc.ShortDate(new DateTimeOffset(dataDate.ToDateTime(TimeOnly.MinValue), DateTimeOffset.Now.Offset)))
+                    + " · " + DisplayUnits.Time(currency.UpdatedAt)
+                : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(currency.UpdatedAt));
         canvas.AlignedText(footer, 9, Muted,
             new Rect(safe.Left, safe.Bottom - 14, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }
