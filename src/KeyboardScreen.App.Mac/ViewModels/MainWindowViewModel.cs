@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly BinanceStockSnapshotSource _binanceSource = new();
     private readonly CurrencySnapshotSource _currencySource = new();
     private readonly GitHubContributionSource _gitHubSource = new();
+    private readonly AirAlertSource _airAlertSource = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
@@ -639,6 +640,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _binanceSource.Dispose();
         _currencySource.Dispose();
         _gitHubSource.Dispose();
+        _airAlertSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -708,7 +710,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "alerts", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -1018,6 +1020,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            AirAlertSnapshot? airAlerts = null;
+            if (theme.Id == "alerts")
+            {
+                airAlerts = await _airAlertSource.ReadAsync(
+                    _settings.AirAlerts ?? new AirAlertSettings(),
+                    cancellationToken);
+            }
+
             SystemSnapshot snapshot = system with
             {
                 Music = music,
@@ -1026,7 +1036,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 AiQuota = AiQuotaSnapshot.Empty,
                 Currency = currency,
                 Crypto = crypto,
-                GitHub = gitHub
+                GitHub = gitHub,
+                AirAlerts = airAlerts
             };
             _latestFrame = _renderer.Render(
                 theme,

@@ -592,6 +592,29 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsAlertsTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize AlertsHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize AlertsHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Grid.Column="1" VerticalAlignment="Top" Command="{Binding OpenAlertsSiteCommand}" Content="{infra:Localize AlertsOpenSite}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsTokenLabel}" />
+                          <TextBox Grid.Column="1" PasswordChar="*" Text="{Binding AlertsToken, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize AlertsTokenHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsLocationLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="48" PlaceholderText="Київ" Text="{Binding AlertsLocation, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize AlertsLocationHint}" TextWrapping="Wrap" />
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsGitHubTheme}" Classes="card">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
