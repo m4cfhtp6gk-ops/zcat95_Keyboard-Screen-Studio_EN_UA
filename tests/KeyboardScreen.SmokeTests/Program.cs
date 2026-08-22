@@ -29,8 +29,9 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
-Assert(themes.Count == 27, "built-in theme catalog should contain the 27 supported schemes");
-Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
+Assert(themes.Count == 32, "built-in theme catalog should contain the 32 supported schemes");
+Assert(themes.All(theme => theme.Id != "ambient"), "the removed ambient theme must not be registered");
+Assert(themes.Any(theme => theme.Id == "calendar"), "the ICS calendar theme must be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
 Assert(themes.Any(theme => theme.Id == "performance-visual"), "performance-visual theme must be registered");
@@ -116,7 +117,8 @@ Console.WriteLine("PASS AI quota model and single-platform theme for subscriptio
 var weatherResponses = new Queue<string>(new[]
 {
     """{"results":[{"name":"北京","latitude":39.9042,"longitude":116.4074}]}""",
-    """{"current":{"temperature_2m":31.4,"apparent_temperature":34.2,"relative_humidity_2m":58,"weather_code":2,"is_day":1},"daily":{"time":["2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-01"],"weather_code":[2,3,61,1,0],"temperature_2m_max":[32,31,29,33,34],"temperature_2m_min":[24,23,22,24,25]}}"""
+    """{"current":{"temperature_2m":31.4,"apparent_temperature":34.2,"relative_humidity_2m":58,"weather_code":2,"is_day":1},"daily":{"time":["2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-01"],"weather_code":[2,3,61,1,0],"temperature_2m_max":[32,31,29,33,34],"temperature_2m_min":[24,23,22,24,25],"sunrise":["2026-07-28T05:12"],"sunset":["2026-07-28T19:33"]}}""",
+    """{"current":{"european_aqi":37.4}}"""
 });
 var weatherHandler = new SequenceHandler(weatherResponses);
 using (var weatherClient = new HttpClient(weatherHandler))
@@ -130,9 +132,13 @@ using (var weatherSource = new OpenMeteoWeatherSnapshotSource(weatherClient))
     Assert(weatherSnapshot.ConditionText == "Partly cloudy", "WMO weather condition mapping failed");
     Assert(weatherSnapshot.DailyForecast?.Count == 5, "five-day weather forecast was not parsed");
     Assert(weatherSnapshot.DailyForecast![2].ConditionText == "Rain", "daily WMO weather condition mapping failed");
+    Assert(weatherSnapshot.Sunrise?.Hour == 5 && weatherSnapshot.Sunrise?.Minute == 12, "sunrise was not parsed");
+    Assert(weatherSnapshot.Sunset?.Hour == 19 && weatherSnapshot.Sunset?.Minute == 33, "sunset was not parsed");
+    Assert(weatherSnapshot.EuropeanAqi == 37, "the European AQI was not parsed");
+    Assert(WeatherSnapshot.AqiLabel(37) == Loc.T("ScreenAqiFair"), "the AQI band label is wrong");
     var cachedWeather = await weatherSource.ReadAsync(new WeatherSettings { LocationQuery = "北京" });
     Assert(ReferenceEquals(weatherSnapshot, cachedWeather), "weather snapshot should use the ten-minute cache");
-    Assert(weatherHandler.RequestCount == 2, "cached weather read must not call the APIs again");
+    Assert(weatherHandler.RequestCount == 3, "cached weather read must not call the APIs again");
     var fiveDayFrame = renderer.Render(themes.Single(theme => theme.Id == "weather-five-day"), SystemSnapshot.DesignSample with { Weather = weatherSnapshot });
     Assert(fiveDayFrame.JpegBytes is [0xFF, 0xD8, ..], "five-day weather data view did not render");
 }
@@ -140,7 +146,8 @@ Console.WriteLine("PASS Open-Meteo geocoding/current weather parser and cache");
 
 var automaticWeatherResponses = new Queue<string>(new[]
 {
-    """{"current":{"temperature_2m":27.2,"apparent_temperature":28.1,"relative_humidity_2m":64,"weather_code":1,"is_day":1},"daily":{"time":["2026-07-29"],"weather_code":[1],"temperature_2m_max":[30],"temperature_2m_min":[24]}}"""
+    """{"current":{"temperature_2m":27.2,"apparent_temperature":28.1,"relative_humidity_2m":64,"weather_code":1,"is_day":1},"daily":{"time":["2026-07-29"],"weather_code":[1],"temperature_2m_max":[30],"temperature_2m_min":[24]}}""",
+    """{"error":true}"""
 });
 var automaticWeatherHandler = new SequenceHandler(automaticWeatherResponses);
 using (var automaticWeatherClient = new HttpClient(automaticWeatherHandler))
@@ -156,7 +163,9 @@ using (var automaticWeatherSource = new OpenMeteoWeatherSnapshotSource(automatic
     });
     Assert(automaticWeather.Available, "automatic-location weather snapshot must be available");
     Assert(automaticWeather.LocationName == "当前位置", "automatic-location display name was not retained");
-    Assert(automaticWeatherHandler.RequestCount == 1, "automatic coordinates must bypass city geocoding");
+    Assert(automaticWeatherHandler.RequestCount == 2, "automatic coordinates must bypass city geocoding");
+    Assert(automaticWeather.EuropeanAqi is null && automaticWeather.Sunrise is null,
+        "a weather response without sun or air data must leave those readings out");
 }
 Console.WriteLine("PASS automatic weather coordinates and geocoding bypass");
 
@@ -1493,6 +1502,162 @@ Assert(!alertBanner.JpegBytes.AsSpan().SequenceEqual(noBanner.JpegBytes)
     && !alertBanner.JpegBytes.AsSpan().SequenceEqual(clearBanner.JpegBytes),
     "the banner must draw over the theme and differ between states");
 Console.WriteLine("PASS air alerts: oblast match, alert duration, takeover state machine, banners");
+
+// ---- world clocks, countdown, disks ------------------------------------------
+Assert(WorldClockTheme.TryGetTime("Europe/Kyiv", new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero), out DateTimeOffset kyivWinter)
+    && kyivWinter.Hour == 14,
+    "Europe/Kyiv must resolve to UTC+2 in winter");
+Assert(WorldClockTheme.TryGetTime("Asia/Tokyo", new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero), out DateTimeOffset tokyo)
+    && tokyo.Hour == 21,
+    "Asia/Tokyo must resolve to UTC+9");
+Assert(!WorldClockTheme.TryGetTime("Neverland/Nowhere", DateTimeOffset.Now, out _),
+    "an unknown zone must fail gracefully");
+Assert(WorldClockSnapshot.From(new WorldClockSettings
+{
+    Items =
+    [
+        new WorldClockItem { Label = "Київ", TimeZoneId = "Europe/Kyiv" },
+        new WorldClockItem(),
+        new WorldClockItem { Label = "", TimeZoneId = "Asia/Tokyo" }
+    ]
+}).Clocks.Count == 2, "empty world-clock rows must be skipped");
+
+Assert(CountdownSettings.TryParseDate("2026-12-31", out DateTimeOffset newYearEve) && newYearEve.Month == 12,
+    "ISO countdown dates must parse");
+Assert(CountdownSettings.TryParseDate("31.12.2026 18:30", out DateTimeOffset withTime)
+    && withTime.Hour == 18 && withTime.Minute == 30,
+    "dotted countdown dates with a time must parse");
+Assert(!CountdownSettings.TryParseDate("soon", out _), "junk countdown dates must be rejected");
+var countdownSnapshot = CountdownSnapshot.From(new CountdownSettings
+{
+    Items =
+    [
+        new CountdownItem { Title = "B", Date = "2027-05-01" },
+        new CountdownItem { Title = "A", Date = "2026-12-31" },
+        new CountdownItem { Title = "", Date = "2026-11-01" }
+    ]
+});
+Assert(countdownSnapshot.Events.Count == 2 && countdownSnapshot.Events[0].Title == "A",
+    "countdown events must sort by date and skip untitled rows");
+
+var diskSourceSnapshot = new DiskUsageSource().Read();
+Assert(diskSourceSnapshot is not null, "the disk source must never throw");
+Assert(new DiskVolume("C:", "", 95, 100).UsedPercent == 95, "disk percent math is wrong");
+
+foreach (string newThemeId in new[] { "disks", "ping", "world-clock", "countdown", "calendar" })
+{
+    var newFrame = renderer.Render(themes.Single(theme => theme.Id == newThemeId), SystemSnapshot.DesignSample);
+    Assert(newFrame.JpegBytes is [0xFF, 0xD8, ..], $"{newThemeId}: the design sample did not render");
+    var emptyFrame = renderer.Render(themes.Single(theme => theme.Id == newThemeId), SystemSnapshot.DesignSample with
+    {
+        Disks = null, Ping = null, WorldClocks = null, Countdown = null, Calendar = null
+    });
+    Assert(emptyFrame.JpegBytes is [0xFF, 0xD8, ..], $"{newThemeId}: the empty state did not render");
+}
+Console.WriteLine("PASS world clocks, countdown, disks: zones, dates, renders");
+
+// ---- ping monitor -------------------------------------------------------------
+var emptyPing = await new PingMonitorSource().ReadAsync(new PingSettings { Hosts = ["", "  "] });
+Assert(!emptyPing.Available, "no hosts must read as unavailable");
+Assert(new PingHostSnapshot("x", null, [null]).IsReachable == false
+    && new PingHostSnapshot("x", 12, [12.0]).IsReachable,
+    "ping reachability must follow the latency");
+Console.WriteLine("PASS ping monitor: empty hosts, reachability");
+
+// ---- ICS calendar parser ------------------------------------------------------
+const string icsFixture = """
+    BEGIN:VCALENDAR
+    VERSION:2.0
+    BEGIN:VEVENT
+    SUMMARY:Разова зустріч\, важлива
+    DTSTART:20260825T140000
+    END:VEVENT
+    BEGIN:VEVENT
+    SUMMARY:Щотижневий стендап
+    DTSTART;TZID=Europe/Kyiv:20260824T110000
+    RRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=6
+    EXDATE;TZID=Europe/Kyiv:20260826T110000
+    END:VEVENT
+    BEGIN:VEVENT
+    SUMMARY:День народження
+    DTSTART;VALUE=DATE:20260901
+    RRULE:FREQ=YEARLY
+    END:VEVENT
+    END:VCALENDAR
+    """;
+var icsWindowStart = new DateTimeOffset(2026, 8, 22, 0, 0, 0, DateTimeOffset.Now.Offset);
+var icsEvents = IcsParser.Parse(icsFixture, icsWindowStart, icsWindowStart.AddDays(30));
+Assert(icsEvents.Count(item => item.Title == "Разова зустріч, важлива") == 1,
+    "the single event must parse once with unescaped commas");
+var standups = icsEvents.Where(item => item.Title == "Щотижневий стендап").ToArray();
+Assert(standups.Length == 5, $"weekly BYDAY with COUNT=6 minus one EXDATE must leave 5, got {standups.Length}");
+Assert(standups.All(item => item.Start.Hour == 11 || item.Start.Hour != 0),
+    "recurring times must carry the hour through");
+Assert(standups.Select(item => item.Start.LocalDateTime.DayOfWeek)
+        .All(day => day is DayOfWeek.Monday or DayOfWeek.Wednesday),
+    "weekly BYDAY must expand onto the listed weekdays only");
+Assert(icsEvents.Count(item => item.Title == "День народження" && item.IsAllDay) == 1,
+    "the yearly all-day event must appear once inside the window");
+
+var icsHandler = new ClaudeHandler(new Queue<string>(new[] { icsFixture }));
+using (var icsClient = new HttpClient(icsHandler))
+using (var icsSource = new IcsCalendarSource(icsClient))
+{
+    var calendarSnapshot = await icsSource.ReadAsync(new CalendarSettings { IcsUrl = "webcal://calendar.test/private-token/basic.ics" });
+    Assert(calendarSnapshot.Available, "the calendar snapshot must be available");
+    Assert(icsHandler.Requests[0].StartsWith("https://calendar.test/", StringComparison.Ordinal),
+        "webcal:// must be fetched over https");
+    var cachedCalendar = await icsSource.ReadAsync(new CalendarSettings { IcsUrl = "webcal://calendar.test/private-token/basic.ics" });
+    Assert(ReferenceEquals(calendarSnapshot, cachedCalendar), "calendar reads must use the fifteen-minute cache");
+}
+Assert(!new CalendarSettings { IcsUrl = "ftp://x" }.IsConfigured
+    && new CalendarSettings { IcsUrl = "https://x/cal.ics" }.IsConfigured,
+    "only http(s) calendar links count as configured");
+Console.WriteLine("PASS ICS calendar: unfolding, RRULE, EXDATE, webcal, cache");
+
+// ---- stock portfolio ----------------------------------------------------------
+var portfolioQuotes = new List<StockQuoteSnapshot>
+{
+    new("AAPL", "Apple", 100, 2.0, DateTimeOffset.Now, Quantity: 10),
+    new("MSFT", "Microsoft", 50, -1.0, DateTimeOffset.Now, Quantity: 4),
+    new("NOQTY", "NoQty", 77, 5.0, DateTimeOffset.Now)
+};
+var portfolioResult = StockPortfolio.Compute(portfolioQuotes);
+Assert(portfolioResult is not null, "a portfolio with quantities must compute");
+Assert(Math.Abs(portfolioResult!.Value.Value - 1200) < 0.001, "the portfolio value must sum price times quantity");
+double expectedPrevious = 1000 / 1.02 + 200 / 0.99;
+Assert(Math.Abs(portfolioResult.Value.DayChange - (1200 - expectedPrevious)) < 0.01,
+    "the portfolio day change must derive from the change percents");
+Assert(StockPortfolio.Compute([new("AAPL", "Apple", 100, 2.0, DateTimeOffset.Now)]) is null,
+    "no quantities must mean no portfolio row");
+var attachedStocks = StockPortfolio.Attach(
+    new StockSnapshot([new("AAPL", "Apple", 100, 2.0, DateTimeOffset.Now)], DateTimeOffset.Now, true),
+    new StockSettings { Items = [new() { Symbol = "aapl", Quantity = 3 }] });
+Assert(attachedStocks.Quotes[0].Quantity == 3, "quantities must attach by symbol, case-insensitively");
+var portfolioFrame = renderer.Render(themes.Single(theme => theme.Id == "stocks"), SystemSnapshot.DesignSample with
+{
+    Stocks = new StockSnapshot(portfolioQuotes, DateTimeOffset.Now, RedForGain: false)
+});
+Assert(portfolioFrame.JpegBytes is [0xFF, 0xD8, ..], "the portfolio strip did not render");
+Console.WriteLine("PASS stock portfolio: math, attach, render");
+
+// ---- per-theme accent and porter secrets --------------------------------------
+var accentSettings = new AppSettings
+{
+    ThemeAccentOverrides = new Dictionary<string, string> { ["clock"] = "#3366FF" },
+    Calendar = new CalendarSettings { IcsUrl = "https://calendar.test/secret-token/basic.ics" },
+    AdditionalEndpoints = ["192.168.1.51"]
+};
+string accentExported = SettingsPorter.ExportJson(accentSettings);
+Assert(!accentExported.Contains("secret-token"), "the calendar link must be stripped from exports");
+Assert(accentExported.Contains("#3366FF") && accentExported.Contains("192.168.1.51"),
+    "accent overrides and extra devices must survive the export");
+var accentImported = SettingsPorter.ImportJson(accentExported, accentSettings);
+Assert(accentImported.Calendar.IcsUrl == "https://calendar.test/secret-token/basic.ics",
+    "importing a stripped file must keep the local calendar link");
+Assert(accentImported.ThemeAccentOverrides["clock"] == "#3366FF",
+    "accent overrides must round-trip through the porter");
+Console.WriteLine("PASS per-theme accent and calendar-link stripping");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();

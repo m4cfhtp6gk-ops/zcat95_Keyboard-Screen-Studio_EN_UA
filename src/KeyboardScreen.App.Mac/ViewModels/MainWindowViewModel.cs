@@ -24,6 +24,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly GitHubContributionSource _gitHubSource = new();
     private readonly AirAlertSource _airAlertSource = new();
     private readonly AirAlertTakeoverState _alertTakeoverState = new();
+    private readonly DiskUsageSource _diskSource = new();
+    private readonly PingMonitorSource _pingSource = new();
+    private readonly IcsCalendarSource _calendarSource = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
@@ -642,6 +645,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _currencySource.Dispose();
         _gitHubSource.Dispose();
         _airAlertSource.Dispose();
+        _calendarSource.Dispose();
         _desktopServices.Dispose();
         _refreshLock.Dispose();
         _lifetime?.Dispose();
@@ -1013,6 +1017,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 stocks = await _stockSource.ReadAsync(
                     _settings.Stocks ?? new StockSettings(),
                     cancellationToken);
+                stocks = StockPortfolio.Attach(stocks, _settings.Stocks);
             }
 
             CurrencySnapshot? currency = null;
@@ -1046,6 +1051,26 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
+            DiskSnapshot? disks = null;
+            if (theme.Id == "disks")
+            {
+                disks = await Task.Run(_diskSource.Read, cancellationToken);
+            }
+
+            PingSnapshot? ping = null;
+            if (theme.Id == "ping")
+            {
+                ping = await _pingSource.ReadAsync(_settings.Ping, cancellationToken);
+            }
+
+            CalendarSnapshot? calendar = null;
+            if (theme.Id == "calendar")
+            {
+                calendar = await _calendarSource.ReadAsync(
+                    _settings.Calendar ?? new CalendarSettings(),
+                    cancellationToken);
+            }
+
             SystemSnapshot snapshot = system with
             {
                 Music = music,
@@ -1055,13 +1080,18 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Currency = currency,
                 Crypto = crypto,
                 GitHub = gitHub,
-                AirAlerts = airAlerts
+                AirAlerts = airAlerts,
+                Disks = disks,
+                Ping = ping,
+                Calendar = calendar,
+                WorldClocks = WorldClockSnapshot.From(_settings.WorldClock),
+                Countdown = CountdownSnapshot.From(_settings.Countdown)
             };
             _latestFrame = _renderer.Render(
                 theme,
                 snapshot,
                 100,
-                GetAccentColor(),
+                GetAccentColor(theme.Id),
                 GetSelectedFontFamily(),
                 new ScreenDisplayOptions(
                     ImageTimePlacement,
@@ -1144,10 +1174,20 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         Fonts.FirstOrDefault(item => item.Id == SelectedFontId)?.FontFamily
         ?? ScreenFontOption.Default.FontFamily;
 
-    private WpfColor GetAccentColor() =>
-        TryParseAccentColor(AccentColor, out WpfColor color)
+    private WpfColor GetAccentColor(string? themeId = null)
+    {
+        if (themeId is not null &&
+            _settings.ThemeAccentOverrides is { } overrides &&
+            overrides.TryGetValue(themeId, out string? themeAccent) &&
+            TryParseAccentColor(themeAccent, out WpfColor themed))
+        {
+            return themed;
+        }
+
+        return TryParseAccentColor(AccentColor, out WpfColor color)
             ? color
             : WpfColor.FromRgb(228, 105, 76);
+    }
 
     private static bool TryParseAccentColor(string? value, out WpfColor color)
     {

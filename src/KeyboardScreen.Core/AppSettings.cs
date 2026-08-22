@@ -99,6 +99,20 @@ public sealed class AppSettings
 	/// <summary>Per-theme refresh intervals in seconds; themes not listed use their built-in cadence.</summary>
 	public Dictionary<string, int> ThemeRefreshOverrides { get; set; } = new();
 
+	/// <summary>Per-theme accent colors (#RRGGBB); themes not listed use the global accent.</summary>
+	public Dictionary<string, string> ThemeAccentOverrides { get; set; } = new();
+
+	/// <summary>Extra keyboards to push every frame to, as IPs or full endpoint URLs.</summary>
+	public List<string> AdditionalEndpoints { get; set; } = new();
+
+	public WorldClockSettings WorldClock { get; set; } = new();
+
+	public CountdownSettings Countdown { get; set; } = new();
+
+	public PingSettings Ping { get; set; } = new();
+
+	public CalendarSettings Calendar { get; set; } = new();
+
 
 
 

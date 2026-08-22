@@ -267,6 +267,22 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
         }
     }
 
+    private async void ThemeAccentButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        string current = _viewModel.CurrentThemeAccentColor.Length > 0
+            ? _viewModel.CurrentThemeAccentColor
+            : _viewModel.AccentColor;
+        var dialog = new AccentColorWindow(current);
+        string? selected = await dialog.ShowDialog<string?>(this);
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            _viewModel.CurrentThemeAccentColor = selected;
+        }
+    }
+
+    private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.CurrentThemeAccentColor = string.Empty;
+
     private async Task<string?> PickExportPathAsync()
     {
         IStorageFile? file = await StorageProvider.SaveFilePickerAsync(

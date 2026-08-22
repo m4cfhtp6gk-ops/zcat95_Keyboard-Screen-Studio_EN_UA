@@ -37,6 +37,25 @@ public sealed class StockTheme : IScreenTheme
         double bottom = safe.Bottom - 30;
         var redForGain = stocks?.RedForGain ?? true;
 
+        if (StockPortfolio.Compute(quotes) is { } portfolio)
+        {
+            var strip = new Rect(safe.Left, top, safe.Width, 42);
+            canvas.RoundedRect(strip, 10, panel, stroke);
+            canvas.AlignedText(Loc.T("ScreenStocksPortfolio"), 9, secondary,
+                new Rect(strip.Left + 10, strip.Top + 5, strip.Width - 20, 12), FontWeights.Medium, TextAlignment.Left);
+            canvas.AlignedText(StockPortfolio.FormatValue(portfolio.Value), 15, Colors.White,
+                new Rect(strip.Left + 10, strip.Top + 18, strip.Width - 20, 20), FontWeights.SemiBold, TextAlignment.Left);
+            bool portfolioGain = portfolio.DayChange >= 0;
+            var portfolioColor = portfolioGain == redForGain
+                ? Color.FromRgb(238, 78, 88)
+                : Color.FromRgb(47, 194, 116);
+            canvas.AlignedText(
+                $"{(portfolioGain ? "▲" : "▼")} {Math.Abs(portfolio.DayChangePercent):0.00}%",
+                12, portfolioColor,
+                new Rect(strip.Left + 10, strip.Top + 20, strip.Width - 20, 17), FontWeights.SemiBold, TextAlignment.Right);
+            top = strip.Bottom + 8;
+        }
+
         if (showVisual)
         {
             DrawTwoStockBlocks(
