@@ -110,7 +110,7 @@ public sealed class ImageTheme : IScreenTheme
             double lineHeight = RowHeight(row, timeSize, dateSize, weatherSize);
             string value = row switch
             {
-                DigitalRow.Time => snapshot.Timestamp.ToString("HH:mm"),
+                DigitalRow.Time => DisplayUnits.Time(snapshot.Timestamp),
                 DigitalRow.Date => DateLabel(snapshot.Timestamp),
                 _ => WeatherLabel(snapshot.Weather!)
             };
@@ -211,7 +211,7 @@ public sealed class ImageTheme : IScreenTheme
         double tileWidth = (area.Width - inset * 2 - gap) / 2;
         var hour = new Rect(area.Left + inset, area.Top + inset, tileWidth, tileHeight);
         var minute = new Rect(hour.Right + gap, hour.Top, tileWidth, tileHeight);
-        DrawFlipTile(canvas, hour, snapshot.Timestamp.ToString("HH"), primary, timeSize);
+        DrawFlipTile(canvas, hour, DisplayUnits.Hours(snapshot.Timestamp), primary, timeSize);
         DrawFlipTile(canvas, minute, snapshot.Timestamp.ToString("mm"), primary, timeSize);
         var dateBar = new Rect(area.Left + inset, hour.Bottom + gap, area.Width - inset * 2, barHeight);
         DrawInfoBar(canvas, dateBar, DateOnlyLabel(snapshot.Timestamp), WeekdayLabel(snapshot.Timestamp), primary, dateSize);
@@ -310,7 +310,7 @@ public sealed class ImageTheme : IScreenTheme
     private static string DateLabel(DateTimeOffset timestamp) => $"{Loc.ShortDate(timestamp)}  {Loc.DayName(timestamp)}";
     private static string DateOnlyLabel(DateTimeOffset timestamp) => Loc.ShortDate(timestamp);
     private static string WeekdayLabel(DateTimeOffset timestamp) => Loc.DayName(timestamp);
-    private static string WeatherLabel(WeatherSnapshot weather) => $"{weather.ConditionText} {weather.TemperatureC:0}°C";
+    private static string WeatherLabel(WeatherSnapshot weather) => $"{weather.ConditionText} {DisplayUnits.TemperatureWithUnit(weather.TemperatureC)}";
 
     private enum DigitalRow { Time, Date, Weather }
     private enum AnalogRow { Clock, Date, Weather }

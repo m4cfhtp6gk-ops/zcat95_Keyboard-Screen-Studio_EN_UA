@@ -1196,6 +1196,130 @@ Assert(notifyEngine.Evaluate(notifySettings, new NotificationInputs(Prices: pric
     "a re-armed alert must fire on the next crossing");
 Console.WriteLine("PASS notification engine: thresholds, offline transition, price re-arm, cooldowns");
 
+// ---- settings export/import -------------------------------------------------
+var portSource = new AppSettings
+{
+    AccentColor = "#123456",
+    SelectedThemeId = "hardware",
+    ClaudeUsage = new ClaudeUsageSettings { SessionKey = "sk-ant-sid01-secret", OrganizationId = "org-1", ModelScope = "Fable" },
+    GitHub = new GitHubSettings { Username = "zcat95", Token = "github_pat_secret" },
+    Telegram = new TelegramSettings { ApiId = "12345", ApiHash = "hash-secret", PhoneNumber = "+380501234567", PopupSeconds = 9 },
+    Notifications = new NotificationSettings { Enabled = true, PriceAlerts = [new PriceAlertSettings { Symbol = "BTCUSDT", Above = 100_000 }] }
+};
+string exported = SettingsPorter.ExportJson(portSource);
+Assert(!exported.Contains("sk-ant-sid01-secret") && !exported.Contains("github_pat_secret")
+    && !exported.Contains("hash-secret") && !exported.Contains("+380501234567") && !exported.Contains("org-1"),
+    "an export must never carry credentials");
+Assert(exported.Contains("#123456") && exported.Contains("\"hardware\"") && exported.Contains("zcat95")
+    && exported.Contains("BTCUSDT") && exported.Contains("Fable"),
+    "an export must keep the non-secret settings");
+Assert(portSource.ClaudeUsage.SessionKey == "sk-ant-sid01-secret",
+    "exporting must not touch the live settings object");
+
+var portImported = SettingsPorter.ImportJson(exported, portSource);
+Assert(portImported.ClaudeUsage.SessionKey == "sk-ant-sid01-secret"
+    && portImported.ClaudeUsage.OrganizationId == "org-1"
+    && portImported.GitHub.Token == "github_pat_secret"
+    && portImported.Telegram.ApiHash == "hash-secret"
+    && portImported.Telegram.PhoneNumber == "+380501234567",
+    "importing a stripped file must keep the secrets already on this machine");
+Assert(portImported.AccentColor == "#123456" && portImported.Telegram.PopupSeconds == 9
+    && portImported.Notifications.PriceAlerts.Count == 1,
+    "importing must carry the non-secret values through");
+var portForeign = SettingsPorter.ImportJson(
+    """{"AccentColor":"#ABCDEF","ClaudeUsage":{"SessionKey":"sk-other"}}""", portSource);
+Assert(portForeign.ClaudeUsage.SessionKey == "sk-other" && portForeign.AccentColor == "#ABCDEF",
+    "a file that does carry a secret must win over the local one");
+bool portThrew = false;
+try
+{
+    SettingsPorter.ImportJson("{not json", portSource);
+}
+catch (InvalidOperationException)
+{
+    portThrew = true;
+}
+Assert(portThrew, "invalid JSON must be rejected with the localized message");
+Console.WriteLine("PASS settings porter: secrets stripped, merge on import, invalid input");
+
+// ---- theme carousel ----------------------------------------------------------
+var carousel = new CarouselSettings { Enabled = true, IntervalSeconds = 30, ThemeIds = ["clock", "system", "clock"] };
+Assert(ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "clock"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(29)) == "clock"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(30)) == "system"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(60)) == "clock",
+    "the carousel must rotate on the wall clock with duplicates removed");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = false, ThemeIds = ["clock", "system"] }, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "a disabled carousel keeps the selected theme");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = true, ThemeIds = ["clock"] }, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "fewer than two themes keeps the selected theme");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = true, IntervalSeconds = 1, ThemeIds = ["clock", "system"] }, "image", DateTimeOffset.FromUnixTimeSeconds(15)) == "system",
+    "the interval must clamp to the 10-second floor");
+Assert(ThemeCarousel.ResolveThemeId(null, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "missing settings keep the selected theme");
+Console.WriteLine("PASS theme carousel: rotation, dedup, clamps");
+
+// ---- display units ----------------------------------------------------------
+var unitsStamp = new DateTimeOffset(2026, 8, 21, 21, 5, 0, TimeSpan.Zero);
+Assert(!DisplayUnits.Use12HourClock && !DisplayUnits.UseFahrenheit, "units must default to 24h and Celsius");
+Assert(DisplayUnits.Time(unitsStamp) == "21:05" && DisplayUnits.Hours(unitsStamp) == "21",
+    "24-hour formatting is wrong");
+Assert(DisplayUnits.TemperatureShort(26.4) == "26°" && DisplayUnits.TemperatureWithUnit(26.4) == "26°C",
+    "Celsius formatting is wrong");
+try
+{
+    DisplayUnits.Use12HourClock = true;
+    DisplayUnits.UseFahrenheit = true;
+    Assert(DisplayUnits.Time(unitsStamp) == "9:05" && DisplayUnits.Hours(unitsStamp) == "9",
+        "12-hour formatting is wrong");
+    Assert(DisplayUnits.Time(unitsStamp.AddHours(-12)) == "9:05", "9 AM and 9 PM share digits without a marker");
+    Assert(DisplayUnits.TemperatureShort(26.0) == "79°" && DisplayUnits.TemperatureWithUnit(0) == "32°F",
+        "Fahrenheit conversion is wrong");
+    Assert(HardwareMonitorTheme.FormatTemperature(62.0) == "144°",
+        "hardware temperatures must follow the Fahrenheit preference");
+    var units12Frame = renderer.Render(themes.Single(theme => theme.Id == "clock-flip"),
+        SystemSnapshot.DesignSample with { Timestamp = unitsStamp });
+    Assert(units12Frame.JpegBytes is [0xFF, 0xD8, ..], "the flip clock did not render in 12-hour mode");
+}
+finally
+{
+    DisplayUnits.Use12HourClock = false;
+    DisplayUnits.UseFahrenheit = false;
+}
+Console.WriteLine("PASS display units: 12/24-hour time and Celsius/Fahrenheit");
+
+// ---- per-theme refresh cadence ----------------------------------------------
+var refreshSettings = new AppSettings();
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 1) == 1
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 5) == 5,
+    "live themes must follow the global refresh setting");
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "currency", 1) == 60
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "weather-five-day", 1) == 60
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "crypto", 1) == 30
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "github", 1) == 300,
+    "data themes must default to their built-in slower cadence");
+refreshSettings.ThemeRefreshOverrides["currency"] = 10;
+refreshSettings.ThemeRefreshOverrides["clock"] = 5;
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "currency", 1) == 10
+    && ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, "clock", 1) == 5,
+    "a per-theme override must win over the default and the global setting");
+Assert(ThemeRefreshPolicy.EffectiveSeconds(refreshSettings, null, 3) == 3,
+    "no theme id falls back to the global setting");
+
+var refreshNow = new DateTimeOffset(2026, 8, 22, 10, 0, 12, TimeSpan.Zero);
+Assert(ThemeRefreshPolicy.NextDelay(refreshNow, 1) == TimeSpan.FromSeconds(1),
+    "a live theme sleeps exactly its interval");
+TimeSpan slowDelay = ThemeRefreshPolicy.NextDelay(refreshNow, 60);
+Assert(slowDelay > TimeSpan.FromSeconds(40) && slowDelay < TimeSpan.FromSeconds(50),
+    "a slow theme must wake right after the next minute flip");
+TimeSpan carouselDelay = ThemeRefreshPolicy.NextDelay(
+    refreshNow, 600, new CarouselSettings { Enabled = true, IntervalSeconds = 30, ThemeIds = ["clock", "system"] });
+Assert(carouselDelay <= TimeSpan.FromSeconds(31),
+    "a running carousel must cap the sleep at its next boundary");
+Assert(ThemeRefreshPolicy.NextDelay(refreshNow, 60, pollCapSeconds: 1) == TimeSpan.FromSeconds(1),
+    "media polling must cap the sleep");
+Console.WriteLine("PASS refresh cadence: defaults, overrides, minute alignment, carousel cap");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

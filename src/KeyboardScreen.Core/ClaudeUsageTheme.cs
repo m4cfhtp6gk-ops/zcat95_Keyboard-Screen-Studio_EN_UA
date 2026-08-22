@@ -92,7 +92,7 @@ public sealed class ClaudeUsageTheme : IScreenTheme
     {
         string footer = usage is { IsStale: true }
             ? Loc.T("ScreenClaudeStale")
-            : Loc.T("ScreenWeatherUpdated", (usage?.UpdatedAt ?? DateTimeOffset.Now).ToString("HH:mm"));
+            : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(usage?.UpdatedAt ?? DateTimeOffset.Now));
         canvas.AlignedText(footer, 9, Muted,
             new Rect(safe.Left, safe.Bottom - 14, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

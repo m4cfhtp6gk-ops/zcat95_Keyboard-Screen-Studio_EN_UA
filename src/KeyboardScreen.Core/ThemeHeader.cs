@@ -32,7 +32,7 @@ public static class ThemeHeader
         if (showTime)
         {
             canvas.Text(
-                snapshot.Timestamp.ToString("HH:mm"),
+                DisplayUnits.Time(snapshot.Timestamp),
                 14,
                 Colors.White,
                 new Point(safe.Left, safe.Top + 5),

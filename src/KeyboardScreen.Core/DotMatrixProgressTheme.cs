@@ -40,7 +40,7 @@ public sealed class DotMatrixProgressTheme : IScreenTheme
         canvas.AlignedText($"{timestamp.Month}/{timestamp.Day}", fontSize, secondary,
             new Rect(header.Left, header.Top, header.Width / 2, header.Height),
             FontWeights.Medium, TextAlignment.Left, Doto);
-        canvas.AlignedText(timestamp.ToString("HH:mm"), fontSize, Colors.White,
+        canvas.AlignedText(DisplayUnits.Time(timestamp), fontSize, Colors.White,
             new Rect(header.Left + header.Width / 2, header.Top, header.Width / 2, header.Height),
             FontWeights.Medium, TextAlignment.Right, Doto);
     }

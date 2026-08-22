@@ -95,7 +95,7 @@ public sealed class GitHubContributionTheme : IScreenTheme
 
         string footer = contributions.IsStale
             ? Loc.T("ScreenStocksStale")
-            : Loc.T("ScreenWeatherUpdated", contributions.UpdatedAt.ToString("HH:mm"));
+            : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(contributions.UpdatedAt));
         canvas.AlignedText(footer, 9, Muted,
             new Rect(safe.Left, safe.Bottom - 14, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

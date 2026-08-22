@@ -269,6 +269,18 @@
 
                   <StackPanel x:Name="ThemePage" Classes="page-content" IsVisible="{Binding IsThemePage}" Spacing="16" x:CompileBindings="False">
                     <Border Classes="card">
+                      <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,72" ColumnSpacing="12">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ThemeRefreshHeading}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ThemeRefreshHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <NumericUpDown Grid.Column="1" VerticalAlignment="Center" Classes="compact-value" Minimum="1" Maximum="600" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding CurrentThemeRefreshSeconds, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card">
                       <StackPanel Spacing="16">
                         <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ScreenFontHeading}" />
                         <Grid ColumnDefinitions="*,12,Auto">
@@ -843,6 +855,36 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CarouselHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize CarouselHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding CarouselEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CarouselIntervalLabel}" />
+                          <Slider Grid.Column="1" IsEnabled="{Binding CarouselEnabled}" Minimum="10" Maximum="600" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding CarouselIntervalSeconds, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" IsEnabled="{Binding CarouselEnabled}" Minimum="10" Maximum="600" Increment="10" FormatString="0" ShowButtonSpinner="False" Value="{Binding CarouselIntervalSeconds, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CarouselPickHint}" />
+                        <ItemsControl IsEnabled="{Binding CarouselEnabled}" ItemsSource="{Binding CarouselOptions}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <CheckBox Margin="0,0,14,8" IsChecked="{Binding Included, Mode=TwoWay}" Content="{Binding Theme.Name}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">
@@ -882,6 +924,26 @@
                           </ComboBox.ItemTemplate>
                         </ComboBox>
                       </Grid>
+                    </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize UnitsHeading}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize Units12Hour}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize Units12HourHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding Use12HourClock, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize UnitsFahrenheit}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize UnitsFahrenheitHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding UseFahrenheit, Mode=TwoWay}" />
+                        </Grid>
+                      </StackPanel>
                     </Border>
 <Border Classes="card" Padding="16">
                       <Grid ColumnDefinitions="92,*">
@@ -1026,6 +1088,20 @@
                           <TextBox Grid.Column="4" IsEnabled="{Binding NotifyEnabled}" MaxLength="16" Text="{Binding NotifyBelow3, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyWindowsOnly}" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize PortHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize PortHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Button Command="{Binding ExportSettingsCommand}" Content="{infra:Localize PortExport}" />
+                          <Button Command="{Binding ImportSettingsCommand}" Content="{infra:Localize PortImport}" />
+                        </StackPanel>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding PortStatusText}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
 

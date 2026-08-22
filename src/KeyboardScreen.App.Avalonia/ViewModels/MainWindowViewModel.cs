@@ -14,6 +14,20 @@ using WpfFontFamily = KeyboardScreen.Core.FontFamily;
 
 namespace KeyboardScreen.App.Avalonia.ViewModels;
 
+/// <summary>A theme's membership checkbox in the carousel card.</summary>
+public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action changed) : ObservableObject
+{
+    private bool _included;
+
+    public ThemeItemViewModel Theme { get; } = theme;
+
+    public bool Included
+    {
+        get => _included;
+        set { if (SetProperty(ref _included, value)) changed(); }
+    }
+}
+
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly ISystemSnapshotSource _systemSource = new WindowsSystemSnapshotSource();
@@ -147,6 +161,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _hardwarePageSeconds = 5;
     private HardwareSnapshot? _hardwareSnapshot;
     private HardwareMonitorTheme? _hardwareTheme;
+    private bool _carouselEnabled;
+    private int _carouselIntervalSeconds = 30;
+    private bool _use12HourClock;
+    private bool _useFahrenheit;
+    private string? _lastEffectiveThemeId;
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
@@ -211,6 +230,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SubmitTelegramCodeCommand = new RelayCommand(SubmitTelegramCode);
         SubmitTelegramPasswordCommand = new RelayCommand(SubmitTelegramPassword);
         TelegramLogoutCommand = new AsyncCommand(TelegramLogoutAsync);
+        ExportSettingsCommand = new AsyncCommand(ExportSettingsAsync);
+        ImportSettingsCommand = new AsyncCommand(ImportSettingsAsync);
         CheckForUpdatesCommand = new AsyncCommand(CheckForUpdatesAsync);
         OpenLatestReleaseCommand = new RelayCommand(() =>
         {
@@ -224,6 +245,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<ThemeGroupViewModel> ThemeGroups { get; } = [];
     public ObservableCollection<ThemeItemViewModel> IdleThemeOptions { get; } = [];
     public ObservableCollection<ThemeItemViewModel> MusicThemeOptions { get; } = [];
+    public ObservableCollection<CarouselOptionViewModel> CarouselOptions { get; } = [];
     public ObservableCollection<TokscaleDataOption> TokscaleOptions { get; } = [];
     public IReadOnlyList<AiUsageModeOption> AiUsageModes { get; } =
     [
@@ -246,9 +268,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand SubmitTelegramCodeCommand { get; }
     public ICommand SubmitTelegramPasswordCommand { get; }
     public ICommand TelegramLogoutCommand { get; }
+    public ICommand ExportSettingsCommand { get; }
+    public ICommand ImportSettingsCommand { get; }
 
     /// <summary>Set by the window: shows the Telegram risk notice dialog once.</summary>
     public Func<Task>? ShowTelegramNoticeAsync { get; set; }
+
+    /// <summary>Set by the window: file pickers for the settings backup card.</summary>
+    public Func<Task<string?>>? PickExportPathAsync { get; set; }
+
+    public Func<Task<string?>>? PickImportPathAsync { get; set; }
     public ICommand CheckForUpdatesCommand { get; }
     public ICommand OpenLatestReleaseCommand { get; }
 
@@ -602,6 +631,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             if (SetProperty(ref _refreshSeconds, value))
             {
                 OnPropertyChanged(nameof(RefreshDurationText));
+                OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
                 ScheduleCommit();
             }
         }
@@ -1394,6 +1424,78 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsPomodoroRunning => _pomodoroTimer.IsRunning;
 
+    public bool CarouselEnabled
+    {
+        get => _carouselEnabled;
+        set { if (SetProperty(ref _carouselEnabled, value)) ScheduleCommit(); }
+    }
+
+    public int CarouselIntervalSeconds
+    {
+        get => _carouselIntervalSeconds;
+        set { if (SetProperty(ref _carouselIntervalSeconds, Math.Clamp(value, 10, 600))) ScheduleCommit(); }
+    }
+
+    /// <summary>
+    /// The refresh interval of the currently selected theme. Reading resolves
+    /// override -> built-in default -> the global setting; writing stores a
+    /// per-theme override straight into the settings.
+    /// </summary>
+    public int CurrentThemeRefreshSeconds
+    {
+        get => ThemeRefreshPolicy.EffectiveSeconds(_settings, SelectedTheme?.Id, RefreshSeconds);
+        set
+        {
+            if (SelectedTheme?.Id is not { } themeId)
+            {
+                return;
+            }
+
+            int clamped = Math.Clamp(value, 1, ThemeRefreshPolicy.MaxSeconds);
+            if (clamped == CurrentThemeRefreshSeconds)
+            {
+                return;
+            }
+
+            (_settings.ThemeRefreshOverrides ??= new Dictionary<string, int>())[themeId] = clamped;
+            OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
+            ScheduleCommit();
+        }
+    }
+
+    public bool Use12HourClock
+    {
+        get => _use12HourClock;
+        set
+        {
+            if (SetProperty(ref _use12HourClock, value))
+            {
+                DisplayUnits.Use12HourClock = value;
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool UseFahrenheit
+    {
+        get => _useFahrenheit;
+        set
+        {
+            if (SetProperty(ref _useFahrenheit, value))
+            {
+                DisplayUnits.UseFahrenheit = value;
+                ScheduleCommit();
+            }
+        }
+    }
+
+    private CarouselSettings BuildCarouselSettings() => new()
+    {
+        Enabled = CarouselEnabled,
+        IntervalSeconds = CarouselIntervalSeconds,
+        ThemeIds = CarouselOptions.Where(option => option.Included).Select(option => option.Theme.Id).ToList()
+    };
+
     public void TogglePomodoro()
     {
         if (_pomodoroTimer.IsRunning)
@@ -1793,6 +1895,68 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    private string _portStatusText = string.Empty;
+
+    public string PortStatusText
+    {
+        get => _portStatusText;
+        set => SetProperty(ref _portStatusText, value);
+    }
+
+    private async Task ExportSettingsAsync()
+    {
+        if (PickExportPathAsync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string? path = await PickExportPathAsync();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            // Persist the current UI state first so the export matches what is on screen.
+            await SaveSettingsAsync(CancellationToken.None);
+            await File.WriteAllTextAsync(path, SettingsPorter.ExportJson(_settings));
+            PortStatusText = Loc.T("PortExportedTo", path);
+        }
+        catch (Exception ex)
+        {
+            PortStatusText = Loc.T("PortFailed", ex.Message);
+        }
+    }
+
+    private async Task ImportSettingsAsync()
+    {
+        if (PickImportPathAsync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string? path = await PickImportPathAsync();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            string json = await File.ReadAllTextAsync(path);
+            _settings = SettingsPorter.ImportJson(json, _settings);
+            ApplySettings();
+            await _settingsStore.SaveAsync(_settings);
+            PortStatusText = Loc.T("PortImportDone");
+            await RefreshAndPushAsync(AutoPush, forcePush: true);
+        }
+        catch (Exception ex)
+        {
+            PortStatusText = Loc.T("PortFailed", ex.Message);
+        }
+    }
+
     private (string Title, string? Preview) FormatTelegramPopup(TelegramMessageEvent message)
     {
         int total = 1 + _telegramPopupExtra;
@@ -2024,9 +2188,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
         IdleThemeOptions.Clear();
         MusicThemeOptions.Clear();
+        CarouselOptions.Clear();
         foreach (ThemeItemViewModel item in ThemeGroups.SelectMany(group => group.Themes))
         {
             (MediaThemeAutomation.IsMusicThemeId(item.Id) ? MusicThemeOptions : IdleThemeOptions).Add(item);
+            CarouselOptions.Add(new CarouselOptionViewModel(item, ScheduleCommit));
         }
     }
 
@@ -2126,6 +2292,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         TelegramPopupsEnabled = _settings.Telegram.PopupsEnabled;
         TelegramPrivacyMode = _settings.Telegram.PrivacyMode;
         TelegramPopupSeconds = _settings.Telegram.PopupSeconds;
+        Use12HourClock = _settings.Use12HourClock;
+        UseFahrenheit = _settings.UseFahrenheit;
+        _settings.Carousel ??= new CarouselSettings();
+        CarouselEnabled = _settings.Carousel.Enabled;
+        CarouselIntervalSeconds = _settings.Carousel.IntervalSeconds;
+        var carouselIds = new HashSet<string>(_settings.Carousel.ThemeIds ?? [], StringComparer.OrdinalIgnoreCase);
+        foreach (CarouselOptionViewModel option in CarouselOptions)
+        {
+            option.Included = carouselIds.Contains(option.Theme.Id);
+        }
         _settings.Notifications ??= new NotificationSettings();
         NotifyEnabled = _settings.Notifications.Enabled;
         NotifyClaude = _settings.Notifications.ClaudeThresholds;
@@ -2219,6 +2395,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsHardwareTheme));
         OnPropertyChanged(nameof(IsGitHubTheme));
+        OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -2405,6 +2582,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         };
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
+        _settings.Carousel = BuildCarouselSettings();
+        _settings.Use12HourClock = Use12HourClock;
+        _settings.UseFahrenheit = UseFahrenheit;
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2415,9 +2595,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
+                int themeSeconds = ThemeRefreshPolicy.EffectiveSeconds(
+                    _settings,
+                    _lastEffectiveThemeId ?? SelectedTheme?.Id,
+                    RefreshSeconds);
+                // Media automation watches for playback outside the theme, so
+                // it keeps the poll fast even under a slow data theme.
+                int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                await Task.Delay(
+                    ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
+                    cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true)
+                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true ||
+                    _settings.Carousel?.Enabled == true)
                 {
                     await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
                 }
@@ -2468,10 +2658,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            // Layering, lowest first: carousel substitutes the selected theme,
+            // media automation may override it, the night theme wins at idle.
+            string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
                 mediaPlaying,
-                requestedTheme.Id);
+                carouselId);
             // Media automation outranks the schedule, but only while it is
             // actually showing the playing theme; the night theme applies otherwise.
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
@@ -2481,6 +2674,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
                 ?? requestedTheme;
+            _lastEffectiveThemeId = theme.Id;
 
             WeatherSnapshot? weather = null;
             StockSnapshot? stocks = null;

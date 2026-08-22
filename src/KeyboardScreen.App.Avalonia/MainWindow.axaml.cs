@@ -25,6 +25,8 @@ public sealed partial class MainWindow : Window
         WindowsRoundedWindow.UseCustomCorners(this);
         _viewModel = new MainWindowViewModel(new WindowsDesktopServices());
         _viewModel.PickImageAsync = PickImageAsync;
+        _viewModel.PickExportPathAsync = PickExportPathAsync;
+        _viewModel.PickImportPathAsync = PickImportPathAsync;
         _viewModel.ShowTelegramNoticeAsync = async () =>
         {
             var dialog = new RiskNoticeWindow(
@@ -259,6 +261,35 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
         {
             _viewModel.AccentColor = selected;
         }
+    }
+
+    private async Task<string?> PickExportPathAsync()
+    {
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                SuggestedFileName = "kss-settings.json",
+                DefaultExtension = "json",
+                FileTypeChoices =
+                [
+                    new FilePickerFileType(Loc.T("PortJsonFileType")) { Patterns = ["*.json"] }
+                ]
+            });
+        return file?.TryGetLocalPath();
+    }
+
+    private async Task<string?> PickImportPathAsync()
+    {
+        IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType(Loc.T("PortJsonFileType")) { Patterns = ["*.json"] }
+                ]
+            });
+        return files.FirstOrDefault()?.TryGetLocalPath();
     }
 
     private async Task<string?> PickImageAsync()

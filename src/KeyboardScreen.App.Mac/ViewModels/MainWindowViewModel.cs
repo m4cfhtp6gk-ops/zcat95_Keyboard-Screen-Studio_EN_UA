@@ -735,6 +735,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private void ApplySettings()
     {
         _loading = true;
+        DisplayUnits.Use12HourClock = _settings.Use12HourClock;
+        DisplayUnits.UseFahrenheit = _settings.UseFahrenheit;
         DeviceIp = ExtractDeviceIp(_settings.DeviceEndpoint);
         AccentColor = string.IsNullOrWhiteSpace(_settings.AccentColor) ? "#E4694C" : _settings.AccentColor;
         SelectedFontId = _settings.SelectedFontId;
@@ -918,7 +920,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
+                int themeSeconds = ThemeRefreshPolicy.EffectiveSeconds(_settings, SelectedTheme?.Id, RefreshSeconds);
+                int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                await Task.Delay(
+                    ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
+                    cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
                 if (!staticImage || AutoMediaThemeSwitch)
                 {
@@ -958,10 +964,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
                 mediaPlaying,
-                requestedTheme.Id);
+                carouselId);
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
             {
                 effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);

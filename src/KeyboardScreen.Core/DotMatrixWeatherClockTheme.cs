@@ -37,7 +37,7 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
             return;
         }
 
-        canvas.AlignedText($"{weather.TemperatureC:0}°", 43, primary,
+        canvas.AlignedText(DisplayUnits.TemperatureShort(weather.TemperatureC), 43, primary,
             new Rect(safe.Left, safe.Top + 116, safe.Width - 42, 60), FontWeights.Medium, TextAlignment.Left);
         DrawWeatherIcon(canvas, WeatherCondition.IconFromCode(weather.WeatherCode),
             new Rect(safe.Right - 38, safe.Top + 126, 36, 36), primary, canvas.AccentColor);
@@ -45,10 +45,10 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
             new Rect(safe.Left, safe.Top + 182, safe.Width, 24), FontWeights.SemiBold, TextAlignment.Left);
 
         canvas.Line(new Point(safe.Left, safe.Top + 228), new Point(safe.Right, safe.Top + 228), border);
-        DrawStatRow(canvas, safe, safe.Top + 248, Loc.T("ScreenLabelFeelsLike"), $"{weather.ApparentTemperatureC:0}°", secondary, primary);
+        DrawStatRow(canvas, safe, safe.Top + 248, Loc.T("ScreenLabelFeelsLike"), DisplayUnits.TemperatureShort(weather.ApparentTemperatureC), secondary, primary);
         DrawStatRow(canvas, safe, safe.Top + 291, Loc.T("ScreenLabelHumidity"), $"{weather.RelativeHumidityPercent}%", secondary, primary);
 
-        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", weather.UpdatedAt.ToString("HH:mm"));
+        var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(weather.UpdatedAt));
         canvas.AlignedText(updateText, 9, disabled,
             new Rect(safe.Left, safe.Bottom - 24, safe.Width, 15), FontWeights.Normal, TextAlignment.Left);
     }
@@ -61,7 +61,7 @@ public sealed class DotMatrixWeatherClockTheme : IScreenTheme
         const double dotOffset = 6;
         var numberWidth = (bounds.Width - colonWidth) / 2;
 
-        canvas.AlignedText(timestamp.ToString("HH"), 39, color,
+        canvas.AlignedText(DisplayUnits.Hours(timestamp), 39, color,
             new Rect(bounds.Left, bounds.Top, numberWidth, bounds.Height),
             FontWeights.Medium, TextAlignment.Left, Doto);
         canvas.AlignedText(timestamp.ToString("mm"), 39, color,

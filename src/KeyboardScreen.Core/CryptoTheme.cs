@@ -48,7 +48,7 @@ public sealed class CryptoTheme : IScreenTheme
 
         string footer = crypto.IsStale
             ? Loc.T("ScreenStocksStale")
-            : Loc.T("ScreenWeatherUpdated", crypto.UpdatedAt.ToString("HH:mm"));
+            : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(crypto.UpdatedAt));
         canvas.AlignedText(footer, 9, Muted,
             new Rect(safe.Left, safe.Bottom - 14, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }

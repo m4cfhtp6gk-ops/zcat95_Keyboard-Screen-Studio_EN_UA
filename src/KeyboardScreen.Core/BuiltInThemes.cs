@@ -186,7 +186,7 @@ public static class BuiltInThemes
 	{
 		Rect safe = c.SafeBounds;
 		c.Fill(Color.FromRgb(5, 7, 10));
-		c.Text(s.Timestamp.ToString("HH:mm"), 19, c.AccentColor,
+		c.Text(DisplayUnits.Time(s.Timestamp), 19, c.AccentColor,
 			new Point(safe.Left, safe.Top + 4), FontWeights.SemiBold);
 
 		MinimalMetric(c, safe, safe.Top + 76, Loc.T("ScreenLabelProcessor"), s.CpuPercent);
@@ -223,7 +223,7 @@ public static class BuiltInThemes
 
 		ThemeHeader.Draw(c, s, Loc.T("ScreenTitleNeonClock"), showTime: false);
 
-		c.AlignedText(s.Timestamp.ToString("HH:mm"), 39, Colors.White,
+		c.AlignedText(DisplayUnits.Time(s.Timestamp), 39, Colors.White,
 			new Rect(safe.Left, safe.Top + 72, safe.Width, 56), FontWeights.SemiBold, TextAlignment.Left);
 		c.AlignedText(s.Timestamp.ToString("ss"), 22, accent,
 			new Rect(safe.Left, safe.Top + 142, safe.Width, 31), FontWeights.SemiBold, TextAlignment.Left);
@@ -251,7 +251,7 @@ public static class BuiltInThemes
 			new Rect(safe.Left, safe.Top + 134, width, 17), FontWeights.SemiBold);
 		c.CenteredText(Loc.T("ScreenLabelMinutes"), 10, Color.FromRgb(138, 150, 164),
 			new Rect(safe.Left + width + gap, safe.Top + 134, width, 17), FontWeights.SemiBold);
-		FlipTile(c, new Rect(safe.Left, cardTop, width, width), s.Timestamp.ToString("HH"));
+		FlipTile(c, new Rect(safe.Left, cardTop, width, width), DisplayUnits.Hours(s.Timestamp));
 		FlipTile(c, new Rect(safe.Left + width + gap, cardTop, width, width), s.Timestamp.ToString("mm"));
 
 		var seconds = new Rect(safe.Left, safe.Top + 169, safe.Width, 44);
@@ -307,7 +307,7 @@ public static class BuiltInThemes
 		{
 			c.Text(Time(musicSnapshot.Duration), 10.0, Color.FromRgb(126, 139, 153), new Point(safeBounds.Left, safeBounds.Top + 271.0), FontWeights.SemiBold, TextAlignment.Right, safeBounds.Width);
 		}
-		c.Text(s.Timestamp.ToString("HH:mm"), 18.0, Colors.White, new Point(safeBounds.Left, safeBounds.Bottom - 45.0), FontWeights.SemiBold);
+		c.Text(DisplayUnits.Time(s.Timestamp), 18.0, Colors.White, new Point(safeBounds.Left, safeBounds.Bottom - 45.0), FontWeights.SemiBold);
 	}
 
 	private static void MusicPoster(ScreenCanvas c, SystemSnapshot s)
