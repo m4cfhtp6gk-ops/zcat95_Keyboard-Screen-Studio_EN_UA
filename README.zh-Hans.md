@@ -8,13 +8,14 @@ Keyboard Screen Studio（KSS）是一款面向 Linx68 键盘竖屏的桌面工�
 
 ## 当前状态
 
-- **Windows：** v1.2.0，已迁移到 Avalonia UI，作为当前正式发布平台。
+- **Windows：** v1.3.0，已迁移到 Avalonia UI，作为当前正式发布平台。
 - **macOS：** 已保留跨平台项目和发布脚本，Intel 与 Apple Silicon 包仍待真实设备测试，暂不作为稳定版本发布。
 - **Linux：** 暂未发布；核心数据、渲染与平台接口已为后续适配留出空间。
 
 ## 主要功能
 
-- 20 个内置主题，涵盖监控、时间、资讯、音乐、点阵与图片时间。
+- 26 个内置主题，涵盖监控、时间、资讯、音乐、点阵与图片时间——包括分页轮播的硬件监控、汇率、带走势图的币安加密货币、番茄钟和 GitHub 贡献网格。
+- 夜间计划（在设定时段切换主题并降低亮度）、来自您账号的 Telegram 弹窗（覆盖任意主题），以及可选的 Windows 通知（Claude 额度、键盘离线、价格提醒），均带防刷屏冷却。
 - 142×428 实时预览，保留键盘固件状态栏安全区。
 - 自定义主题强调色、屏幕字体、内容安全区和图片时间排版。
 - 亮色、暗色和跟随系统的应用界面，不影响键盘主题输出。
@@ -29,7 +30,7 @@ Keyboard Screen Studio（KSS）是一款面向 Linx68 键盘竖屏的桌面工�
 - 电脑与键盘处于同一局域网。
 - 在键盘菜单中启用“图像 API”，然后将显示的 IP 地址填入 KSS。
 
-下载 Release 中的 `KeyboardScreenStudio-v1.2.0-win-x64.zip`，解压后运行 `KeyboardScreenStudio.exe`。发布包为自包含版本，无需另装 .NET。
+下载 Release 中的 `KeyboardScreenStudio-v1.3.0-win-x64.zip`，解压后运行 `KeyboardScreenStudio.exe`。发布包为自包含版本，无需另装 .NET。
 
 ## 从源码构建
 
