@@ -63,11 +63,39 @@ public sealed class HardwareMonitorTheme : IScreenTheme
 
         double top = safe.Top + 36;
         DrawDeviceCard(canvas, new Rect(safe.Left, top, safe.Width, 122), cpu, showVram: false);
+        double bottom = top + 122;
 
         if (gpu is not null)
         {
             DrawDeviceCard(canvas, new Rect(safe.Left, top + 130, safe.Width, 144), gpu, showVram: true);
+            bottom = top + 274;
         }
+
+        DrawSensorNote(canvas, safe, bottom + 8, hardware?.SensorAccess ?? HardwareSensorAccess.Full);
+    }
+
+    /// <summary>
+    /// A dash on its own says a reading is missing but never why. This says which
+    /// of the two reasons it was, short enough to survive the 142 px width.
+    /// </summary>
+    private static void DrawSensorNote(ScreenCanvas canvas, Rect safe, double top, HardwareSensorAccess access)
+    {
+        if (access == HardwareSensorAccess.Full)
+        {
+            return;
+        }
+
+        if (access == HardwareSensorAccess.Unsupported)
+        {
+            canvas.CenteredText(Loc.T("ScreenHwNoSensors"), 9, Muted,
+                new Rect(safe.Left, top, safe.Width, 13), FontWeights.Medium);
+            return;
+        }
+
+        canvas.CenteredText(Loc.T("ScreenHwAdminLine1"), 9, Muted,
+            new Rect(safe.Left, top, safe.Width, 13), FontWeights.Medium);
+        canvas.CenteredText(Loc.T("ScreenHwAdminLine2"), 9, Muted,
+            new Rect(safe.Left, top + 13, safe.Width, 13), FontWeights.Medium);
     }
 
     private static void DrawDeviceCard(ScreenCanvas canvas, Rect card, HardwareComponentSnapshot device, bool showVram)

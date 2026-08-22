@@ -234,6 +234,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private bool _perfVisualDownloadEnabled = true;
     private bool _perfVisualUploadEnabled = true;
     private bool _perfVisualGpuEnabled = true;
+    private bool _perfVisualValuesEnabled = true;
     private PerformanceVisualTheme? _perfVisualTheme;
 
     public MainWindowViewModel(IWindowsDesktopServices desktopServices)
@@ -252,6 +253,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
         OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         OpenAlertsSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://alerts.in.ua"));
+        RestartElevatedCommand = new RelayCommand(RestartElevated);
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
         StartPomodoroCommand = new RelayCommand(StartPomodoro);
         StopPomodoroCommand = new RelayCommand(StopPomodoro);
@@ -292,6 +294,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenTokscaleDocsCommand { get; }
     public ICommand OpenClaudeSiteCommand { get; }
     public ICommand OpenAlertsSiteCommand { get; }
+    public ICommand RestartElevatedCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
     public ICommand StartPomodoroCommand { get; }
     public ICommand StopPomodoroCommand { get; }
@@ -498,6 +501,20 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    /// <summary>The numeric readout on each panel; the curves stay either way.</summary>
+    public bool PerfVisualValuesEnabled
+    {
+        get => _perfVisualValuesEnabled;
+        set
+        {
+            if (SetProperty(ref _perfVisualValuesEnabled, value))
+            {
+                ApplyPerfVisualModules();
+                ScheduleCommit();
+            }
+        }
+    }
+
     public bool IsPerformanceVisualTheme => SelectedTheme?.Id == "performance-visual";
 
     public string RefreshSecondsInput
@@ -522,13 +539,35 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private void ApplyPerfVisualModules() =>
+    /// <summary>
+    /// Restarts elevated so the sensor driver can load. A dismissed prompt leaves
+    /// this instance running exactly as it was.
+    /// </summary>
+    private void RestartElevated()
+    {
+        if (!_desktopServices.TryRestartElevated())
+        {
+            return;
+        }
+
+        if (global::Avalonia.Application.Current?.ApplicationLifetime
+                is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is MainWindow window)
+        {
+            window.RequestExit();
+        }
+    }
+
+    private void ApplyPerfVisualModules()
+    {
         _perfVisualTheme?.SetModulesEnabled(
             PerfVisualCpuEnabled,
             PerfVisualMemoryEnabled,
             PerfVisualDownloadEnabled,
             PerfVisualUploadEnabled,
             PerfVisualGpuEnabled);
+        _perfVisualTheme?.SetValuesVisible(PerfVisualValuesEnabled);
+    }
 
     private bool CanDisableStockSlot(int slotIndex)
     {
@@ -1349,6 +1388,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsCryptoTheme => SelectedTheme?.Id == "crypto";
     public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
     public bool IsHardwareTheme => SelectedTheme?.Id == "hardware";
+
+    /// <summary>
+    /// Offer the elevated restart only while it could still change something: once
+    /// the process is elevated, a missing temperature is the board's answer, not ours.
+    /// </summary>
+    public bool CanRestartElevated => LibreHardwareMonitorSource.CanElevateForSensors;
     public bool IsGitHubTheme => SelectedTheme?.Id == "github";
     public bool IsAlertsTheme => SelectedTheme?.Id == "alerts";
 
@@ -2643,6 +2688,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         PerfVisualDownloadEnabled = _settings.PerfVisualDownloadEnabled;
         PerfVisualUploadEnabled = _settings.PerfVisualUploadEnabled;
         PerfVisualGpuEnabled = _settings.PerfVisualGpuEnabled;
+        PerfVisualValuesEnabled = _settings.PerfVisualValuesEnabled;
         _settings.AiQuota ??= new AiQuotaSettings();
         SelectedAiUsageMode = AiUsageModes.First(option => option.Kind == _settings.AiQuota.DataKind);
         AiDisplayName = _settings.AiQuota.DisplayName ?? string.Empty;
@@ -2791,6 +2837,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.PerfVisualDownloadEnabled = PerfVisualDownloadEnabled;
         _settings.PerfVisualUploadEnabled = PerfVisualUploadEnabled;
         _settings.PerfVisualGpuEnabled = PerfVisualGpuEnabled;
+        _settings.PerfVisualValuesEnabled = PerfVisualValuesEnabled;
         _settings.SafeArea = ReadSafeArea();
         _settings.ImagePath = _imageTheme.ImagePath;
         _settings.ImageTimePlacement = ImageTimePlacement;

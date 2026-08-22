@@ -579,6 +579,21 @@ perfVisualTheme.SetModulesEnabled(cpu: true, memory: true, download: true, uploa
 Assert(SystemSnapshot.DesignSample.GpuPercent is double, "design sample must carry a GPU sample");
 Console.WriteLine("PASS performance-visual module toggles and GPU sample");
 
+// The readouts are right-aligned, and aligning against an unbounded width put
+// them at x = +infinity: every panel drew its label and silently lost its number.
+// Two fresh themes hold one sample each, so neither draws a curve and the numbers
+// are the only thing that can differ between the frames.
+var perfValuesOn = new PerformanceVisualTheme();
+var perfValuesOff = new PerformanceVisualTheme();
+perfValuesOff.SetValuesVisible(false);
+var perfWithValues = renderer.Render(perfValuesOn, SystemSnapshot.DesignSample);
+var perfWithoutValues = renderer.Render(perfValuesOff, SystemSnapshot.DesignSample);
+Assert(!perfWithValues.JpegBytes.AsSpan().SequenceEqual(perfWithoutValues.JpegBytes),
+    "the numeric readout toggle changed nothing on screen");
+Assert(MeanLuma(perfWithValues.JpegBytes) > MeanLuma(perfWithoutValues.JpegBytes) + 0.3,
+    "the performance-visual readouts drew no ink; right-aligned text needs the box it aligns in");
+Console.WriteLine("PASS performance-visual numeric readouts");
+
 var perfSettingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-perf-settings-{Guid.NewGuid():N}.json");
 try
 {
@@ -587,6 +602,7 @@ try
     await perfStore.SaveAsync(perfSettings);
     var perfLoaded = await perfStore.LoadAsync();
     Assert(!perfLoaded.PerfVisualUploadEnabled && !perfLoaded.PerfVisualGpuEnabled, "performance-visual module toggles did not persist");
+    Assert(new AppSettings().PerfVisualValuesEnabled, "the numeric readout must be on for a first run");
     Console.WriteLine("PASS performance-visual settings persistence");
 }
 finally
@@ -1139,7 +1155,36 @@ var hwPartial = renderer.Render(hardwareTheme, SystemSnapshot.DesignSample with
     Hardware = new HardwareSnapshot(true, new HardwareComponentSnapshot("CPU", 38.4), null, null, null, null, DateTimeOffset.Now)
 });
 Assert(hwPartial.JpegBytes is [0xFF, 0xD8, ..], "a partial hardware snapshot did not render");
-Console.WriteLine("PASS hardware monitor: page rotation, formatting, renders");
+
+// A dash alone never says why a reading is missing, and the two reasons need
+// different words: one the user can act on, one they cannot.
+var hwSensorFrames = new List<(HardwareSensorAccess Access, byte[] Jpeg)>();
+foreach (HardwareSensorAccess access in new[]
+         {
+             HardwareSensorAccess.Full,
+             HardwareSensorAccess.NeedsAdministrator,
+             HardwareSensorAccess.Unsupported
+         })
+{
+    var frame = renderer.Render(hardwareTheme, SystemSnapshot.DesignSample with
+    {
+        Timestamp = DateTimeOffset.FromUnixTimeSeconds(0),
+        Hardware = new HardwareSnapshot(true, new HardwareComponentSnapshot("CPU", 38.4), null, null, null, null,
+            DateTimeOffset.Now, null, access)
+    });
+    Assert(frame.JpegBytes is [0xFF, 0xD8, ..], $"the hardware page did not render for {access}");
+    hwSensorFrames.Add((access, frame.JpegBytes));
+}
+
+Assert(!hwSensorFrames[0].Jpeg.AsSpan().SequenceEqual(hwSensorFrames[1].Jpeg),
+    "a driver that needs administrator rights must say so on the screen, not just dash the cell");
+Assert(!hwSensorFrames[1].Jpeg.AsSpan().SequenceEqual(hwSensorFrames[2].Jpeg),
+    "an elevated process with no sensors must not repeat the run-as-administrator advice");
+Assert(HardwareSnapshot.Unavailable("driver").SensorAccess == HardwareSensorAccess.Full
+    && HardwareSnapshot.Unavailable("driver", HardwareSensorAccess.NeedsAdministrator).SensorAccess
+        == HardwareSensorAccess.NeedsAdministrator,
+    "the unavailable snapshot must carry the sensor access it was given");
+Console.WriteLine("PASS hardware monitor: page rotation, formatting, renders, sensor-gap reason");
 
 // ---- GitHub contributions ---------------------------------------------------
 // Week grouping is Sunday-based like GitHub's calendar.
