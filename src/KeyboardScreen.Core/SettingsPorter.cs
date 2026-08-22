@@ -5,8 +5,8 @@ namespace KeyboardScreen.Core;
 /// <summary>
 /// Export/import of the settings file. An export NEVER carries credentials:
 /// the claude.ai session key (and its cached organization id), the GitHub
-/// token and the Telegram api_id/api_hash/phone are blanked, so the file is
-/// safe to share or sync. An import keeps whatever secrets already live on
+/// token, the Telegram api_id/api_hash/phone and the alerts.in.ua token are
+/// blanked, so the file is safe to share or sync. An import keeps whatever secrets already live on
 /// this machine when the file carries blanks. The Telegram session file is a
 /// separate artifact and never passes through here at all.
 /// </summary>
@@ -27,6 +27,8 @@ public static class SettingsPorter
         clone.Telegram.ApiId = string.Empty;
         clone.Telegram.ApiHash = string.Empty;
         clone.Telegram.PhoneNumber = string.Empty;
+        clone.AirAlerts ??= new AirAlertSettings();
+        clone.AirAlerts.Token = string.Empty;
         return JsonSerializer.Serialize(clone, JsonOptions);
     }
 
@@ -64,6 +66,12 @@ public static class SettingsPorter
             imported.Telegram.ApiId = current.Telegram?.ApiId ?? string.Empty;
             imported.Telegram.ApiHash = current.Telegram?.ApiHash ?? string.Empty;
             imported.Telegram.PhoneNumber = current.Telegram?.PhoneNumber ?? string.Empty;
+        }
+
+        imported.AirAlerts ??= new AirAlertSettings();
+        if (string.IsNullOrWhiteSpace(imported.AirAlerts.Token))
+        {
+            imported.AirAlerts.Token = current.AirAlerts?.Token ?? string.Empty;
         }
 
         return imported;

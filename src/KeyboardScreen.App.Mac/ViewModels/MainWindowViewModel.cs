@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly CurrencySnapshotSource _currencySource = new();
     private readonly GitHubContributionSource _gitHubSource = new();
     private readonly AirAlertSource _airAlertSource = new();
+    private readonly AirAlertTakeoverState _alertTakeoverState = new();
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
@@ -924,11 +925,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 int themeSeconds = ThemeRefreshPolicy.EffectiveSeconds(_settings, SelectedTheme?.Id, RefreshSeconds);
                 int? pollCap = AutoMediaThemeSwitch || AutoSwitchToMusic ? RefreshSeconds : null;
+                bool alertTakeoverArmed = AirAlertTakeover.IsArmed(_settings.AirAlerts);
+                if (alertTakeoverArmed)
+                {
+                    pollCap = Math.Min(pollCap ?? AirAlertTakeover.PollCapSeconds, AirAlertTakeover.PollCapSeconds);
+                }
                 await Task.Delay(
                     ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
                     cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch)
+                if (!staticImage || AutoMediaThemeSwitch || alertTakeoverArmed)
                 {
                     await RefreshAndPushAsync(AutoPush, cancellationToken);
                 }
@@ -966,6 +972,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            AirAlertSnapshot? airAlerts = null;
+            if (AirAlertTakeover.IsArmed(_settings.AirAlerts) || requestedTheme.Id == "alerts")
+            {
+                airAlerts = await _airAlertSource.ReadAsync(
+                    _settings.AirAlerts ?? new AirAlertSettings(),
+                    cancellationToken);
+            }
             string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
@@ -974,6 +987,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
             {
                 effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);
+            }
+            AirAlertTakeoverDecision alertTakeover = AirAlertTakeover.Decide(
+                _settings.AirAlerts, airAlerts, _alertTakeoverState, scheduleNow);
+            if (alertTakeover.ShowFullScreen)
+            {
+                effectiveId = "alerts";
             }
             IScreenTheme theme = _themes.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
@@ -1020,8 +1039,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     cancellationToken);
             }
 
-            AirAlertSnapshot? airAlerts = null;
-            if (theme.Id == "alerts")
+            if (airAlerts is null && theme.Id == "alerts")
             {
                 airAlerts = await _airAlertSource.ReadAsync(
                     _settings.AirAlerts ?? new AirAlertSettings(),
@@ -1062,7 +1080,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     ImageAnalogOrder,
                     ImageFlipTimeFontSize,
                     DotMatrixProgressHeaderFontSize),
-                ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow));
+                alertTakeover.Active ? 100 : ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow),
+                alertTakeover.ShowPopup
+                    ? overlayCanvas => AirAlertPopupOverlay.Draw(
+                        overlayCanvas, alertTakeover.IsAllClear, _settings.AirAlerts?.Location?.Trim() ?? string.Empty)
+                    : null);
 
             using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
             var bitmap = new Bitmap(stream);

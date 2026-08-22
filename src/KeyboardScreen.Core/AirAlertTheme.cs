@@ -67,13 +67,19 @@ public sealed class AirAlertTheme : IScreenTheme
 
         if (active)
         {
-            AirAlertInfo? mine = alerts.ActiveAlerts
-                .FirstOrDefault(alert => AirAlertSource.MatchesLocation(alert.LocationTitle, alerts.Location));
-            if (mine?.StartedAt is { } startedAt)
+            if (AirAlertSource.EarliestStart(alerts.ActiveAlerts, alerts.Location) is { } startedAt)
             {
                 canvas.AlignedText(Loc.T("ScreenAlertsSince", DisplayUnits.Time(startedAt.ToLocalTime())), 11, Secondary,
                     new Rect(safe.Left, safe.Top + 242, safe.Width, 18), FontWeights.Medium, TextAlignment.Center);
             }
+        }
+        else if (alerts is { LastAlertStartedAt: { } lastStart, LastAlertEndedAt: { } lastEnd } &&
+                 lastEnd - lastStart > TimeSpan.Zero)
+        {
+            canvas.AlignedText(Loc.T("ScreenAlertsLasted"), 11, Secondary,
+                new Rect(safe.Left, safe.Top + 240, safe.Width, 18), FontWeights.Medium, TextAlignment.Center);
+            canvas.AlignedText(FormatDuration(lastEnd - lastStart), 11, Colors.White,
+                new Rect(safe.Left, safe.Top + 258, safe.Width, 18), FontWeights.SemiBold, TextAlignment.Center);
         }
 
         canvas.AlignedText(Loc.T("ScreenAlertsCount", alerts.ActiveAlerts.Count), 11, Secondary,
@@ -123,6 +129,11 @@ public sealed class AirAlertTheme : IScreenTheme
         canvas.RoundedRect(new Rect(centerX - 2, centerY - half * 0.42, 4, half * 0.72), 2, mark);
         canvas.Ellipse(new Rect(centerX - 2.5, centerY + half * 0.44, 5, 5), mark);
     }
+
+    private static string FormatDuration(TimeSpan lasted) =>
+        lasted.TotalHours >= 1
+            ? Loc.T("ScreenClaudeHoursMinutes", (int)lasted.TotalHours, lasted.Minutes)
+            : Loc.T("ScreenAlertsMinutes", Math.Max(1, (int)lasted.TotalMinutes));
 
     private static void DrawDisclaimer(ScreenCanvas canvas, Rect safe) =>
         canvas.AlignedText(Loc.T("ScreenAlertsDisclaimer"), 8, Muted,
