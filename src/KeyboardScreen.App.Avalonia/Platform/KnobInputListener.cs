@@ -6,22 +6,28 @@ namespace KeyboardScreen.App.Avalonia.Platform;
 /// <summary>
 /// Turns the Linx68 volume knob into a theme switcher.
 ///
-/// Two Windows mechanisms cooperate: Raw Input (usage page 0x0C, Consumer
-/// Control, INPUTSINK) tells us WHICH device produced a volume event, so an
-/// optional VID/PID filter can bind the feature to the keyboard alone; the
-/// low-level keyboard hook sees the translated Volume Up/Down/Mute keys and
-/// is the only one of the two that can swallow them, so the system volume
-/// stays put while the knob drives themes. In hot-key mode (an encoder
-/// remapped to F13-F24 in VIA/QMK) the hook listens for those keys instead
-/// and volume is never involved.
+/// Two Windows mechanisms cooperate. Raw Input (usage page 0x0C, Consumer
+/// Control, INPUTSINK) says WHICH HID collection produced a volume event and
+/// which usage it carried; the low-level keyboard hook sees the translated
+/// Volume Up/Down/Mute keys and is the only one of the two that can swallow
+/// them. Raw Input therefore decides whether a key belongs to the knob, and
+/// the hook acts on that decision.
+///
+/// The distinction matters because a knob and the same keyboard's Fn media
+/// keys share a VID and PID: filtering on those alone binds the whole
+/// keyboard and silences its media keys too. A knob almost always sits on its
+/// own HID collection, which the detector learns and this class then matches,
+/// so the other keys keep controlling the volume. In hot-key mode (an encoder
+/// remapped to F13-F24 in VIA/QMK) the hook listens for those keys instead and
+/// volume is never involved.
 ///
 /// Everything lives on one dedicated thread with its own message-only window
-/// and message loop; the hook callback does nothing but compare a few
-/// integers and hand the action to the view model's dispatcher. When the
-/// feature is off this class is simply never constructed - no hook, no
-/// registration. Dispose posts WM_QUIT and joins the thread, which unhooks
-/// before it exits; leaking a low-level hook would make the whole system's
-/// input lag once Windows times it out.
+/// and message loop; the hook callback does nothing but compare a few integers
+/// and hand the action to the view model's dispatcher. When the feature is off
+/// this class is simply never constructed - no hook, no registration. Dispose
+/// posts WM_QUIT and joins the thread, which unhooks before it exits; leaking a
+/// low-level hook would make the whole system's input lag once Windows times it
+/// out.
 /// </summary>
 public sealed class KnobInputListener : IDisposable
 {
@@ -38,16 +44,29 @@ public sealed class KnobInputListener : IDisposable
     private const int VkVolumeUp = 0xAF;
     private const uint RidevInputSink = 0x00000100;
     private const uint RidInput = 0x10000003;
+    private const uint RidiPreparsedData = 0x20000005;
     private const uint RidiDeviceName = 0x20000007;
+    private const int RimTypeKeyboard = 1;
     private const int RimTypeHid = 2;
+    private const ushort ConsumerUsagePage = 0x0C;
+    private const ushort ConsumerControlUsage = 0x01;
+    private const ushort GenericDesktopUsagePage = 0x01;
+    private const ushort KeyboardUsage = 0x06;
+    private const int HidPInput = 0;
+    private const int HidPStatusSuccess = 0x00110000;
+    private const ushort RawKeyboardBreakFlag = 0x01;
 
-    /// <summary>How close a raw report and the hook key must be to count as one knob event.</summary>
+    /// <summary>How close a raw report and the hook key must be to count as one event.</summary>
     private const long DeviceMatchWindowMs = 150;
 
-    private readonly Action<KnobAction> _onAction;
+    private readonly Action<KnobAction>? _onAction;
+    private readonly Action<KnobObservation>? _onObserved;
+    private readonly bool _learnMode;
     private readonly KnobMode _mode;
     private readonly bool _suppressVolume;
-    private readonly bool _filterByDevice;
+    private readonly string _boundDeviceKey;
+    private readonly IReadOnlyList<int> _boundUsages;
+    private readonly bool _filterByVidPid;
     private readonly ushort _vid;
     private readonly ushort _pid;
     private readonly int _forwardVk;
@@ -57,19 +76,50 @@ public sealed class KnobInputListener : IDisposable
     private readonly Thread _thread;
     private readonly WndProcDelegate _wndProc;
     private readonly HookProcDelegate _hookProc;
+    private readonly object _observationGate = new();
+    private readonly Dictionary<nint, string> _deviceKeys = new();
+    private readonly Dictionary<nint, nint> _preparsed = new();
     private nint _hwnd;
     private nint _hook;
     private uint _threadId;
-    private long _lastDeviceEventMs;
+    private KnobObservation _lastObservation;
+    private long _lastObservationMs;
+    private volatile bool _rawInputActive;
     private volatile bool _disposed;
 
     public KnobInputListener(KnobSettings settings, Action<KnobAction> onAction)
+        : this(settings, onAction ?? throw new ArgumentNullException(nameof(onAction)), null, learnMode: false)
+    {
+    }
+
+    /// <summary>
+    /// The detector's listener: it reports every consumer and keyboard report it
+    /// sees and never acts on one, so learning which collection the knob speaks
+    /// on can never swallow a volume key or switch a theme by accident.
+    /// </summary>
+    public KnobInputListener(Action<KnobObservation> onObserved)
+        : this(new KnobSettings(), null, onObserved ?? throw new ArgumentNullException(nameof(onObserved)), learnMode: true)
+    {
+    }
+
+    private KnobInputListener(
+        KnobSettings settings,
+        Action<KnobAction>? onAction,
+        Action<KnobObservation>? onObserved,
+        bool learnMode)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _onAction = onAction ?? throw new ArgumentNullException(nameof(onAction));
+        _onAction = onAction;
+        _onObserved = onObserved;
+        _learnMode = learnMode;
         _mode = settings.Mode;
         _suppressVolume = settings.SuppressVolume;
-        _filterByDevice = KnobControl.TryParseVidPid(settings.VidPid, out _vid, out _pid);
+        _boundDeviceKey = (settings.DeviceKey ?? string.Empty).Trim();
+        _boundUsages = settings.Usages is { Count: > 0 } usages ? usages.ToArray() : Array.Empty<int>();
+        // The old whole-keyboard filter still applies to settings written before
+        // the detector existed, but a learned collection always outranks it.
+        _filterByVidPid = _boundDeviceKey.Length == 0
+            && KnobControl.TryParseVidPid(settings.VidPid, out _vid, out _pid);
         _forwardVk = KnobControl.HotKeyToVirtualKey(settings.KeyForward) ?? 0x7C;
         _backwardVk = KnobControl.HotKeyToVirtualKey(settings.KeyBackward) ?? 0x7D;
         _toggleVk = KnobControl.HotKeyToVirtualKey(settings.KeyToggle) ?? 0x7E;
@@ -86,6 +136,8 @@ public sealed class KnobInputListener : IDisposable
         };
         _thread.Start();
     }
+
+    private bool NeedsRawInput => _learnMode || _mode == KnobMode.VolumeKnob;
 
     private void RunMessageLoop()
     {
@@ -113,21 +165,9 @@ public sealed class KnobInputListener : IDisposable
                 return;
             }
 
-            // Raw Input only matters when a specific device is being watched;
-            // without a VID/PID every volume key counts as the knob anyway.
-            if (_mode == KnobMode.VolumeKnob && _filterByDevice)
+            if (NeedsRawInput)
             {
-                var devices = new[]
-                {
-                    new RawInputDevice
-                    {
-                        UsagePage = 0x0C, // Consumer
-                        Usage = 0x01,     // Consumer Control
-                        Flags = RidevInputSink,
-                        Target = _hwnd
-                    }
-                };
-                RegisterRawInputDevices(devices, 1, (uint)Marshal.SizeOf<RawInputDevice>());
+                RegisterForRawInput();
             }
 
             _hook = SetWindowsHookEx(WhKeyboardLl, _hookProc, GetModuleHandle(null), 0);
@@ -155,28 +195,71 @@ public sealed class KnobInputListener : IDisposable
                 DestroyWindow(_hwnd);
                 _hwnd = 0;
             }
+
+            ReleasePreparsedData();
         }
+    }
+
+    private void RegisterForRawInput()
+    {
+        // Consumer Control carries the knob and the media keys. The keyboard
+        // page is only added while learning, so the detector can also show an
+        // encoder already remapped to F13-F24; subscribing to every keystroke
+        // in the system is not worth it for the steady state.
+        var devices = _learnMode
+            ? new[]
+            {
+                new RawInputDevice
+                {
+                    UsagePage = ConsumerUsagePage,
+                    Usage = ConsumerControlUsage,
+                    Flags = RidevInputSink,
+                    Target = _hwnd
+                },
+                new RawInputDevice
+                {
+                    UsagePage = GenericDesktopUsagePage,
+                    Usage = KeyboardUsage,
+                    Flags = RidevInputSink,
+                    Target = _hwnd
+                }
+            }
+            : new[]
+            {
+                new RawInputDevice
+                {
+                    UsagePage = ConsumerUsagePage,
+                    Usage = ConsumerControlUsage,
+                    Flags = RidevInputSink,
+                    Target = _hwnd
+                }
+            };
+        _rawInputActive = RegisterRawInputDevices(devices, (uint)devices.Length, (uint)Marshal.SizeOf<RawInputDevice>());
     }
 
     private nint WndProc(nint hwnd, uint message, nint wParam, nint lParam)
     {
         if (message == WmInput)
         {
-            NoteRawInputDevice(lParam);
+            HandleRawInput(lParam);
         }
 
         return DefWindowProc(hwnd, message, wParam, lParam);
     }
 
-    /// <summary>Records when the watched device speaks; the hook correlates by time.</summary>
-    private void NoteRawInputDevice(nint rawInputHandle)
+    /// <summary>
+    /// Reads one raw report, works out which collection and usage it carries and
+    /// remembers it. The hook, microseconds later, asks whether that was the
+    /// bound knob.
+    /// </summary>
+    private void HandleRawInput(nint rawInputHandle)
     {
         try
         {
-            uint size = 0;
             uint headerSize = (uint)Marshal.SizeOf<RawInputHeader>();
+            uint size = 0;
             GetRawInputData(rawInputHandle, RidInput, 0, ref size, headerSize);
-            if (size == 0 || size > 1024)
+            if (size == 0 || size > 8192)
             {
                 return;
             }
@@ -190,14 +273,25 @@ public sealed class KnobInputListener : IDisposable
                 }
 
                 RawInputHeader header = Marshal.PtrToStructure<RawInputHeader>(buffer);
-                if (header.Type != RimTypeHid || header.Device == 0)
+                if (header.Device == 0)
                 {
                     return;
                 }
 
-                if (DeviceMatches(header.Device))
+                string deviceKey = ResolveDeviceKey(header.Device);
+                if (deviceKey.Length == 0)
                 {
-                    Interlocked.Exchange(ref _lastDeviceEventMs, Environment.TickCount64);
+                    return;
+                }
+
+                nint payload = buffer + (int)headerSize;
+                if (header.Type == RimTypeHid)
+                {
+                    ReadHidUsages(header.Device, deviceKey, payload);
+                }
+                else if (header.Type == RimTypeKeyboard)
+                {
+                    ReadKeyboardReport(deviceKey, payload);
                 }
             }
             finally
@@ -207,34 +301,208 @@ public sealed class KnobInputListener : IDisposable
         }
         catch (Exception)
         {
-            // Raw input parsing failures only cost the device binding.
+            // Raw input parsing failures only cost the device binding; the knob
+            // then behaves as it did before one was learned.
         }
     }
 
-    private bool DeviceMatches(nint device)
+    private void ReadHidUsages(nint device, string deviceKey, nint payload)
+    {
+        int reportSize = Marshal.ReadInt32(payload);
+        int reportCount = Marshal.ReadInt32(payload, 4);
+        nint reports = payload + 8;
+        if (reportSize <= 0 || reportCount <= 0 || reportCount > 16)
+        {
+            Observe(new KnobObservation(deviceKey, 0, 0));
+            return;
+        }
+
+        nint preparsed = ResolvePreparsedData(device);
+        bool sawUsage = false;
+        for (int index = 0; index < reportCount; index++)
+        {
+            nint report = reports + index * reportSize;
+            foreach (ushort usage in ReadUsages(preparsed, report, (uint)reportSize))
+            {
+                sawUsage = true;
+                Observe(new KnobObservation(deviceKey, usage, 0));
+            }
+        }
+
+        if (!sawUsage)
+        {
+            // A release report carries no usage. It still names the collection,
+            // which is the part the binding is built on.
+            Observe(new KnobObservation(deviceKey, 0, 0));
+        }
+    }
+
+    private static ushort[] ReadUsages(nint preparsed, nint report, uint reportSize)
+    {
+        if (preparsed == 0)
+        {
+            return [];
+        }
+
+        uint capacity = HidP_MaxUsageListLength(HidPInput, ConsumerUsagePage, preparsed);
+        if (capacity == 0 || capacity > 64)
+        {
+            return [];
+        }
+
+        ushort[] usages = new ushort[capacity];
+        uint length = capacity;
+        int status = HidP_GetUsages(HidPInput, ConsumerUsagePage, 0, usages, ref length, preparsed, report, reportSize);
+        if (status != HidPStatusSuccess || length == 0)
+        {
+            return [];
+        }
+
+        return usages[..(int)Math.Min(length, capacity)];
+    }
+
+    private void ReadKeyboardReport(string deviceKey, nint payload)
+    {
+        // RAWKEYBOARD: MakeCode, Flags, Reserved, VKey, Message, ExtraInformation.
+        ushort flags = (ushort)Marshal.ReadInt16(payload, 2);
+        ushort virtualKey = (ushort)Marshal.ReadInt16(payload, 6);
+        if ((flags & RawKeyboardBreakFlag) != 0 || virtualKey == 0)
+        {
+            return;
+        }
+
+        Observe(new KnobObservation(deviceKey, 0, virtualKey));
+    }
+
+    private void Observe(KnobObservation observation)
+    {
+        lock (_observationGate)
+        {
+            _lastObservation = observation;
+            _lastObservationMs = Environment.TickCount64;
+        }
+
+        if (_learnMode)
+        {
+            _onObserved?.Invoke(observation);
+        }
+    }
+
+    private string ResolveDeviceKey(nint device)
+    {
+        if (_deviceKeys.TryGetValue(device, out string? cached))
+        {
+            return cached;
+        }
+
+        string key = KnobControl.DeviceKeyFromPath(ReadDevicePath(device));
+        // Device handles stay valid for as long as the device is attached, so a
+        // handful of entries is the whole cache; it is only read on this thread.
+        _deviceKeys[device] = key;
+        return key;
+    }
+
+    private static string? ReadDevicePath(nint device)
     {
         uint length = 0;
         GetRawInputDeviceInfo(device, RidiDeviceName, 0, ref length);
-        if (length == 0 || length > 1024)
+        if (length == 0 || length > 2048)
         {
-            return false;
+            return null;
         }
 
         nint buffer = Marshal.AllocHGlobal((int)length * sizeof(char));
         try
         {
-            if (GetRawInputDeviceInfo(device, RidiDeviceName, buffer, ref length) <= 0)
-            {
-                return false;
-            }
-
-            string? path = Marshal.PtrToStringUni(buffer);
-            return KnobControl.DevicePathMatches(path, _vid, _pid);
+            return GetRawInputDeviceInfo(device, RidiDeviceName, buffer, ref length) > 0
+                ? Marshal.PtrToStringUni(buffer)
+                : null;
         }
         finally
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private nint ResolvePreparsedData(nint device)
+    {
+        if (_preparsed.TryGetValue(device, out nint cached))
+        {
+            return cached;
+        }
+
+        nint blob = 0;
+        uint size = 0;
+        GetRawInputDeviceInfo(device, RidiPreparsedData, 0, ref size);
+        if (size > 0 && size <= 64 * 1024)
+        {
+            nint buffer = Marshal.AllocHGlobal((int)size);
+            if (GetRawInputDeviceInfo(device, RidiPreparsedData, buffer, ref size) > 0)
+            {
+                blob = buffer;
+            }
+            else
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        _preparsed[device] = blob;
+        return blob;
+    }
+
+    private void ReleasePreparsedData()
+    {
+        foreach (nint blob in _preparsed.Values)
+        {
+            if (blob != 0)
+            {
+                Marshal.FreeHGlobal(blob);
+            }
+        }
+
+        _preparsed.Clear();
+        _deviceKeys.Clear();
+    }
+
+    /// <summary>
+    /// Whether the volume key the hook is looking at belongs to the bound knob.
+    ///
+    /// Raw Input for a report reaches this thread's queue before the hook runs
+    /// for the key it produced, so the most recent observation is the right one
+    /// to ask. When it is stale the answer is no: at worst the knob changes the
+    /// volume once, whereas guessing yes would swallow another device's volume
+    /// key - the exact thing binding to the knob is meant to prevent.
+    /// </summary>
+    private bool IsFromBoundSource()
+    {
+        if (_boundDeviceKey.Length == 0 && !_filterByVidPid)
+        {
+            return true;
+        }
+
+        // No Raw Input means no way to attribute a key to a device. Falling back
+        // to the unbound behaviour keeps the knob working; refusing everything
+        // would make the feature look broken with nothing on screen to say why.
+        if (!_rawInputActive)
+        {
+            return true;
+        }
+
+        KnobObservation observation;
+        lock (_observationGate)
+        {
+            if (Environment.TickCount64 - _lastObservationMs >= DeviceMatchWindowMs)
+            {
+                return false;
+            }
+
+            observation = _lastObservation;
+        }
+
+        return _boundDeviceKey.Length > 0
+            ? KnobControl.Matches(observation, _boundDeviceKey, _boundUsages)
+            : KnobControl.DevicePathMatches(observation.DeviceKey, _vid, _pid);
     }
 
     /// <summary>
@@ -258,13 +526,20 @@ public sealed class KnobInputListener : IDisposable
             return CallNextHookEx(_hook, code, wParam, lParam);
         }
 
+        // Learning watches; it never acts and never swallows, so a detector left
+        // open cannot take the volume keys away.
+        if (_learnMode)
+        {
+            return CallNextHookEx(_hook, code, wParam, lParam);
+        }
+
         if (_mode == KnobMode.HotKeys)
         {
             if (vk == _forwardVk || vk == _backwardVk || vk == _toggleVk)
             {
                 if (isDown)
                 {
-                    _onAction(vk == _forwardVk ? KnobAction.NextTheme
+                    _onAction?.Invoke(vk == _forwardVk ? KnobAction.NextTheme
                         : vk == _backwardVk ? KnobAction.PreviousTheme
                         : KnobAction.ToggleCarousel);
                 }
@@ -274,22 +549,17 @@ public sealed class KnobInputListener : IDisposable
             return CallNextHookEx(_hook, code, wParam, lParam);
         }
 
-        if (vk is VkVolumeUp or VkVolumeDown or VkVolumeMute)
+        if ((vk is VkVolumeUp or VkVolumeDown or VkVolumeMute) && IsFromBoundSource())
         {
-            bool fromKnob = !_filterByDevice ||
-                Environment.TickCount64 - Interlocked.Read(ref _lastDeviceEventMs) < DeviceMatchWindowMs;
-            if (fromKnob)
+            if (isDown)
             {
-                if (isDown)
-                {
-                    _onAction(vk == VkVolumeUp ? KnobAction.NextTheme
-                        : vk == VkVolumeDown ? KnobAction.PreviousTheme
-                        : KnobAction.ToggleCarousel);
-                }
-                if (_suppressVolume)
-                {
-                    return 1;
-                }
+                _onAction?.Invoke(vk == VkVolumeUp ? KnobAction.NextTheme
+                    : vk == VkVolumeDown ? KnobAction.PreviousTheme
+                    : KnobAction.ToggleCarousel);
+            }
+            if (_suppressVolume)
+            {
+                return 1;
             }
         }
 
@@ -407,6 +677,13 @@ public sealed class KnobInputListener : IDisposable
 
     [DllImport("user32.dll")]
     private static extern nint CallNextHookEx(nint hook, int code, nint wParam, nint lParam);
+
+    [DllImport("hid.dll")]
+    private static extern uint HidP_MaxUsageListLength(int reportType, ushort usagePage, nint preparsedData);
+
+    [DllImport("hid.dll")]
+    private static extern int HidP_GetUsages(int reportType, ushort usagePage, ushort linkCollection,
+        [In, Out] ushort[] usageList, ref uint usageLength, nint preparsedData, nint report, uint reportLength);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? module);

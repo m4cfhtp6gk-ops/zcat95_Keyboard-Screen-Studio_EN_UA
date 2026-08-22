@@ -1855,7 +1855,66 @@ Assert(KnobControl.HotKeyNames.Count == 12 && KnobControl.HotKeyNames[0] == "F13
 var knobDefaults = new KnobSettings();
 Assert(!knobDefaults.Enabled && knobDefaults.SuppressVolume && knobDefaults.Mode == KnobMode.VolumeKnob,
     "the knob feature must ship disabled with volume suppression preferred");
-Console.WriteLine("PASS knob switching: circular cycle, carousel fallback, VID/PID, hot keys");
+Assert(knobDefaults.DeviceKey.Length == 0 && knobDefaults.Usages.Count == 0,
+    "no knob is bound until the detector has run");
+
+// The device key is what separates a knob from the same keyboard's Fn media
+// keys, so it must keep the HID collection and drop the port-specific instance.
+Assert(KnobControl.DeviceKeyFromPath(
+        @"\\?\HID#VID_3151&PID_4015&MI_01&Col02#7&2f3a1b&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}")
+    == "VID_3151&PID_4015&MI_01&COL02",
+    "the device key must be the collection segment, upper-cased");
+Assert(KnobControl.DeviceKeyFromPath(@"\\?\HID#VID_3151&PID_4015&MI_01&Col02#8&11111&0&0000#{guid}")
+    == KnobControl.DeviceKeyFromPath(@"\\?\HID#VID_3151&PID_4015&MI_01&Col02#7&2f3a1b&0&0000#{guid}"),
+    "the same collection on another USB port must give the same key");
+Assert(KnobControl.DeviceKeyFromPath(@"\\?\HID#VID_3151&PID_4015&MI_01&Col01#7&2f3a1b&0&0000#{guid}")
+    != KnobControl.DeviceKeyFromPath(@"\\?\HID#VID_3151&PID_4015&MI_01&Col02#7&2f3a1b&0&0000#{guid}"),
+    "two collections on one keyboard must give different keys");
+Assert(KnobControl.DeviceKeyFromPath(null).Length == 0 && KnobControl.DeviceKeyFromPath("  ").Length == 0,
+    "a missing path must give no key");
+
+var knobCollection = new KnobObservation("VID_3151&PID_4015&MI_01&COL02", 0x00E9, 0);
+var keysCollection = new KnobObservation("VID_3151&PID_4015&MI_01&COL01", 0x00E9, 0);
+Assert(KnobControl.Matches(knobCollection, string.Empty, []),
+    "an unbound knob must still react to every volume key, as it did before the detector");
+Assert(KnobControl.Matches(knobCollection, "VID_3151&PID_4015&MI_01&COL02", []),
+    "a bound collection must match its own reports whatever the usage");
+Assert(!KnobControl.Matches(keysCollection, "VID_3151&PID_4015&MI_01&COL02", []),
+    "the keyboard's other collection must not pass as the knob");
+Assert(KnobControl.Matches(knobCollection, "vid_3151&pid_4015&mi_01&col02", []),
+    "the collection key must match case-insensitively");
+Assert(!KnobControl.Matches(knobCollection, "VID_3151&PID_4015&MI_01&COL02", [0x00EA]),
+    "a usage-narrowed binding must reject the usages it does not name");
+
+// The good case: the knob has a collection of its own, so the binding takes the
+// whole collection and both rotation directions keep working.
+KnobObservation[] turned =
+[
+    new("VID_3151&PID_4015&MI_01&COL02", 0x00E9, 0),
+    new("VID_3151&PID_4015&MI_01&COL02", 0x00EA, 0)
+];
+KnobObservation[] fnKeys = [new("VID_3151&PID_4015&MI_01&COL01", 0x00E9, 0)];
+KnobBinding? ownCollection = KnobControl.PickBinding(turned, fnKeys);
+Assert(ownCollection is { Usages.Count: 0 } && ownCollection.DeviceKey == "VID_3151&PID_4015&MI_01&COL02",
+    "a knob on its own collection must bind the collection, not one usage");
+Assert(KnobControl.Matches(turned[0], ownCollection!.DeviceKey, ownCollection.Usages)
+    && KnobControl.Matches(turned[1], ownCollection.DeviceKey, ownCollection.Usages)
+    && !KnobControl.Matches(fnKeys[0], ownCollection.DeviceKey, ownCollection.Usages),
+    "both directions must stay bound while the Fn keys stay free");
+
+// One collection, but the knob has a usage of its own: narrow to that usage.
+KnobObservation[] sharedCollection = [new("SHARED", 0x00E9, 0), new("SHARED", 0x0238, 0)];
+KnobObservation[] sharedOthers = [new("SHARED", 0x00E9, 0)];
+KnobBinding? narrowed = KnobControl.PickBinding(sharedCollection, sharedOthers);
+Assert(narrowed is { DeviceKey: "SHARED" } && narrowed.Usages.SequenceEqual([0x0238]),
+    "a shared collection must fall back to the usages the other keys never send");
+
+// Truly indistinguishable: no binding at all, rather than one that looks right.
+Assert(KnobControl.PickBinding([new("SHARED", 0x00E9, 0)], [new("SHARED", 0x00E9, 0)]) is null,
+    "identical collection and usage must report no binding is possible");
+Assert(KnobControl.PickBinding([], [new("SHARED", 0x00E9, 0)]) is null,
+    "hearing nothing from the knob must not bind anything");
+Console.WriteLine("PASS knob switching: circular cycle, carousel fallback, VID/PID, hot keys, knob detection");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
