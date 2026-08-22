@@ -29,7 +29,7 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
-Assert(themes.Count == 26, "built-in theme catalog should contain the 26 supported schemes");
+Assert(themes.Count == 27, "built-in theme catalog should contain the 27 supported schemes");
 Assert(themes.All(theme => theme.Id is not "calendar" and not "ambient"), "removed calendar/ambient themes must not be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
 Assert(themes.All(theme => theme.Id != "week"), "removed week calendar theme must not be registered");
@@ -48,6 +48,7 @@ Assert(themes.Any(theme => theme.Id == "crypto"), "crypto theme must be register
 Assert(themes.Any(theme => theme.Id == "pomodoro"), "pomodoro theme must be registered");
 Assert(themes.Any(theme => theme.Id == "hardware"), "hardware monitor theme must be registered");
 Assert(themes.Any(theme => theme.Id == "github"), "GitHub activity theme must be registered");
+Assert(themes.Any(theme => theme.Id == "alerts"), "air alerts theme must be registered");
 
 // The Claude usage theme has to survive both a full snapshot and no data at all:
 // the meters only appear once an account actually reports its limits.
@@ -1320,6 +1321,61 @@ Assert(ThemeRefreshPolicy.NextDelay(refreshNow, 60, pollCapSeconds: 1) == TimeSp
     "media polling must cap the sleep");
 Console.WriteLine("PASS refresh cadence: defaults, overrides, minute alignment, carousel cap");
 
+// ---- air alerts --------------------------------------------------------------
+Assert(AirAlertSource.MatchesLocation("м. Київ", "Київ") && AirAlertSource.MatchesLocation("Київська область", "київ")
+    && !AirAlertSource.MatchesLocation("Львівська область", "Київ"),
+    "location matching must be case-insensitive and substring-based");
+Assert(ThemeRefreshPolicy.EffectiveSeconds(new AppSettings(), "alerts", 1) == 30,
+    "the alerts theme must default to a 30-second cadence");
+
+const string alertsJson = """
+    {"alerts":[
+      {"id":1,"location_title":"м. Київ","location_type":"city","started_at":"2026-08-22T03:40:00.000Z","alert_type":"air_raid"},
+      {"id":2,"location_title":"Чернігівська область","location_type":"oblast","started_at":"2026-08-22T03:12:00.000Z","alert_type":"air_raid"}
+    ],"meta":{"last_updated_at":"2026-08-22T04:20:00.000Z"}}
+    """;
+var alertsHandler = new ClaudeHandler(new Queue<string>(new[] { alertsJson }));
+using (var alertsClient = new HttpClient(alertsHandler))
+using (var alertsSource = new AirAlertSource(alertsClient) { BaseUrl = "https://alerts.test/v1/alerts/active.json" })
+{
+    var alertsSettings = new AirAlertSettings { Token = "test-token", Location = "Київ" };
+    var alertsSnapshot = await alertsSource.ReadAsync(alertsSettings);
+    Assert(alertsHandler.Requests[0] == "https://alerts.test/v1/alerts/active.json", "the alerts request URL is wrong");
+    Assert(alertsHandler.Cookies[0].Length == 0, "no cookies belong on the alerts request");
+    Assert(alertsSnapshot.Available && alertsSnapshot.ActiveAlerts.Count == 2, "both alerts should parse");
+    Assert(alertsSnapshot.AlertActiveAtLocation, "the Київ location must match м. Київ");
+    Assert(alertsSnapshot.ActiveAlerts[0].StartedAt is not null, "started_at must parse");
+    var alertsCached = await alertsSource.ReadAsync(alertsSettings);
+    Assert(ReferenceEquals(alertsSnapshot, alertsCached), "alert reads inside the cache window must not call the API");
+    Assert(alertsHandler.Requests.Count == 1, "exactly one alerts request expected");
+
+    var alertsTheme = themes.Single(theme => theme.Id == "alerts");
+    var alertFrame = renderer.Render(alertsTheme, SystemSnapshot.DesignSample);
+    Assert(alertFrame.JpegBytes is [0xFF, 0xD8, ..], "the alert-state view did not render");
+    var clearFrame = renderer.Render(alertsTheme, SystemSnapshot.DesignSample with
+    {
+        AirAlerts = new AirAlertSnapshot(true, false, [], "м. Київ", DateTimeOffset.Now)
+    });
+    Assert(clearFrame.JpegBytes is [0xFF, 0xD8, ..], "the clear-state view did not render");
+    Assert(!clearFrame.JpegBytes.AsSpan().SequenceEqual(alertFrame.JpegBytes), "alert and clear states must differ");
+    var countryFrame = renderer.Render(alertsTheme, SystemSnapshot.DesignSample with
+    {
+        AirAlerts = alertsSnapshot with { Location = string.Empty }
+    });
+    Assert(countryFrame.JpegBytes is [0xFF, 0xD8, ..], "the country summary did not render");
+    var unconfiguredFrame = renderer.Render(alertsTheme, SystemSnapshot.DesignSample with { AirAlerts = null });
+    Assert(unconfiguredFrame.JpegBytes is [0xFF, 0xD8, ..], "the unconfigured view did not render");
+}
+
+using (var badTokenClient = new HttpClient(new StatusHandler(System.Net.HttpStatusCode.Unauthorized)))
+using (var badTokenSource = new AirAlertSource(badTokenClient) { BaseUrl = "https://alerts.test/v1/alerts/active.json" })
+{
+    var rejected = await badTokenSource.ReadAsync(new AirAlertSettings { Token = "bad" });
+    Assert(!rejected.Available && rejected.ErrorMessage == Loc.T("AirAlertBadToken"),
+        "a rejected token must surface the localized message");
+}
+Console.WriteLine("PASS air alerts: parsing, location match, cache, renders, bad token");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");
@@ -1506,6 +1562,12 @@ sealed class ClaudeHandler : HttpMessageHandler
             Content = new StringContent(_responses.Dequeue())
         });
     }
+}
+
+sealed class StatusHandler(System.Net.HttpStatusCode status) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent("") });
 }
 
 sealed class SequenceHandler : HttpMessageHandler

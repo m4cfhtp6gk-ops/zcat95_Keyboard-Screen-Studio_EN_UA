@@ -42,6 +42,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly PomodoroTimer _pomodoroTimer = new();
     private readonly LibreHardwareMonitorSource _hardwareSource = new();
     private readonly GitHubContributionSource _gitHubSource = new();
+    private readonly AirAlertSource _airAlertSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
@@ -169,6 +170,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
+    private string _alertsToken = string.Empty;
+    private string _alertsLocation = string.Empty;
+    private AirAlertSnapshot? _alertsSnapshot;
     private TelegramService? _telegramService;
     private string _telegramApiId = string.Empty;
     private string _telegramApiHash = string.Empty;
@@ -222,6 +226,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenAuthorCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/zcat95"));
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
         OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
+        OpenAlertsSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://alerts.in.ua"));
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
         StartPomodoroCommand = new RelayCommand(StartPomodoro);
         StopPomodoroCommand = new RelayCommand(StopPomodoro);
@@ -261,6 +266,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenAuthorCommand { get; }
     public ICommand OpenTokscaleDocsCommand { get; }
     public ICommand OpenClaudeSiteCommand { get; }
+    public ICommand OpenAlertsSiteCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
     public ICommand StartPomodoroCommand { get; }
     public ICommand StopPomodoroCommand { get; }
@@ -1319,6 +1325,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
     public bool IsHardwareTheme => SelectedTheme?.Id == "hardware";
     public bool IsGitHubTheme => SelectedTheme?.Id == "github";
+    public bool IsAlertsTheme => SelectedTheme?.Id == "alerts";
+
+    public string AlertsToken
+    {
+        get => _alertsToken;
+        set { if (SetProperty(ref _alertsToken, value)) ScheduleCommit(); }
+    }
+
+    public string AlertsLocation
+    {
+        get => _alertsLocation;
+        set { if (SetProperty(ref _alertsLocation, value)) ScheduleCommit(); }
+    }
 
     public string GitHubUsername
     {
@@ -1981,6 +2000,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "ai-quota" => !_settings.HasAcknowledgedAiUsageNotice,
             "claude-usage" => !_settings.HasAcknowledgedClaudeNotice,
             "github" => !_settings.HasAcknowledgedGitHubNotice,
+            "alerts" => !_settings.HasAcknowledgedAlertsNotice,
             _ => false
         };
 
@@ -1999,6 +2019,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
             case "github":
                 _settings.HasAcknowledgedGitHubNotice = true;
+                break;
+            case "alerts":
+                _settings.HasAcknowledgedAlertsNotice = true;
                 break;
             default:
                 return;
@@ -2105,6 +2128,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _currencySource.Dispose();
         _hardwareSource.Dispose();
         _gitHubSource.Dispose();
+        _airAlertSource.Dispose();
         _telegramPopupDelay?.Cancel();
         _telegramPopupDelay?.Dispose();
         if (_telegramService is not null)
@@ -2182,7 +2206,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
         AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "alerts", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -2285,6 +2309,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.GitHub ??= new GitHubSettings();
         GitHubUsername = _settings.GitHub.Username;
         GitHubToken = _settings.GitHub.Token;
+        _settings.AirAlerts ??= new AirAlertSettings();
+        AlertsToken = _settings.AirAlerts.Token;
+        AlertsLocation = _settings.AirAlerts.Location;
         _settings.Telegram ??= new TelegramSettings();
         TelegramApiId = _settings.Telegram.ApiId;
         TelegramApiHash = _settings.Telegram.ApiHash;
@@ -2395,6 +2422,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsHardwareTheme));
         OnPropertyChanged(nameof(IsGitHubTheme));
+        OnPropertyChanged(nameof(IsAlertsTheme));
         OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
@@ -2580,6 +2608,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             Username = GitHubUsername.Trim().TrimStart('@'),
             Token = GitHubToken.Trim()
         };
+        _settings.AirAlerts = new AirAlertSettings
+        {
+            Token = AlertsToken.Trim(),
+            Location = AlertsLocation.Trim()
+        };
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
         _settings.Carousel = BuildCarouselSettings();
@@ -2737,6 +2770,15 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _gitHubSnapshot = gitHub;
             }
 
+            AirAlertSnapshot? airAlerts = null;
+            if (requestedTheme.Id == "alerts" || theme.Id == "alerts")
+            {
+                airAlerts = await _airAlertSource.ReadAsync(
+                    _settings.AirAlerts ?? new AirAlertSettings(),
+                    cancellationToken);
+                _alertsSnapshot = airAlerts;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -2764,7 +2806,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Currency = currency,
                 Crypto = crypto,
                 Hardware = hardware,
-                GitHub = gitHub
+                GitHub = gitHub,
+                AirAlerts = airAlerts
             };
 
             Action<ScreenCanvas>? popupOverlay = null;
@@ -3040,6 +3083,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     CountThisWeek(gitHubSnapshot),
                     gitHubSnapshot.UpdatedAt.ToString("HH:mm"))
                 : _gitHubSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureGitHub"),
+            "alerts" => _alertsSnapshot is { Available: true } alertsSnapshot
+                ? Loc.T("SummaryAlerts",
+                    alertsSnapshot.ActiveAlerts.Count,
+                    alertsSnapshot.UpdatedAt.ToString("HH:mm"))
+                : _alertsSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureAlerts"),
             "hardware" => _hardwareSnapshot is { Available: true } hardwareSnapshot
                 ? Loc.T("SummaryHardware",
                     HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Cpu?.TemperatureC),
@@ -3086,6 +3134,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "currency" => Loc.T("LoadingCurrency"),
             "crypto" => Loc.T("LoadingCrypto"),
             "github" => Loc.T("LoadingGitHub"),
+            "alerts" => Loc.T("LoadingAlerts"),
             "ai-quota" => Loc.T("LoadingAiUsage"),
             "claude-usage" => Loc.T("LoadingClaude"),
             _ => Loc.T("LoadingTheme")

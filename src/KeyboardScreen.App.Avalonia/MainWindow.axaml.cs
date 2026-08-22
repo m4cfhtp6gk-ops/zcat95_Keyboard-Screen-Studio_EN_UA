@@ -194,6 +194,10 @@ public sealed partial class MainWindow : Window
                     Loc.T("RiskGitHubTitle"),
                     Loc.T("RiskGitHubHeading"),
                     Loc.T("RiskGitHubBody")),
+                "alerts" => (
+                    Loc.T("RiskAlertsTitle"),
+                    Loc.T("RiskAlertsHeading"),
+                    Loc.T("RiskAlertsBody")),
                 _ => (string.Empty, string.Empty, string.Empty)
             };
 

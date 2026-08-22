@@ -15,7 +15,8 @@ public sealed record SystemSnapshot(
     CurrencySnapshot? Currency = null,
     CryptoSnapshot? Crypto = null,
     HardwareSnapshot? Hardware = null,
-    GitHubContributionSnapshot? GitHub = null)
+    GitHubContributionSnapshot? GitHub = null,
+    AirAlertSnapshot? AirAlerts = null)
 {
     public static SystemSnapshot DesignSample { get; } = new(
         DateTimeOffset.Now,
@@ -69,7 +70,17 @@ public sealed record SystemSnapshot(
             RamTotalGb: 32.0,
             DiskUsedPercent: 71.0,
             UpdatedAt: DateTimeOffset.Now),
-        GitHub: SampleGitHub());
+        GitHub: SampleGitHub(),
+        AirAlerts: new AirAlertSnapshot(
+            Available: true,
+            AlertActiveAtLocation: true,
+            [
+                new AirAlertInfo("м. Київ", "air_raid", DateTimeOffset.Now.AddMinutes(-18)),
+                new AirAlertInfo("Київська область", "air_raid", DateTimeOffset.Now.AddMinutes(-18)),
+                new AirAlertInfo("Чернігівська область", "air_raid", DateTimeOffset.Now.AddMinutes(-42))
+            ],
+            Location: "м. Київ",
+            UpdatedAt: DateTimeOffset.Now));
 
     private static GitHubContributionSnapshot SampleGitHub()
     {

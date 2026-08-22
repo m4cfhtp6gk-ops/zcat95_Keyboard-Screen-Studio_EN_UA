@@ -24,6 +24,7 @@ The project's MIT license does not relicense these components.
 - Exchange rates come from the ExchangeRate-API open endpoint (https://www.exchangerate-api.com), which requires attribution: rates by ExchangeRate-API. The open endpoint updates daily and may be rate-limited.
 - The optional GitHub activity screen reads the public contribution page for a user-supplied username; with an optional token it uses the GitHub GraphQL API. The token is stored locally and sent to api.github.com only.
 - The optional Telegram integration signs in to the user's own account through Telegram's official MTProto API using the bundled WTelegramClient library and the api_id/api_hash the user obtains from my.telegram.org. The session key, api_id, api_hash and phone number stay on this machine and are sent to Telegram's servers only; logging out wipes the session.
+- The optional air-raid alerts screen reads Ukrainian civil-defence alert data from the alerts.in.ua API (https://alerts.in.ua) with an API token the user requests from that service. The token is stored locally and sent to alerts.in.ua only. The data is informational: it may lag or be unavailable, and the screen must not be relied on as the only air-raid warning source.
 
 ## Visual assets
 
