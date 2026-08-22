@@ -16,7 +16,8 @@ The project's MIT license does not relicense these components.
 
 - Automatic-location city names are resolved by the BigDataCloud free client-side reverse geocoding API under its fair-use terms: https://www.bigdatacloud.com/free-api
 - Weather data is provided by Open-Meteo under CC BY 4.0 and requires attribution: https://open-meteo.com/en/license
-- This personal project uses Open-Meteo's non-commercial free endpoint. Commercial redistributors and users must obtain an applicable Open-Meteo licence or configure another compliant service endpoint.
+- Air-quality readings come from Open-Meteo's air-quality endpoint under the same terms; the underlying data originates from the Copernicus Atmosphere Monitoring Service (CAMS).
+- This personal project uses Open-Meteo's non-commercial free endpoints. Commercial redistributors and users must obtain an applicable Open-Meteo licence or configure another compliant service endpoint.
 - The experimental stock integration retrieves display data from an unofficial Yahoo Finance web endpoint. It is not a stable or endorsed API and may become unavailable.
 - The experimental AI-usage integration reads local usage data exposed by the user-installed open-source Tokscale tool (https://github.com/junhoyeo/tokscale). KSS does not bundle or sign in to it, and it may stop working when the tool or the underlying platforms change.
 - The optional Claude usage screen calls claude.ai account endpoints with a session key the user supplies. This is not a public or documented API; it may stop working at any time, and the key is stored locally and sent to claude.ai only.
@@ -25,6 +26,7 @@ The project's MIT license does not relicense these components.
 - The optional GitHub activity screen reads the public contribution page for a user-supplied username; with an optional token it uses the GitHub GraphQL API. The token is stored locally and sent to api.github.com only.
 - The optional Telegram integration signs in to the user's own account through Telegram's official MTProto API using the bundled WTelegramClient library and the api_id/api_hash the user obtains from my.telegram.org. The session key, api_id, api_hash and phone number stay on this machine and are sent to Telegram's servers only; logging out wipes the session.
 - The optional air-raid alerts screen reads Ukrainian civil-defence alert data from the alerts.in.ua API (https://alerts.in.ua) with an API token the user requests from that service. The token is stored locally and sent to alerts.in.ua only. The data is informational: it may lag or be unavailable, and the screen must not be relied on as the only air-raid warning source.
+- The optional calendar screen fetches the ICS feed at an address the user supplies (their own calendar provider). A private ICS link embeds an access key, so it is treated like a credential: stored locally, sent only to its own host, and stripped from settings exports.
 
 ## Visual assets
 

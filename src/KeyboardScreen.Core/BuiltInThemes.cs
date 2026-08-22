@@ -52,6 +52,11 @@ public static class BuiltInThemes
 			new CryptoTheme(),
 			new GitHubContributionTheme(),
 			new AirAlertTheme(),
+			new CalendarTheme(),
+			new CountdownTheme(),
+			new WorldClockTheme(),
+			new PingTheme(),
+			new DiskUsageTheme(),
 			new PomodoroTheme(pomodoroTimer),
 			imageTheme
 		};

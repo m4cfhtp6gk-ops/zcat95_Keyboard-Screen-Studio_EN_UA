@@ -11,12 +11,26 @@ public sealed record WeatherSnapshot(
     DateTimeOffset UpdatedAt,
     bool IsStale = false,
     string? ErrorMessage = null,
-    IReadOnlyList<DailyWeatherForecast>? DailyForecast = null)
+    IReadOnlyList<DailyWeatherForecast>? DailyForecast = null,
+    DateTimeOffset? Sunrise = null,
+    DateTimeOffset? Sunset = null,
+    int? EuropeanAqi = null)
 {
     public static WeatherSnapshot Unavailable(string? message = null) =>
         new(false, Loc.T("WeatherUnknown"), 0, 0, 0, 0, true, DateTimeOffset.MinValue, false, message);
 
     public string ConditionText => WeatherCondition.FromCode(WeatherCode);
+
+    /// <summary>The European AQI bands as short localized words.</summary>
+    public static string AqiLabel(int aqi) => aqi switch
+    {
+        < 20 => Loc.T("ScreenAqiGood"),
+        < 40 => Loc.T("ScreenAqiFair"),
+        < 60 => Loc.T("ScreenAqiModerate"),
+        < 80 => Loc.T("ScreenAqiPoor"),
+        < 100 => Loc.T("ScreenAqiVeryPoor"),
+        _ => Loc.T("ScreenAqiExtreme")
+    };
 }
 
 public static class WeatherCondition

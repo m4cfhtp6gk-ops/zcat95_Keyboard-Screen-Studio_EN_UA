@@ -177,6 +177,26 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private bool _alertsTakeoverUntilClear = true;
     private int _alertsTakeoverMinutes = 5;
     private readonly AirAlertTakeoverState _alertTakeoverState = new();
+    private readonly DiskUsageSource _diskSource = new();
+    private readonly PingMonitorSource _pingSource = new();
+    private readonly IcsCalendarSource _calendarSource = new();
+    private DiskSnapshot? _diskSnapshot;
+    private PingSnapshot? _pingSnapshot;
+    private CalendarSnapshot? _calendarSnapshot;
+    private string _calendarUrl = string.Empty;
+    private string _additionalDevices = string.Empty;
+    private string _additionalPushStatus = string.Empty;
+    private Dictionary<string, string> _themeAccentOverrides = new(StringComparer.OrdinalIgnoreCase);
+    private string _worldClockLabel1 = string.Empty, _worldClockLabel2 = string.Empty,
+        _worldClockLabel3 = string.Empty, _worldClockLabel4 = string.Empty;
+    private string _worldClockZone1 = string.Empty, _worldClockZone2 = string.Empty,
+        _worldClockZone3 = string.Empty, _worldClockZone4 = string.Empty;
+    private string _countdownTitle1 = string.Empty, _countdownTitle2 = string.Empty, _countdownTitle3 = string.Empty;
+    private string _countdownDate1 = string.Empty, _countdownDate2 = string.Empty, _countdownDate3 = string.Empty;
+    private string _pingHost1 = string.Empty, _pingHost2 = string.Empty,
+        _pingHost3 = string.Empty, _pingHost4 = string.Empty;
+    private string _stockQuantity1 = string.Empty, _stockQuantity2 = string.Empty, _stockQuantity3 = string.Empty,
+        _stockQuantity4 = string.Empty, _stockQuantity5 = string.Empty;
     private TelegramService? _telegramService;
     private string _telegramApiId = string.Empty;
     private string _telegramApiHash = string.Empty;
@@ -1431,6 +1451,88 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    public bool IsCalendarTheme => SelectedTheme?.Id == "calendar";
+    public bool IsCountdownTheme => SelectedTheme?.Id == "countdown";
+    public bool IsWorldClockTheme => SelectedTheme?.Id == "world-clock";
+    public bool IsPingTheme => SelectedTheme?.Id == "ping";
+
+    public string CalendarUrl
+    {
+        get => _calendarUrl;
+        set { if (SetProperty(ref _calendarUrl, value)) ScheduleCommit(); }
+    }
+
+    public string WorldClockLabel1 { get => _worldClockLabel1; set { if (SetProperty(ref _worldClockLabel1, value)) ScheduleCommit(); } }
+    public string WorldClockLabel2 { get => _worldClockLabel2; set { if (SetProperty(ref _worldClockLabel2, value)) ScheduleCommit(); } }
+    public string WorldClockLabel3 { get => _worldClockLabel3; set { if (SetProperty(ref _worldClockLabel3, value)) ScheduleCommit(); } }
+    public string WorldClockLabel4 { get => _worldClockLabel4; set { if (SetProperty(ref _worldClockLabel4, value)) ScheduleCommit(); } }
+    public string WorldClockZone1 { get => _worldClockZone1; set { if (SetProperty(ref _worldClockZone1, value)) ScheduleCommit(); } }
+    public string WorldClockZone2 { get => _worldClockZone2; set { if (SetProperty(ref _worldClockZone2, value)) ScheduleCommit(); } }
+    public string WorldClockZone3 { get => _worldClockZone3; set { if (SetProperty(ref _worldClockZone3, value)) ScheduleCommit(); } }
+    public string WorldClockZone4 { get => _worldClockZone4; set { if (SetProperty(ref _worldClockZone4, value)) ScheduleCommit(); } }
+
+    public string CountdownTitle1 { get => _countdownTitle1; set { if (SetProperty(ref _countdownTitle1, value)) ScheduleCommit(); } }
+    public string CountdownTitle2 { get => _countdownTitle2; set { if (SetProperty(ref _countdownTitle2, value)) ScheduleCommit(); } }
+    public string CountdownTitle3 { get => _countdownTitle3; set { if (SetProperty(ref _countdownTitle3, value)) ScheduleCommit(); } }
+    public string CountdownDate1 { get => _countdownDate1; set { if (SetProperty(ref _countdownDate1, value)) ScheduleCommit(); } }
+    public string CountdownDate2 { get => _countdownDate2; set { if (SetProperty(ref _countdownDate2, value)) ScheduleCommit(); } }
+    public string CountdownDate3 { get => _countdownDate3; set { if (SetProperty(ref _countdownDate3, value)) ScheduleCommit(); } }
+
+    public string PingHost1 { get => _pingHost1; set { if (SetProperty(ref _pingHost1, value)) ScheduleCommit(); } }
+    public string PingHost2 { get => _pingHost2; set { if (SetProperty(ref _pingHost2, value)) ScheduleCommit(); } }
+    public string PingHost3 { get => _pingHost3; set { if (SetProperty(ref _pingHost3, value)) ScheduleCommit(); } }
+    public string PingHost4 { get => _pingHost4; set { if (SetProperty(ref _pingHost4, value)) ScheduleCommit(); } }
+
+    public string StockQuantity1 { get => _stockQuantity1; set { if (SetProperty(ref _stockQuantity1, value)) ScheduleCommit(); } }
+    public string StockQuantity2 { get => _stockQuantity2; set { if (SetProperty(ref _stockQuantity2, value)) ScheduleCommit(); } }
+    public string StockQuantity3 { get => _stockQuantity3; set { if (SetProperty(ref _stockQuantity3, value)) ScheduleCommit(); } }
+    public string StockQuantity4 { get => _stockQuantity4; set { if (SetProperty(ref _stockQuantity4, value)) ScheduleCommit(); } }
+    public string StockQuantity5 { get => _stockQuantity5; set { if (SetProperty(ref _stockQuantity5, value)) ScheduleCommit(); } }
+
+    /// <summary>Extra push targets shown in the diagnostics card; empty when none are set.</summary>
+    public string AdditionalPushStatus
+    {
+        get => _additionalPushStatus;
+        private set => SetProperty(ref _additionalPushStatus, value);
+    }
+
+    public string AdditionalDevices
+    {
+        get => _additionalDevices;
+        set { if (SetProperty(ref _additionalDevices, value)) ScheduleCommit(); }
+    }
+
+    /// <summary>The selected theme's own accent (#RRGGBB), or empty for the global one.</summary>
+    public string CurrentThemeAccentColor
+    {
+        get => SelectedTheme?.Id is { } themeId &&
+               _themeAccentOverrides.TryGetValue(themeId, out string? color)
+            ? color
+            : string.Empty;
+        set
+        {
+            if (SelectedTheme?.Id is not { } themeId)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                _themeAccentOverrides.Remove(themeId);
+            }
+            else
+            {
+                _themeAccentOverrides[themeId] = value.Trim();
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CurrentThemeHasAccentOverride));
+            ScheduleCommit();
+        }
+    }
+
+    public bool CurrentThemeHasAccentOverride => CurrentThemeAccentColor.Length > 0;
+
     public string GitHubUsername
     {
         get => _gitHubUsername;
@@ -2221,6 +2323,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _hardwareSource.Dispose();
         _gitHubSource.Dispose();
         _airAlertSource.Dispose();
+        _calendarSource.Dispose();
         _telegramPopupDelay?.Cancel();
         _telegramPopupDelay?.Dispose();
         if (_telegramService is not null)
@@ -2296,9 +2399,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
-        AddGroup("ThemeGroupMonitoring", ["system", "hardware", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
-        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "pomodoro", "image"], byId);
-        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "alerts", "ai-quota", "claude-usage"], byId);
+        AddGroup("ThemeGroupMonitoring", ["system", "hardware", "disks", "ping", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
+        AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "world-clock", "countdown", "pomodoro", "image"], byId);
+        AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "alerts", "calendar", "ai-quota", "claude-usage"], byId);
         AddGroup("ThemeGroupMusic", ["music", "music-minimal", "music-poster"], byId);
         AddGroup("ThemeGroupDotMatrix", ["clock-dot-matrix", "clock-weather-dot", "clock-dot-analog", "clock-dot-progress"], byId);
 
@@ -2360,6 +2463,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockAlias4 = stockItems[3].Alias;
         StockSymbol5 = stockItems[4].Symbol;
         StockAlias5 = stockItems[4].Alias;
+        StockQuantity1 = FormatQuantity(stockItems[0].Quantity);
+        StockQuantity2 = FormatQuantity(stockItems[1].Quantity);
+        StockQuantity3 = FormatQuantity(stockItems[2].Quantity);
+        StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
+        StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
         ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
@@ -2408,6 +2516,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         AlertsTakeoverMinutes = _settings.AirAlerts.TakeoverMinutes;
         _alertsTakeoverMode = _settings.AirAlerts.Takeover;
         OnPropertyChanged(nameof(AlertsTakeoverPreference));
+        _settings.Calendar ??= new CalendarSettings();
+        CalendarUrl = _settings.Calendar.IcsUrl;
+        _settings.WorldClock ??= new WorldClockSettings();
+        IReadOnlyList<WorldClockItem> clockItems = PadList(_settings.WorldClock.Items, 4, () => new WorldClockItem());
+        WorldClockLabel1 = clockItems[0].Label;
+        WorldClockZone1 = clockItems[0].TimeZoneId;
+        WorldClockLabel2 = clockItems[1].Label;
+        WorldClockZone2 = clockItems[1].TimeZoneId;
+        WorldClockLabel3 = clockItems[2].Label;
+        WorldClockZone3 = clockItems[2].TimeZoneId;
+        WorldClockLabel4 = clockItems[3].Label;
+        WorldClockZone4 = clockItems[3].TimeZoneId;
+        _settings.Countdown ??= new CountdownSettings();
+        IReadOnlyList<CountdownItem> countdownItems = PadList(_settings.Countdown.Items, 3, () => new CountdownItem());
+        CountdownTitle1 = countdownItems[0].Title;
+        CountdownDate1 = countdownItems[0].Date;
+        CountdownTitle2 = countdownItems[1].Title;
+        CountdownDate2 = countdownItems[1].Date;
+        CountdownTitle3 = countdownItems[2].Title;
+        CountdownDate3 = countdownItems[2].Date;
+        _settings.Ping ??= new PingSettings();
+        IReadOnlyList<string> pingHosts = PadList(_settings.Ping.Hosts, 4, () => string.Empty);
+        PingHost1 = pingHosts[0];
+        PingHost2 = pingHosts[1];
+        PingHost3 = pingHosts[2];
+        PingHost4 = pingHosts[3];
+        AdditionalDevices = string.Join(", ", _settings.AdditionalEndpoints ?? []);
+        _themeAccentOverrides = new Dictionary<string, string>(
+            _settings.ThemeAccentOverrides ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
+        OnPropertyChanged(nameof(CurrentThemeAccentColor));
+        OnPropertyChanged(nameof(CurrentThemeHasAccentOverride));
         _settings.Telegram ??= new TelegramSettings();
         TelegramApiId = _settings.Telegram.ApiId;
         TelegramApiHash = _settings.Telegram.ApiHash;
@@ -2519,7 +2659,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsHardwareTheme));
         OnPropertyChanged(nameof(IsGitHubTheme));
         OnPropertyChanged(nameof(IsAlertsTheme));
+        OnPropertyChanged(nameof(IsCalendarTheme));
+        OnPropertyChanged(nameof(IsCountdownTheme));
+        OnPropertyChanged(nameof(IsWorldClockTheme));
+        OnPropertyChanged(nameof(IsPingTheme));
         OnPropertyChanged(nameof(CurrentThemeRefreshSeconds));
+        OnPropertyChanged(nameof(CurrentThemeAccentColor));
+        OnPropertyChanged(nameof(CurrentThemeHasAccentOverride));
         OnPropertyChanged(nameof(IsPerformanceVisualTheme));
         OnPropertyChanged(nameof(IsMusicTheme));
         OnPropertyChanged(nameof(IsSystemTheme));
@@ -2660,13 +2806,42 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             RedForGain = StockRedForGain,
             Items =
             [
-                new StockItemSettings { Enabled = StockEnabled1, Symbol = StockSymbol1.Trim(), Alias = StockAlias1.Trim() },
-                new StockItemSettings { Enabled = StockEnabled2, Symbol = StockSymbol2.Trim(), Alias = StockAlias2.Trim() },
-                new StockItemSettings { Enabled = StockEnabled3, Symbol = StockSymbol3.Trim(), Alias = StockAlias3.Trim() },
-                new StockItemSettings { Enabled = StockEnabled4, Symbol = StockSymbol4.Trim(), Alias = StockAlias4.Trim() },
-                new StockItemSettings { Enabled = StockEnabled5, Symbol = StockSymbol5.Trim(), Alias = StockAlias5.Trim() }
+                new StockItemSettings { Enabled = StockEnabled1, Symbol = StockSymbol1.Trim(), Alias = StockAlias1.Trim(), Quantity = ParseQuantity(StockQuantity1) },
+                new StockItemSettings { Enabled = StockEnabled2, Symbol = StockSymbol2.Trim(), Alias = StockAlias2.Trim(), Quantity = ParseQuantity(StockQuantity2) },
+                new StockItemSettings { Enabled = StockEnabled3, Symbol = StockSymbol3.Trim(), Alias = StockAlias3.Trim(), Quantity = ParseQuantity(StockQuantity3) },
+                new StockItemSettings { Enabled = StockEnabled4, Symbol = StockSymbol4.Trim(), Alias = StockAlias4.Trim(), Quantity = ParseQuantity(StockQuantity4) },
+                new StockItemSettings { Enabled = StockEnabled5, Symbol = StockSymbol5.Trim(), Alias = StockAlias5.Trim(), Quantity = ParseQuantity(StockQuantity5) }
             ]
         };
+        _settings.Calendar = new CalendarSettings { IcsUrl = CalendarUrl.Trim() };
+        _settings.WorldClock = new WorldClockSettings
+        {
+            Items =
+            [
+                new WorldClockItem { Label = WorldClockLabel1.Trim(), TimeZoneId = WorldClockZone1.Trim() },
+                new WorldClockItem { Label = WorldClockLabel2.Trim(), TimeZoneId = WorldClockZone2.Trim() },
+                new WorldClockItem { Label = WorldClockLabel3.Trim(), TimeZoneId = WorldClockZone3.Trim() },
+                new WorldClockItem { Label = WorldClockLabel4.Trim(), TimeZoneId = WorldClockZone4.Trim() }
+            ]
+        };
+        _settings.Countdown = new CountdownSettings
+        {
+            Items =
+            [
+                new CountdownItem { Title = CountdownTitle1.Trim(), Date = CountdownDate1.Trim() },
+                new CountdownItem { Title = CountdownTitle2.Trim(), Date = CountdownDate2.Trim() },
+                new CountdownItem { Title = CountdownTitle3.Trim(), Date = CountdownDate3.Trim() }
+            ]
+        };
+        _settings.Ping = new PingSettings
+        {
+            Hosts = [PingHost1.Trim(), PingHost2.Trim(), PingHost3.Trim(), PingHost4.Trim()]
+        };
+        _settings.AdditionalEndpoints = AdditionalDevices
+            .Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(4)
+            .ToList();
+        _settings.ThemeAccentOverrides = new Dictionary<string, string>(_themeAccentOverrides, StringComparer.OrdinalIgnoreCase);
         _settings.Currency = new CurrencySettings
         {
             BaseCurrency = string.IsNullOrWhiteSpace(CurrencyBase) ? "USD" : CurrencyBase.Trim().ToUpperInvariant(),
@@ -2848,6 +3023,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 stocks = await GetStockSource().ReadAsync(
                     _settings.Stocks ?? new StockSettings(),
                     cancellationToken);
+                stocks = StockPortfolio.Attach(stocks, _settings.Stocks);
             }
 
             ClaudeUsageSnapshot? claudeUsage = null;
@@ -2903,6 +3079,29 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _alertsSnapshot = airAlerts;
             }
 
+            DiskSnapshot? disks = null;
+            if (requestedTheme.Id == "disks" || theme.Id == "disks")
+            {
+                disks = await Task.Run(_diskSource.Read, cancellationToken);
+                _diskSnapshot = disks;
+            }
+
+            PingSnapshot? ping = null;
+            if (requestedTheme.Id == "ping" || theme.Id == "ping")
+            {
+                ping = await _pingSource.ReadAsync(_settings.Ping, cancellationToken);
+                _pingSnapshot = ping;
+            }
+
+            CalendarSnapshot? calendar = null;
+            if (requestedTheme.Id == "calendar" || theme.Id == "calendar")
+            {
+                calendar = await _calendarSource.ReadAsync(
+                    _settings.Calendar ?? new CalendarSettings(),
+                    cancellationToken);
+                _calendarSnapshot = calendar;
+            }
+
             AiQuotaSnapshot aiQuota = AiQuotaSnapshot.Empty;
             if (requestedTheme.Id == "ai-quota" || theme.Id == "ai-quota")
             {
@@ -2931,7 +3130,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Crypto = crypto,
                 Hardware = hardware,
                 GitHub = gitHub,
-                AirAlerts = airAlerts
+                AirAlerts = airAlerts,
+                Disks = disks,
+                Ping = ping,
+                Calendar = calendar,
+                WorldClocks = WorldClockSnapshot.From(_settings.WorldClock),
+                Countdown = CountdownSnapshot.From(_settings.Countdown)
             };
 
             Action<ScreenCanvas>? popupOverlay = null;
@@ -2952,7 +3156,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 theme,
                 snapshot,
                 100,
-                GetAccentColor(),
+                GetAccentColor(theme.Id),
                 GetSelectedFontFamily(),
                 new ScreenDisplayOptions(
                     ImageTimePlacement,
@@ -3032,6 +3236,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         Dispatcher.UIThread.Post(RaiseDiagnosticsProperties);
         _lastPushedJpeg = _latestFrame.JpegBytes;
         SetDeviceStatus(result.Success);
+        await PushToAdditionalDevicesAsync(_latestFrame, cancellationToken);
+    }
+
+    /// <summary>
+    /// Mirrors the frame to the extra keyboards. Their failures show in the
+    /// diagnostics line but never affect the primary device's status.
+    /// </summary>
+    private async Task PushToAdditionalDevicesAsync(RenderedFrame frame, CancellationToken cancellationToken)
+    {
+        var endpoints = new List<Uri>();
+        foreach (string address in _settings.AdditionalEndpoints ?? [])
+        {
+            if (TryCreateEndpoint(address, out Uri extra))
+            {
+                endpoints.Add(extra);
+            }
+        }
+
+        if (endpoints.Count == 0)
+        {
+            if (_additionalPushStatus.Length > 0)
+            {
+                Dispatcher.UIThread.Post(() => AdditionalPushStatus = string.Empty);
+            }
+            return;
+        }
+
+        DevicePushResult[] results = await Task.WhenAll(
+            endpoints.Select(extra => _transport.PushAsync(extra, frame, cancellationToken)));
+        int succeeded = results.Count(pushResult => pushResult.Success);
+        Dispatcher.UIThread.Post(() =>
+            AdditionalPushStatus = Loc.T("DevicesExtraStatus", succeeded, endpoints.Count));
     }
 
     private void SetDeviceStatus(bool connected) =>
@@ -3061,10 +3297,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         Fonts.FirstOrDefault(item => item.Id == SelectedFontId)?.FontFamily
         ?? ScreenFontOption.Default.FontFamily;
 
-    private WpfColor GetAccentColor() =>
-        TryParseAccentColor(AccentColor, out WpfColor color)
+    private WpfColor GetAccentColor(string? themeId = null)
+    {
+        if (themeId is not null &&
+            _themeAccentOverrides.TryGetValue(themeId, out string? themeAccent) &&
+            TryParseAccentColor(themeAccent, out WpfColor themed))
+        {
+            return themed;
+        }
+
+        return TryParseAccentColor(AccentColor, out WpfColor color)
             ? color
             : WpfColor.FromRgb(228, 105, 76);
+    }
 
     private static bool TryParseAccentColor(string? value, out WpfColor color)
     {
@@ -3138,6 +3383,26 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         int.TryParse(value, out int parsed)
             ? Math.Clamp(parsed, minimum, maximum)
             : fallback;
+
+    private static IReadOnlyList<T> PadList<T>(List<T>? items, int size, Func<T> factory)
+    {
+        var padded = new List<T>(items ?? []);
+        while (padded.Count < size)
+        {
+            padded.Add(factory());
+        }
+        return padded;
+    }
+
+    private static string FormatQuantity(double quantity) =>
+        quantity > 0 ? quantity.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+
+    private static double ParseQuantity(string? value) =>
+        double.TryParse((value ?? string.Empty).Trim().Replace(',', '.'),
+            System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
+            out double parsed) && parsed > 0
+            ? parsed
+            : 0;
 
     private static bool TryCreateEndpoint(string? value, out Uri endpoint)
     {
@@ -3226,6 +3491,21 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Gpu?.TemperatureC),
                     hardwareSnapshot.UpdatedAt.ToString("HH:mm"))
                 : _hardwareSnapshot?.ErrorMessage ?? Loc.T("SummaryLocalOnly"),
+            "calendar" => _calendarSnapshot is { Available: true } calendarSnapshot
+                ? Loc.T("SummaryCalendar",
+                    calendarSnapshot.Events.Count,
+                    calendarSnapshot.UpdatedAt.ToString("HH:mm"))
+                : _calendarSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureCalendar"),
+            "ping" => _pingSnapshot is { Available: true } pingSnapshot
+                ? Loc.T("SummaryPing", pingSnapshot.Hosts.Count)
+                : Loc.T("SummaryPing", 0),
+            "disks" => _diskSnapshot is { Available: true } diskSnapshot
+                ? Loc.T("SummaryDisks", diskSnapshot.Volumes.Count)
+                : Loc.T("SummaryLocalOnly"),
+            "world-clock" => Loc.T("SummaryWorldClock",
+                WorldClockSnapshot.From(_settings.WorldClock).Clocks.Count),
+            "countdown" => Loc.T("SummaryCountdown",
+                CountdownSnapshot.From(_settings.Countdown).Events.Count),
             _ => Loc.T("SummaryLocalOnly")
         };
 
@@ -3267,6 +3547,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             "crypto" => Loc.T("LoadingCrypto"),
             "github" => Loc.T("LoadingGitHub"),
             "alerts" => Loc.T("LoadingAlerts"),
+            "calendar" => Loc.T("LoadingCalendar"),
             "ai-quota" => Loc.T("LoadingAiUsage"),
             "claude-usage" => Loc.T("LoadingClaude"),
             _ => Loc.T("LoadingTheme")

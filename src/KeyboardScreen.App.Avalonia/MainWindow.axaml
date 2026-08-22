@@ -277,6 +277,14 @@
                           </StackPanel>
                           <NumericUpDown Grid.Column="1" VerticalAlignment="Center" Classes="compact-value" Minimum="1" Maximum="600" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding CurrentThemeRefreshSeconds, Mode=TwoWay}" />
                         </Grid>
+                        <Grid ColumnDefinitions="*,Auto,8,Auto" ColumnSpacing="0">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ThemeAccentHeading}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ThemeAccentHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Grid.Column="1" VerticalAlignment="Center" Click="ThemeAccentButton_OnClick" Content="{infra:Localize ThemeAccentPick}" />
+                          <Button Grid.Column="3" VerticalAlignment="Center" IsEnabled="{Binding CurrentThemeHasAccentOverride}" Click="ThemeAccentResetButton_OnClick" Content="{infra:Localize ThemeAccentReset}" />
+                        </Grid>
                       </StackPanel>
                     </Border>
 
@@ -531,42 +539,50 @@
                               TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock Grid.Column="1" Classes="secondary" Text="{infra:Localize StocksSymbolLabel}" />
                           <TextBlock Grid.Column="3" Classes="secondary" Text="{infra:Localize StocksAliasLabel}" />
-                          <TextBlock Grid.Column="4" Margin="16,0,0,0" Classes="secondary" Text="{infra:Localize StocksShowLabel}" />
+                          <TextBlock Grid.Column="5" Classes="secondary" Text="{infra:Localize StocksQuantityPlaceholder}" />
+                          <TextBlock Grid.Column="6" Margin="16,0,0,0" Classes="secondary" Text="{infra:Localize StocksShowLabel}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="AAPL" Text="{Binding StockSymbol1, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Apple" Text="{Binding StockAlias1, Mode=TwoWay}" />
-                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot1CanDisable}" IsChecked="{Binding StockEnabled1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="5" MaxLength="12" Text="{Binding StockQuantity1, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="6" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot1CanDisable}" IsChecked="{Binding StockEnabled1, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="2" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="0700.HK" Text="{Binding StockSymbol2, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="{infra:Localize StocksAliasPlaceholder2}" Text="{Binding StockAlias2, Mode=TwoWay}" />
-                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot2CanDisable}" IsChecked="{Binding StockEnabled2, Mode=TwoWay}" />
+                          <TextBox Grid.Column="5" MaxLength="12" Text="{Binding StockQuantity2, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="6" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot2CanDisable}" IsChecked="{Binding StockEnabled2, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="3" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="BTC-USD" Text="{Binding StockSymbol3, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="Bitcoin" Text="{Binding StockAlias3, Mode=TwoWay}" />
-                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot3CanDisable}" IsChecked="{Binding StockEnabled3, Mode=TwoWay}" />
+                          <TextBox Grid.Column="5" MaxLength="12" Text="{Binding StockQuantity3, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="6" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot3CanDisable}" IsChecked="{Binding StockEnabled3, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="4" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="600519.SS" Text="{Binding StockSymbol4, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="{infra:Localize StocksAliasPlaceholder4}" Text="{Binding StockAlias4, Mode=TwoWay}" />
-                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot4CanDisable}" IsChecked="{Binding StockEnabled4, Mode=TwoWay}" />
+                          <TextBox Grid.Column="5" MaxLength="12" Text="{Binding StockQuantity4, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="6" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot4CanDisable}" IsChecked="{Binding StockEnabled4, Mode=TwoWay}" />
                         </Grid>
-                        <Grid ColumnDefinitions="24,150,10,120,Auto">
+                        <Grid ColumnDefinitions="24,118,10,96,10,64,Auto">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="5" />
                           <TextBox Grid.Column="1" MaxLength="24" PlaceholderText="000001.SZ" Text="{Binding StockSymbol5, Mode=TwoWay}" />
                           <TextBox Grid.Column="3" MaxLength="12" PlaceholderText="{infra:Localize StocksAliasPlaceholder5}" Text="{Binding StockAlias5, Mode=TwoWay}" />
-                          <ToggleSwitch Grid.Column="4" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot5CanDisable}" IsChecked="{Binding StockEnabled5, Mode=TwoWay}" />
+                          <TextBox Grid.Column="5" MaxLength="12" Text="{Binding StockQuantity5, Mode=TwoWay}" />
+                          <ToggleSwitch Grid.Column="6" HorizontalAlignment="Left" Margin="16,0,0,0" MinWidth="58" OnContent="" OffContent="" IsEnabled="{Binding StockSlot5CanDisable}" IsChecked="{Binding StockEnabled5, Mode=TwoWay}" />
                         </Grid>
+
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize StocksPortfolioHint}" TextWrapping="Wrap" />
 
                         <Grid ColumnDefinitions="*,220">
                           <StackPanel VerticalAlignment="Center" Spacing="4">
@@ -634,6 +650,86 @@
                         <Grid ColumnDefinitions="*,120" IsEnabled="{Binding AlertsTakeoverMinutesEnabled}">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize AlertsTakeoverMinutesLabel}" />
                           <NumericUpDown Grid.Column="1" Minimum="1" Maximum="180" Increment="1" FormatString="0" Value="{Binding AlertsTakeoverMinutes, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsCalendarTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CalendarHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize CalendarHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CalendarUrlLabel}" />
+                          <TextBox Grid.Column="1" PasswordChar="*" Text="{Binding CalendarUrl, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CalendarUrlHint}" TextWrapping="Wrap" />
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsWorldClockTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize WorldClockHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize WorldClockHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="24,150,10,*" ColumnSpacing="0" RowDefinitions="Auto,8,Auto,8,Auto,8,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
+                          <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="{infra:Localize WorldClockCityLabel}" Text="{Binding WorldClockLabel1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="40" PlaceholderText="Europe/Kyiv" Text="{Binding WorldClockZone1, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="secondary" Text="2" />
+                          <TextBox Grid.Row="2" Grid.Column="1" MaxLength="20" PlaceholderText="{infra:Localize WorldClockCityLabel}" Text="{Binding WorldClockLabel2, Mode=TwoWay}" />
+                          <TextBox Grid.Row="2" Grid.Column="3" MaxLength="40" PlaceholderText="Europe/Warsaw" Text="{Binding WorldClockZone2, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="secondary" Text="3" />
+                          <TextBox Grid.Row="4" Grid.Column="1" MaxLength="20" PlaceholderText="{infra:Localize WorldClockCityLabel}" Text="{Binding WorldClockLabel3, Mode=TwoWay}" />
+                          <TextBox Grid.Row="4" Grid.Column="3" MaxLength="40" PlaceholderText="America/New_York" Text="{Binding WorldClockZone3, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="6" VerticalAlignment="Center" Classes="secondary" Text="4" />
+                          <TextBox Grid.Row="6" Grid.Column="1" MaxLength="20" PlaceholderText="{infra:Localize WorldClockCityLabel}" Text="{Binding WorldClockLabel4, Mode=TwoWay}" />
+                          <TextBox Grid.Row="6" Grid.Column="3" MaxLength="40" PlaceholderText="Asia/Tokyo" Text="{Binding WorldClockZone4, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsCountdownTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CountdownHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize CountdownHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="24,*,10,150" ColumnSpacing="0" RowDefinitions="Auto,8,Auto,8,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
+                          <TextBox Grid.Column="1" MaxLength="40" PlaceholderText="{infra:Localize CountdownTitleLabel}" Text="{Binding CountdownTitle1, Mode=TwoWay}" />
+                          <TextBox Grid.Column="3" MaxLength="20" PlaceholderText="31.12.2026 18:30" Text="{Binding CountdownDate1, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="secondary" Text="2" />
+                          <TextBox Grid.Row="2" Grid.Column="1" MaxLength="40" PlaceholderText="{infra:Localize CountdownTitleLabel}" Text="{Binding CountdownTitle2, Mode=TwoWay}" />
+                          <TextBox Grid.Row="2" Grid.Column="3" MaxLength="20" PlaceholderText="2027-05-01" Text="{Binding CountdownDate2, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="secondary" Text="3" />
+                          <TextBox Grid.Row="4" Grid.Column="1" MaxLength="40" PlaceholderText="{infra:Localize CountdownTitleLabel}" Text="{Binding CountdownTitle3, Mode=TwoWay}" />
+                          <TextBox Grid.Row="4" Grid.Column="3" MaxLength="20" PlaceholderText="24.08.2026" Text="{Binding CountdownDate3, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsPingTheme}" Classes="card">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize PingHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize PingHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="24,*" ColumnSpacing="0" RowDefinitions="Auto,8,Auto,8,Auto,8,Auto">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="1" />
+                          <TextBox Grid.Column="1" MaxLength="64" PlaceholderText="192.168.1.1" Text="{Binding PingHost1, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="secondary" Text="2" />
+                          <TextBox Grid.Row="2" Grid.Column="1" MaxLength="64" PlaceholderText="1.1.1.1" Text="{Binding PingHost2, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="secondary" Text="3" />
+                          <TextBox Grid.Row="4" Grid.Column="1" MaxLength="64" PlaceholderText="example.com" Text="{Binding PingHost3, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="6" VerticalAlignment="Center" Classes="secondary" Text="4" />
+                          <TextBox Grid.Row="6" Grid.Column="1" MaxLength="64" Text="{Binding PingHost4, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
                       </StackPanel>
@@ -716,6 +812,8 @@
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="4" />
                           <TextBox Grid.Column="1" MaxLength="20" PlaceholderText="TONUSDT" Text="{Binding CryptoSymbol4, Mode=TwoWay}" />
                         </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize StocksPortfolioHint}" TextWrapping="Wrap" />
+
                         <Grid ColumnDefinitions="*,220">
                           <StackPanel VerticalAlignment="Center" Spacing="4">
                             <TextBlock FontWeight="SemiBold" Text="{infra:Localize StocksColorLabel}" />
@@ -993,10 +1091,17 @@
                       </StackPanel>
                     </Border>
 <Border Classes="card" Padding="16">
-                      <Grid ColumnDefinitions="92,*">
-                        <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DeviceAddress}" />
-                        <controls:IpAddressEditor Grid.Column="1" Value="{Binding DeviceIp, Mode=TwoWay}" />
-                      </Grid>
+                      <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="92,*">
+                          <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DeviceAddress}" />
+                          <controls:IpAddressEditor Grid.Column="1" Value="{Binding DeviceIp, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize DevicesExtraLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="128" PlaceholderText="192.168.1.51, 192.168.1.52" Text="{Binding AdditionalDevices, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize DevicesExtraHint}" TextWrapping="Wrap" />
+                      </StackPanel>
                     </Border>
 
                     <Border Classes="card" Padding="16">
@@ -1012,6 +1117,7 @@
                           <TextBlock Grid.Row="2" Grid.Column="1" Classes="secondary" Text="{Binding DiagnosticsErrorsText}" TextWrapping="Wrap" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{Binding DiagnosticsDetailText}" />
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding AdditionalPushStatus}" IsVisible="{Binding AdditionalPushStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
                     </Border>
 

@@ -16,8 +16,10 @@ public static class ThemeRefreshPolicy
     public static int DefaultSeconds(string? themeId) => themeId switch
     {
         "weather-five-day" or "stocks" or "currency" or "ai-quota" or "claude-usage" => 60,
-        "crypto" or "clock-weather-dot" or "clock-dot-progress" or "alerts" => 30,
-        "github" => 300,
+        "crypto" or "clock-weather-dot" or "clock-dot-progress" or "alerts" or "ping" => 30,
+        "disks" or "countdown" => 60,
+        "github" or "calendar" => 300,
+        "world-clock" => 5,
         _ => 0
     };
 

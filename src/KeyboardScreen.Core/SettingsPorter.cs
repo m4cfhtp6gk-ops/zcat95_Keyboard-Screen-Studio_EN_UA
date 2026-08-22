@@ -29,6 +29,9 @@ public static class SettingsPorter
         clone.Telegram.PhoneNumber = string.Empty;
         clone.AirAlerts ??= new AirAlertSettings();
         clone.AirAlerts.Token = string.Empty;
+        // A private ICS link embeds an access token in the URL itself.
+        clone.Calendar ??= new CalendarSettings();
+        clone.Calendar.IcsUrl = string.Empty;
         return JsonSerializer.Serialize(clone, JsonOptions);
     }
 
@@ -72,6 +75,12 @@ public static class SettingsPorter
         if (string.IsNullOrWhiteSpace(imported.AirAlerts.Token))
         {
             imported.AirAlerts.Token = current.AirAlerts?.Token ?? string.Empty;
+        }
+
+        imported.Calendar ??= new CalendarSettings();
+        if (string.IsNullOrWhiteSpace(imported.Calendar.IcsUrl))
+        {
+            imported.Calendar.IcsUrl = current.Calendar?.IcsUrl ?? string.Empty;
         }
 
         return imported;

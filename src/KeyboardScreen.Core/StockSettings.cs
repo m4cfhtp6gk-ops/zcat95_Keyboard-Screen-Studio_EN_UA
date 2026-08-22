@@ -30,4 +30,7 @@ public sealed class StockItemSettings
     public string Symbol { get; set; } = string.Empty;
 
     public string Alias { get; set; } = string.Empty;
+
+    /// <summary>Shares held; zero keeps the symbol out of the portfolio row.</summary>
+    public double Quantity { get; set; }
 }

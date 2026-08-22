@@ -106,7 +106,7 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
         var longitude = location.Longitude.ToString("0.####", CultureInfo.InvariantCulture);
         var uri = $"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}"
             + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day"
-            + "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto";
+            + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=5&timezone=auto";
         using var response = await _client.GetAsync(uri, cancellationToken);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -116,6 +116,7 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
             throw new InvalidOperationException(Loc.T("WeatherNoCurrentData"));
         }
 
+        (DateTimeOffset? sunrise, DateTimeOffset? sunset) = ReadSunTimes(document.RootElement);
         return new WeatherSnapshot(
             true,
             location.Name,
@@ -125,7 +126,60 @@ public sealed class OpenMeteoWeatherSnapshotSource : IWeatherSnapshotSource, IDi
             current.GetProperty("weather_code").GetInt32(),
             current.GetProperty("is_day").GetInt32() == 1,
             DateTimeOffset.Now,
-            DailyForecast: ReadDailyForecast(document.RootElement));
+            DailyForecast: ReadDailyForecast(document.RootElement),
+            Sunrise: sunrise,
+            Sunset: sunset,
+            EuropeanAqi: await ReadAirQualityAsync(latitude, longitude, cancellationToken));
+    }
+
+    /// <summary>Today's sunrise/sunset; the API returns local wall-clock strings under timezone=auto.</summary>
+    private static (DateTimeOffset?, DateTimeOffset?) ReadSunTimes(JsonElement root)
+    {
+        if (!root.TryGetProperty("daily", out var daily))
+        {
+            return (null, null);
+        }
+
+        return (ParseLocalTime(daily, "sunrise"), ParseLocalTime(daily, "sunset"));
+
+        static DateTimeOffset? ParseLocalTime(JsonElement daily, string property) =>
+            daily.TryGetProperty(property, out var list)
+                && list.ValueKind == JsonValueKind.Array
+                && list.GetArrayLength() > 0
+                && DateTime.TryParseExact(list[0].GetString(), "yyyy-MM-dd'T'HH:mm",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed)
+                ? new DateTimeOffset(parsed, DateTimeOffset.Now.Offset)
+                : null;
+    }
+
+    /// <summary>
+    /// The European AQI from Open-Meteo's separate air-quality endpoint; any
+    /// failure just leaves the reading out - it must never break the weather.
+    /// </summary>
+    private async Task<int?> ReadAirQualityAsync(string latitude, string longitude, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var uri = $"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={latitude}&longitude={longitude}"
+                + "&current=european_aqi";
+            using var response = await _client.GetAsync(uri, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            return document.RootElement.TryGetProperty("current", out var current)
+                && current.TryGetProperty("european_aqi", out var aqi)
+                && aqi.ValueKind == JsonValueKind.Number
+                    ? (int)Math.Round(aqi.GetDouble())
+                    : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return null;
+        }
     }
 
     private static IReadOnlyList<DailyWeatherForecast> ReadDailyForecast(JsonElement root)

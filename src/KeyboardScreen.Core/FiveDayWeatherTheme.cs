@@ -62,8 +62,36 @@ public sealed class FiveDayWeatherTheme : IScreenTheme
                 canvas.AccentColor);
         }
 
+        DrawSunAndAir(canvas, weather, safe, secondary);
+
         var updateText = weather.IsStale ? Loc.T("ScreenWeatherStale") : Loc.T("ScreenWeatherUpdated", DisplayUnits.Time(weather.UpdatedAt));
         canvas.AlignedText(updateText, 9, secondary,
             new Rect(safe.Left, safe.Bottom - 18, safe.Width, 13), FontWeights.Normal, TextAlignment.Center);
     }
+
+    /// <summary>Sunrise/sunset plus the air-quality index, when the source has them.</summary>
+    private static void DrawSunAndAir(ScreenCanvas canvas, WeatherSnapshot weather, Rect safe, Color secondary)
+    {
+        var band = new Rect(safe.Left, safe.Bottom - 37, safe.Width, 14);
+        if (weather is { Sunrise: { } sunrise, Sunset: { } sunset })
+        {
+            canvas.AlignedText("↑" + DisplayUnits.Time(sunrise) + " ↓" + DisplayUnits.Time(sunset),
+                9, secondary, band, FontWeights.Medium, TextAlignment.Left);
+        }
+        if (weather.EuropeanAqi is { } aqi)
+        {
+            // The band word has no room here; the color carries it instead.
+            canvas.AlignedText(Loc.T("ScreenAqi", aqi), 9, AqiColor(aqi),
+                band, FontWeights.SemiBold, TextAlignment.Right);
+        }
+    }
+
+    private static Color AqiColor(int aqi) => aqi switch
+    {
+        < 20 => Color.FromRgb(64, 186, 120),
+        < 40 => Color.FromRgb(168, 190, 84),
+        < 60 => Color.FromRgb(232, 158, 74),
+        < 80 => Color.FromRgb(232, 110, 74),
+        _ => Color.FromRgb(224, 68, 68)
+    };
 }
