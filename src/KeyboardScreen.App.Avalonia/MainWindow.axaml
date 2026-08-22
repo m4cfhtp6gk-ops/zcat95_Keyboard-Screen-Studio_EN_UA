@@ -843,6 +843,36 @@
                       </StackPanel>
                     </Border>
 
+                    <Border Classes="card">
+                      <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize CarouselHeading}" />
+                            <TextBlock Classes="secondary" Text="{infra:Localize CarouselHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding CarouselEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="150,*,72" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CarouselIntervalLabel}" />
+                          <Slider Grid.Column="1" IsEnabled="{Binding CarouselEnabled}" Minimum="10" Maximum="600" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding CarouselIntervalSeconds, Mode=TwoWay}" />
+                          <NumericUpDown Grid.Column="2" Classes="compact-value" IsEnabled="{Binding CarouselEnabled}" Minimum="10" Maximum="600" Increment="10" FormatString="0" ShowButtonSpinner="False" Value="{Binding CarouselIntervalSeconds, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CarouselPickHint}" />
+                        <ItemsControl IsEnabled="{Binding CarouselEnabled}" ItemsSource="{Binding CarouselOptions}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <CheckBox Margin="0,0,14,8" IsChecked="{Binding Included, Mode=TwoWay}" Content="{Binding Theme.Name}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">

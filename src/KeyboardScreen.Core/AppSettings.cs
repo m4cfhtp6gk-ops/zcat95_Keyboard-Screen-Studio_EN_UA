@@ -86,6 +86,8 @@ public sealed class AppSettings
 
 	public NotificationSettings Notifications { get; set; } = new();
 
+	public CarouselSettings Carousel { get; set; } = new();
+
 
 
 

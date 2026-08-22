@@ -1242,6 +1242,23 @@ catch (InvalidOperationException)
 Assert(portThrew, "invalid JSON must be rejected with the localized message");
 Console.WriteLine("PASS settings porter: secrets stripped, merge on import, invalid input");
 
+// ---- theme carousel ----------------------------------------------------------
+var carousel = new CarouselSettings { Enabled = true, IntervalSeconds = 30, ThemeIds = ["clock", "system", "clock"] };
+Assert(ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "clock"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(29)) == "clock"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(30)) == "system"
+    && ThemeCarousel.ResolveThemeId(carousel, "image", DateTimeOffset.FromUnixTimeSeconds(60)) == "clock",
+    "the carousel must rotate on the wall clock with duplicates removed");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = false, ThemeIds = ["clock", "system"] }, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "a disabled carousel keeps the selected theme");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = true, ThemeIds = ["clock"] }, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "fewer than two themes keeps the selected theme");
+Assert(ThemeCarousel.ResolveThemeId(new CarouselSettings { Enabled = true, IntervalSeconds = 1, ThemeIds = ["clock", "system"] }, "image", DateTimeOffset.FromUnixTimeSeconds(15)) == "system",
+    "the interval must clamp to the 10-second floor");
+Assert(ThemeCarousel.ResolveThemeId(null, "image", DateTimeOffset.FromUnixTimeSeconds(0)) == "image",
+    "missing settings keep the selected theme");
+Console.WriteLine("PASS theme carousel: rotation, dedup, clamps");
+
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();
 Assert(shippedLanguages.Length == 3, "three languages should ship");

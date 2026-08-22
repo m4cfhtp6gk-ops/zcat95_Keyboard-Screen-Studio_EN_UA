@@ -958,10 +958,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
                 mediaPlaying,
-                requestedTheme.Id);
+                carouselId);
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
             {
                 effectiveId = ThemeSchedule.ResolveThemeId(_settings.Schedule, effectiveId, scheduleNow);

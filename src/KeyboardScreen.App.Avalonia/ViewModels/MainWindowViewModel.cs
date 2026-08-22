@@ -14,6 +14,20 @@ using WpfFontFamily = KeyboardScreen.Core.FontFamily;
 
 namespace KeyboardScreen.App.Avalonia.ViewModels;
 
+/// <summary>A theme's membership checkbox in the carousel card.</summary>
+public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action changed) : ObservableObject
+{
+    private bool _included;
+
+    public ThemeItemViewModel Theme { get; } = theme;
+
+    public bool Included
+    {
+        get => _included;
+        set { if (SetProperty(ref _included, value)) changed(); }
+    }
+}
+
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly ISystemSnapshotSource _systemSource = new WindowsSystemSnapshotSource();
@@ -147,6 +161,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private int _hardwarePageSeconds = 5;
     private HardwareSnapshot? _hardwareSnapshot;
     private HardwareMonitorTheme? _hardwareTheme;
+    private bool _carouselEnabled;
+    private int _carouselIntervalSeconds = 30;
     private string _gitHubUsername = string.Empty;
     private string _gitHubToken = string.Empty;
     private GitHubContributionSnapshot? _gitHubSnapshot;
@@ -226,6 +242,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ObservableCollection<ThemeGroupViewModel> ThemeGroups { get; } = [];
     public ObservableCollection<ThemeItemViewModel> IdleThemeOptions { get; } = [];
     public ObservableCollection<ThemeItemViewModel> MusicThemeOptions { get; } = [];
+    public ObservableCollection<CarouselOptionViewModel> CarouselOptions { get; } = [];
     public ObservableCollection<TokscaleDataOption> TokscaleOptions { get; } = [];
     public IReadOnlyList<AiUsageModeOption> AiUsageModes { get; } =
     [
@@ -1403,6 +1420,25 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsPomodoroRunning => _pomodoroTimer.IsRunning;
 
+    public bool CarouselEnabled
+    {
+        get => _carouselEnabled;
+        set { if (SetProperty(ref _carouselEnabled, value)) ScheduleCommit(); }
+    }
+
+    public int CarouselIntervalSeconds
+    {
+        get => _carouselIntervalSeconds;
+        set { if (SetProperty(ref _carouselIntervalSeconds, Math.Clamp(value, 10, 600))) ScheduleCommit(); }
+    }
+
+    private CarouselSettings BuildCarouselSettings() => new()
+    {
+        Enabled = CarouselEnabled,
+        IntervalSeconds = CarouselIntervalSeconds,
+        ThemeIds = CarouselOptions.Where(option => option.Included).Select(option => option.Theme.Id).ToList()
+    };
+
     public void TogglePomodoro()
     {
         if (_pomodoroTimer.IsRunning)
@@ -2095,9 +2131,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
         IdleThemeOptions.Clear();
         MusicThemeOptions.Clear();
+        CarouselOptions.Clear();
         foreach (ThemeItemViewModel item in ThemeGroups.SelectMany(group => group.Themes))
         {
             (MediaThemeAutomation.IsMusicThemeId(item.Id) ? MusicThemeOptions : IdleThemeOptions).Add(item);
+            CarouselOptions.Add(new CarouselOptionViewModel(item, ScheduleCommit));
         }
     }
 
@@ -2197,6 +2235,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         TelegramPopupsEnabled = _settings.Telegram.PopupsEnabled;
         TelegramPrivacyMode = _settings.Telegram.PrivacyMode;
         TelegramPopupSeconds = _settings.Telegram.PopupSeconds;
+        _settings.Carousel ??= new CarouselSettings();
+        CarouselEnabled = _settings.Carousel.Enabled;
+        CarouselIntervalSeconds = _settings.Carousel.IntervalSeconds;
+        var carouselIds = new HashSet<string>(_settings.Carousel.ThemeIds ?? [], StringComparer.OrdinalIgnoreCase);
+        foreach (CarouselOptionViewModel option in CarouselOptions)
+        {
+            option.Included = carouselIds.Contains(option.Theme.Id);
+        }
         _settings.Notifications ??= new NotificationSettings();
         NotifyEnabled = _settings.Notifications.Enabled;
         NotifyClaude = _settings.Notifications.ClaudeThresholds;
@@ -2476,6 +2522,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         };
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
+        _settings.Carousel = BuildCarouselSettings();
         UpdateRenderer();
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
@@ -2488,7 +2535,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 await Task.Delay(TimeSpan.FromSeconds(RefreshSeconds), cancellationToken);
                 bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true)
+                if (!staticImage || AutoMediaThemeSwitch || _settings.Schedule?.Enabled == true ||
+                    _settings.Carousel?.Enabled == true)
                 {
                     await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
                 }
@@ -2539,10 +2587,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
             bool mediaPlaying = music.Available && music.IsPlaying;
             DateTimeOffset scheduleNow = DateTimeOffset.Now;
+            // Layering, lowest first: carousel substitutes the selected theme,
+            // media automation may override it, the night theme wins at idle.
+            string carouselId = ThemeCarousel.ResolveThemeId(_settings.Carousel, requestedTheme.Id, scheduleNow);
             string effectiveId = MediaThemeAutomation.ResolveThemeId(
                 _settings,
                 mediaPlaying,
-                requestedTheme.Id);
+                carouselId);
             // Media automation outranks the schedule, but only while it is
             // actually showing the playing theme; the night theme applies otherwise.
             if (!(mediaPlaying && (_settings.AutoMediaThemeSwitch || _settings.AutoSwitchToMusic)))
