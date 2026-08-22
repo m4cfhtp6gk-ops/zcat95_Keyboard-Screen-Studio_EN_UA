@@ -195,6 +195,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _knobKeyForward = "F13";
     private string _knobKeyBackward = "F14";
     private string _knobKeyToggle = "F15";
+    private string _knobDeviceKey = string.Empty;
+    private List<int> _knobUsages = [];
+    private KnobInputListener? _knobDetector;
+    private readonly HashSet<KnobObservation> _knobHeard = new();
+    private readonly HashSet<KnobObservation> _knobOtherHeard = new();
+    private int _knobDetectStep;
+    private string _knobDetectResult = string.Empty;
     private Dictionary<string, string> _themeAccentOverrides = new(StringComparer.OrdinalIgnoreCase);
     private string _worldClockLabel1 = string.Empty, _worldClockLabel2 = string.Empty,
         _worldClockLabel3 = string.Empty, _worldClockLabel4 = string.Empty;
@@ -261,6 +268,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
         OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         OpenAlertsSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://alerts.in.ua"));
+        StartKnobDetectCommand = new RelayCommand(StartKnobDetect);
+        KnobDetectNextCommand = new RelayCommand(() => SetKnobDetectStep(2));
+        KnobDetectFinishCommand = new RelayCommand(FinishKnobDetect);
+        KnobDetectSkipCommand = new RelayCommand(() => { _knobOtherHeard.Clear(); FinishKnobDetect(); });
+        KnobDetectCloseCommand = new RelayCommand(CancelKnobDetect);
+        ClearKnobBindingCommand = new RelayCommand(ClearKnobBinding);
         RestartElevatedCommand = new RelayCommand(RestartElevated);
         RefreshTokscaleCommand = new AsyncCommand(() => RefreshTokscaleAsync(force: true));
         StartPomodoroCommand = new RelayCommand(StartPomodoro);
@@ -302,6 +315,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenTokscaleDocsCommand { get; }
     public ICommand OpenClaudeSiteCommand { get; }
     public ICommand OpenAlertsSiteCommand { get; }
+    public ICommand StartKnobDetectCommand { get; }
+    public ICommand KnobDetectNextCommand { get; }
+    public ICommand KnobDetectFinishCommand { get; }
+    public ICommand KnobDetectSkipCommand { get; }
+    public ICommand KnobDetectCloseCommand { get; }
+    public ICommand ClearKnobBindingCommand { get; }
     public ICommand RestartElevatedCommand { get; }
     public ICommand RefreshTokscaleCommand { get; }
     public ICommand StartPomodoroCommand { get; }
@@ -1595,6 +1614,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// The HID collection the detector learned. A knob and the same keyboard's
+    /// Fn media keys share a VID and PID, so this - not the VID/PID - is what
+    /// lets one be bound while the others keep controlling the volume.
+    /// </summary>
+    public string KnobBoundDescription => _knobDeviceKey.Length == 0
+        ? Loc.T("KnobBoundNone")
+        : _knobUsages.Count == 0
+            ? _knobDeviceKey
+            : _knobDeviceKey + " · " + string.Join(", ", _knobUsages.Select(usage => KnobControl.DescribeUsage((ushort)usage)));
+
+    public bool HasKnobBinding => _knobDeviceKey.Length > 0;
+
+    public bool IsKnobDetecting => _knobDetectStep is 1 or 2;
+    public bool IsKnobDetectingKnob => _knobDetectStep == 1;
+    public bool IsKnobDetectingOthers => _knobDetectStep == 2;
+    public bool IsKnobDetectDone => _knobDetectStep == 3;
+
+    /// <summary>Everything heard so far in the current step, so the user can see it working.</summary>
+    public string KnobDetectHeard
+    {
+        get
+        {
+            IReadOnlyCollection<KnobObservation> heard = _knobDetectStep == 2 ? _knobOtherHeard : _knobHeard;
+            return heard.Count == 0
+                ? Loc.T("KnobDetectNothing")
+                : string.Join("\n", heard.Select(DescribeObservation));
+        }
+    }
+
+    public string KnobDetectResult => _knobDetectResult;
+
     /// <summary>Display-text picker over the stored enum, like <see cref="StockSourcePreference"/>.</summary>
     public string KnobModePreference
     {
@@ -2492,6 +2543,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _airAlertSource.Dispose();
         _calendarSource.Dispose();
         _knobListener?.Dispose();
+        _knobDetector?.Dispose();
         _telegramPopupDelay?.Cancel();
         _telegramPopupDelay?.Dispose();
         if (_telegramService is not null)
@@ -2721,6 +2773,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _knobKeyForward = _settings.Knob.KeyForward;
         _knobKeyBackward = _settings.Knob.KeyBackward;
         _knobKeyToggle = _settings.Knob.KeyToggle;
+        _knobDeviceKey = _settings.Knob.DeviceKey ?? string.Empty;
+        _knobUsages = _settings.Knob.Usages is { } savedUsages ? [.. savedUsages] : [];
         OnPropertyChanged(nameof(KnobEnabled));
         OnPropertyChanged(nameof(KnobSuppressVolume));
         OnPropertyChanged(nameof(KnobVidPid));
@@ -2730,6 +2784,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(KnobKeyForward));
         OnPropertyChanged(nameof(KnobKeyBackward));
         OnPropertyChanged(nameof(KnobKeyToggle));
+        OnPropertyChanged(nameof(KnobBoundDescription));
+        OnPropertyChanged(nameof(HasKnobBinding));
         _themeAccentOverrides = new Dictionary<string, string>(
             _settings.ThemeAccentOverrides ?? new Dictionary<string, string>(),
             StringComparer.OrdinalIgnoreCase);
@@ -2818,11 +2874,147 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     /// (Re)creates the knob listener to match the current settings. With the
     /// feature off no listener exists at all - no hook, no registration.
     /// </summary>
+    /// <summary>
+    /// Learns which HID collection the knob speaks on. The listener this starts
+    /// only watches - it never swallows a key and never switches a theme - so
+    /// the volume keeps working throughout, and the acting listener is stopped
+    /// meanwhile so a half-known binding cannot fire.
+    /// </summary>
+    private void StartKnobDetect()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        _knobListener?.Dispose();
+        _knobListener = null;
+        _knobDetector?.Dispose();
+        _knobDetector = null;
+        _knobDetectResult = string.Empty;
+        _knobHeard.Clear();
+        _knobOtherHeard.Clear();
+
+        try
+        {
+            _knobDetector = new KnobInputListener(observation =>
+                Dispatcher.UIThread.Post(() => NoteKnobObservation(observation)));
+        }
+        catch (Exception)
+        {
+            _knobDetector = null;
+            return;
+        }
+
+        SetKnobDetectStep(1);
+    }
+
+    private void NoteKnobObservation(KnobObservation observation)
+    {
+        if (_knobDetectStep is not (1 or 2))
+        {
+            return;
+        }
+
+        HashSet<KnobObservation> target = _knobDetectStep == 2 ? _knobOtherHeard : _knobHeard;
+        // A held key repeats; the cap keeps a forgotten detector from growing a
+        // list nobody will read.
+        if (target.Count >= 32 || !target.Add(observation))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(KnobDetectHeard));
+    }
+
+    private void SetKnobDetectStep(int step)
+    {
+        _knobDetectStep = step;
+        OnPropertyChanged(nameof(IsKnobDetecting));
+        OnPropertyChanged(nameof(IsKnobDetectingKnob));
+        OnPropertyChanged(nameof(IsKnobDetectingOthers));
+        OnPropertyChanged(nameof(IsKnobDetectDone));
+        OnPropertyChanged(nameof(KnobDetectHeard));
+        OnPropertyChanged(nameof(KnobDetectResult));
+    }
+
+    private void FinishKnobDetect()
+    {
+        _knobDetector?.Dispose();
+        _knobDetector = null;
+
+        KnobObservation[] knob = [.. _knobHeard.Where(observation => observation.VirtualKey == 0)];
+        KnobObservation[] others = [.. _knobOtherHeard.Where(observation => observation.VirtualKey == 0)];
+        int[] hotKeys = [.. _knobHeard
+            .Select(observation => observation.VirtualKey)
+            .Where(key => key is >= 0x7C and <= 0x87)
+            .Distinct()
+            .Order()];
+
+        if (knob.Length == 0 && hotKeys.Length > 0)
+        {
+            // The encoder is already remapped in VIA/QMK, so no volume key is
+            // involved at all and hot-key mode is both simpler and exact.
+            _knobDetectResult = Loc.T("KnobDetectResultHotKeys",
+                string.Join(", ", hotKeys.Select(key => "F" + (13 + key - 0x7C))));
+        }
+        else if (knob.Length == 0)
+        {
+            _knobDetectResult = Loc.T("KnobDetectResultNothing");
+        }
+        else if (KnobControl.PickBinding(knob, others) is { } binding)
+        {
+            _knobDeviceKey = binding.DeviceKey;
+            _knobUsages = [.. binding.Usages];
+            OnPropertyChanged(nameof(KnobBoundDescription));
+            OnPropertyChanged(nameof(HasKnobBinding));
+            _knobDetectResult = Loc.T("KnobDetectResultBound", KnobBoundDescription);
+            ScheduleCommit();
+        }
+        else
+        {
+            // One collection, the same usages: nothing in user mode can tell the
+            // knob from the keys, so the binding is left alone rather than made
+            // to look like it worked.
+            _knobDetectResult = Loc.T("KnobDetectResultSame");
+        }
+
+        SetKnobDetectStep(3);
+        RestartKnobListener();
+    }
+
+    private void CancelKnobDetect()
+    {
+        _knobDetector?.Dispose();
+        _knobDetector = null;
+        SetKnobDetectStep(0);
+        RestartKnobListener();
+    }
+
+    private void ClearKnobBinding()
+    {
+        _knobDeviceKey = string.Empty;
+        _knobUsages = [];
+        _knobDetectResult = string.Empty;
+        OnPropertyChanged(nameof(KnobBoundDescription));
+        OnPropertyChanged(nameof(HasKnobBinding));
+        OnPropertyChanged(nameof(KnobDetectResult));
+        RestartKnobListener();
+        ScheduleCommit();
+    }
+
+    private static string DescribeObservation(KnobObservation observation) =>
+        observation.DeviceKey + " · " + (observation.VirtualKey != 0
+            ? Loc.T("KnobHeardKey", "0x" + observation.VirtualKey.ToString("X2", CultureInfo.InvariantCulture))
+            : KnobControl.DescribeUsage(observation.Usage));
+
     private void RestartKnobListener()
     {
         _knobListener?.Dispose();
         _knobListener = null;
-        if (!KnobEnabled || _loading || !OperatingSystem.IsWindows())
+        // The detector owns the input while it runs; two listeners would mean
+        // two low-level hooks fighting over the same keys.
+        if (!KnobEnabled || _loading || _knobDetector is not null || !OperatingSystem.IsWindows())
         {
             return;
         }
@@ -2836,6 +3028,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     Mode = _knobMode,
                     SuppressVolume = KnobSuppressVolume,
                     VidPid = KnobVidPid,
+                    DeviceKey = _knobDeviceKey,
+                    Usages = [.. _knobUsages],
                     KeyForward = KnobKeyForward,
                     KeyBackward = KnobKeyBackward,
                     KeyToggle = KnobKeyToggle
@@ -3095,7 +3289,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             VidPid = KnobVidPid.Trim(),
             KeyForward = KnobKeyForward,
             KeyBackward = KnobKeyBackward,
-            KeyToggle = KnobKeyToggle
+            KeyToggle = KnobKeyToggle,
+            DeviceKey = _knobDeviceKey,
+            Usages = [.. _knobUsages]
         };
         _settings.Currency = new CurrencySettings
         {

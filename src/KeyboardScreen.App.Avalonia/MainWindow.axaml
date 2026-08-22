@@ -1148,6 +1148,46 @@
                               <TextBox Grid.Column="1" MaxLength="16" PlaceholderText="3151:4015" Text="{Binding KnobVidPid, Mode=TwoWay}" />
                             </Grid>
                             <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobVidPidHint}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                              <StackPanel VerticalAlignment="Center" Spacing="4">
+                                <TextBlock Classes="secondary" Text="{infra:Localize KnobBoundLabel}" />
+                                <TextBlock FontSize="11" Text="{Binding KnobBoundDescription}" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button IsVisible="{Binding HasKnobBinding}" Command="{Binding ClearKnobBindingCommand}" Content="{infra:Localize KnobBoundClear}" />
+                                <Button IsVisible="{Binding !IsKnobDetecting}" Command="{Binding StartKnobDetectCommand}" Content="{infra:Localize KnobDetectStart}" />
+                              </StackPanel>
+                            </Grid>
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobDetectHint}" TextWrapping="Wrap" />
+                            <Border IsVisible="{Binding IsKnobDetectingKnob}" CornerRadius="8" Padding="12" Background="{DynamicResource KssSelectedBrush}">
+                              <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="{infra:Localize KnobDetectStep1}" />
+                                <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobDetectStep1Hint}" TextWrapping="Wrap" />
+                                <TextBlock FontSize="11" Text="{Binding KnobDetectHeard}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <Button Command="{Binding KnobDetectNextCommand}" Content="{infra:Localize KnobDetectNext}" />
+                                  <Button Command="{Binding KnobDetectCloseCommand}" Content="{infra:Localize KnobDetectCancel}" />
+                                </StackPanel>
+                              </StackPanel>
+                            </Border>
+                            <Border IsVisible="{Binding IsKnobDetectingOthers}" CornerRadius="8" Padding="12" Background="{DynamicResource KssSelectedBrush}">
+                              <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="{infra:Localize KnobDetectStep2}" />
+                                <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobDetectStep2Hint}" TextWrapping="Wrap" />
+                                <TextBlock FontSize="11" Text="{Binding KnobDetectHeard}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <Button Command="{Binding KnobDetectFinishCommand}" Content="{infra:Localize KnobDetectFinish}" />
+                                  <Button Command="{Binding KnobDetectSkipCommand}" Content="{infra:Localize KnobDetectSkip}" />
+                                  <Button Command="{Binding KnobDetectCloseCommand}" Content="{infra:Localize KnobDetectCancel}" />
+                                </StackPanel>
+                              </StackPanel>
+                            </Border>
+                            <Border IsVisible="{Binding IsKnobDetectDone}" CornerRadius="8" Padding="12" Background="{DynamicResource KssSelectedBrush}">
+                              <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding KnobDetectResult}" TextWrapping="Wrap" />
+                                <Button HorizontalAlignment="Left" Command="{Binding KnobDetectCloseCommand}" Content="{infra:Localize KnobDetectClose}" />
+                              </StackPanel>
+                            </Border>
                           </StackPanel>
                           <StackPanel Spacing="12" IsVisible="{Binding IsKnobHotKeyMode}">
                             <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
