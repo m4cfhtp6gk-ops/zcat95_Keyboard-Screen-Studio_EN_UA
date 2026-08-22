@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.3.0 - 2026-08-22
+
+### Added
+
+- Currency Rates theme: up to four currencies against a chosen base, fed
+  daily by the open ExchangeRate-API endpoint (no key).
+- Crypto theme: two to four Binance pairs with live price, 24-hour change and
+  an hourly sparkline; Binance also became a third source in the stocks theme.
+- Pomodoro theme: a wall-clock focus/break timer with a 30-dot countdown ring
+  and a cycle tally, controlled from settings or the tray menu.
+- Hardware Monitor theme: CPU/GPU temperatures, clocks, fan speeds and VRAM
+  plus a memory/disk/network page, rotating on a configurable 3-10 s dwell
+  (LibreHardwareMonitor; missing readings draw as an em dash).
+- GitHub Activity theme: 17 weeks of the contribution calendar as a dot grid
+  with weekly totals; public by username, private with an optional token.
+- Night schedule: an optional night theme and render dimming (20-100%)
+  between configurable times; media automation still wins while music plays.
+- Telegram popups: incoming messages from your own account (MTProto via
+  WTelegramClient) shown over any theme, with three privacy modes, respect
+  for muted chats, and a session that logging out wipes.
+- Desktop notifications (Windows, opt-in): Claude limits at 80/90/95%, the
+  keyboard going offline, and Binance price alerts - all with cooldowns.
+- Push diagnostics card and a step-by-step claude.ai key guide.
+
+### Changed
+
+- 26 built-in themes (was 21); string catalogues at 577 keys in all three
+  languages; third-party notices now cover every external data service.
+
 ## v1.2.0 - 2026-08-21
 
 ### Added
