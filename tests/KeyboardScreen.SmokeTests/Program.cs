@@ -710,6 +710,31 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
     var cached = await claudeSource.ReadAsync(claudeSettings);
     Assert(ReferenceEquals(claudeSnapshot, cached), "a second read inside the cache window must not call the API");
     Assert(claudeHandler.Requests.Count == 2, "the cached read issued extra requests");
+    Assert(claudeHandler.ClientHints.All(hint => hint.Contains("Chromium")),
+        "every claude.ai request must carry the sec-ch-ua client hints");
+    Assert(claudeHandler.Versions.All(version => version.Major == 2),
+        "claude.ai requests must ask for HTTP/2 like the browser the cookie came from");
+}
+
+// A Cloudflare challenge must trigger a backoff: the very next read stays off
+// the wire, keeps the message, and never calls the key expired.
+var challengedHandler = new StatusBodyHandler(System.Net.HttpStatusCode.Forbidden,
+    "<html><title>Just a moment...</title></html>");
+using (var challengedClient = new HttpClient(challengedHandler))
+using (var challengedSource = new ClaudeUsageSnapshotSource(challengedClient, new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+       { BaseUrl = "https://claude.test/api" })
+{
+    var challenged = await challengedSource.ReadAsync(
+        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+    Assert(!challenged.Available && challenged.ErrorMessage == Loc.T("ClaudeChallenged"),
+        "a Cloudflare challenge must surface the challenge message, not an expired key");
+    int requestsAfterChallenge = challengedHandler.RequestCount;
+    var duringBackoff = await challengedSource.ReadAsync(
+        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+    Assert(challengedHandler.RequestCount == requestsAfterChallenge,
+        "reads during the challenge backoff must stay off the wire");
+    Assert(duringBackoff.ErrorMessage == Loc.T("ClaudeChallenged"),
+        "the backoff read must keep the challenge message");
 }
 
 // Newer payload shape: seven_day_* per-model keys are nulled out and the real
@@ -1084,6 +1109,9 @@ Assert(HardwareMonitorTheme.PageIndex(DateTimeOffset.FromUnixTimeSeconds(3), 0, 
     "the dwell must clamp to the 3-second floor");
 Assert(HardwareMonitorTheme.FormatPercent(38.4) == "38%" && HardwareMonitorTheme.FormatPercent(null) == "—",
     "percent formatting is wrong");
+Assert(HardwareMonitorTheme.FormatTemperature(0) == "—" && HardwareMonitorTheme.FormatClock(0) == "—"
+    && HardwareMonitorTheme.FormatFan(0) == "—",
+    "flat-zero sensor readings must draw as missing");
 Assert(HardwareMonitorTheme.FormatTemperature(62.4) == "62°" && HardwareMonitorTheme.FormatTemperature(null) == "—",
     "temperature formatting is wrong");
 Assert(HardwareMonitorTheme.FormatClock(4.553) == "4.55" && HardwareMonitorTheme.FormatClock(null) == "—",
@@ -1899,6 +1927,8 @@ sealed class ClaudeHandler : HttpMessageHandler
     private readonly Queue<string> _responses;
     public List<string> Requests { get; } = [];
     public List<string> Cookies { get; } = [];
+    public List<string> ClientHints { get; } = [];
+    public List<Version> Versions { get; } = [];
 
     public ClaudeHandler(Queue<string> responses)
     {
@@ -1909,6 +1939,8 @@ sealed class ClaudeHandler : HttpMessageHandler
     {
         Requests.Add(request.RequestUri?.ToString() ?? string.Empty);
         Cookies.Add(request.Headers.TryGetValues("Cookie", out var values) ? string.Join("; ", values) : string.Empty);
+        ClientHints.Add(request.Headers.TryGetValues("sec-ch-ua", out var hints) ? string.Join("; ", hints) : string.Empty);
+        Versions.Add(request.Version);
         if (_responses.Count == 0)
         {
             throw new InvalidOperationException("No mocked Claude response remains.");
@@ -1917,6 +1949,18 @@ sealed class ClaudeHandler : HttpMessageHandler
         {
             Content = new StringContent(_responses.Dequeue())
         });
+    }
+}
+
+/// <summary>A fixed status with a fixed body, counting the requests.</summary>
+sealed class StatusBodyHandler(System.Net.HttpStatusCode status, string body) : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
     }
 }
 

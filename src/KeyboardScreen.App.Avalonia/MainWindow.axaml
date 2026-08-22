@@ -764,6 +764,7 @@
                           <Slider Grid.Column="1" Minimum="3" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding HardwarePageSeconds, Mode=TwoWay}" />
                           <NumericUpDown Grid.Column="2" Classes="compact-value" Minimum="3" Maximum="10" Increment="1" FormatString="0" ShowButtonSpinner="False" Value="{Binding HardwarePageSeconds, Mode=TwoWay}" />
                         </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize HardwareAdminHint}" TextWrapping="Wrap" />
                         <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>

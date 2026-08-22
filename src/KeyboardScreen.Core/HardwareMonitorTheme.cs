@@ -170,15 +170,16 @@ public sealed class HardwareMonitorTheme : IScreenTheme
     public static string FormatPercent(double? value) =>
         value is { } percent ? $"{percent:0}%" : "—";
 
+    // A flat zero from a sensor is a failed read, never a real value.
     public static string FormatTemperature(double? value) =>
-        value is { } celsius ? DisplayUnits.TemperatureShort(celsius) : "—";
+        value is { } celsius and > 0 ? DisplayUnits.TemperatureShort(celsius) : "—";
 
     /// <summary>The unit lives in the cell label, so the value stays narrow.</summary>
     public static string FormatClock(double? value) =>
-        value is { } ghz ? (ghz < 10 ? $"{ghz:0.00}" : $"{ghz:0}") : "—";
+        value is { } ghz and > 0.01 ? (ghz < 10 ? $"{ghz:0.00}" : $"{ghz:0}") : "—";
 
     public static string FormatFan(double? value) =>
-        value is { } rpm ? $"{rpm:0}" : "—";
+        value is { } rpm and > 0 ? $"{rpm:0}" : "—";
 
     public static string FormatVram(double? usedMb, double? totalMb) =>
         usedMb is { } used && totalMb is { } total && total > 0

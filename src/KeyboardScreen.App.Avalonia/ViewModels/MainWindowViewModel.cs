@@ -3514,7 +3514,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     alertsSnapshot.UpdatedAt.ToString("HH:mm"))
                 : _alertsSnapshot?.ErrorMessage ?? Loc.T("SummaryConfigureAlerts"),
             "hardware" => _hardwareSnapshot is { Available: true } hardwareSnapshot
-                ? Loc.T("SummaryHardware",
+                ? hardwareSnapshot.ErrorMessage ?? Loc.T("SummaryHardware",
                     HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Cpu?.TemperatureC),
                     HardwareMonitorTheme.FormatTemperature(hardwareSnapshot.Gpu?.TemperatureC),
                     hardwareSnapshot.UpdatedAt.ToString("HH:mm"))
