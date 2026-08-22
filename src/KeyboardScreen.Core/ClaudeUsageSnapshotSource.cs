@@ -16,9 +16,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 {
     private static readonly TimeSpan CacheWindow = TimeSpan.FromSeconds(60);
 
+    /// <summary>Hold-off after a Cloudflare challenge; hammering it only prolongs the block.</summary>
+    private static readonly TimeSpan ChallengeBackoff = TimeSpan.FromMinutes(5);
+
+    // The session cookie comes out of a Chrome-family browser, so the request
+    // carries the matching, complete header set. A browser user-agent with the
+    // client-hint headers missing is exactly what the challenge heuristics key
+    // on, and this is the user's own authenticated session.
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/131.0.0.0 Safari/537.36";
+        "Chrome/139.0.0.0 Safari/537.36";
+    private const string ClientHintBrands =
+        "\"Chromium\";v=\"139\", \"Google Chrome\";v=\"139\", \"Not?A_Brand\";v=\"99\"";
 
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -27,6 +36,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private ClaudeUsageSnapshot? _cached;
     private DateTimeOffset _lastFetch = DateTimeOffset.MinValue;
     private string _cachedFor = string.Empty;
+    private DateTimeOffset _challengedUntil = DateTimeOffset.MinValue;
 
     public ClaudeUsageSnapshotSource(HttpClient? client = null, ClaudeCodeTokenReader? tokenReader = null)
     {
@@ -56,6 +66,14 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             && now - _lastFetch < CacheWindow)
         {
             return _cached;
+        }
+
+        if (now < _challengedUntil)
+        {
+            // Mid-backoff after a Cloudflare challenge: stay off the wire.
+            return _cached is null
+                ? ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeChallenged"))
+                : _cached with { IsStale = true, ErrorMessage = Loc.T("ClaudeChallenged") };
         }
 
         try
@@ -110,17 +128,33 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
     private async Task<JsonDocument> GetJsonAsync(string path, string sessionKey, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, BaseUrl + path);
+        using var request = new HttpRequestMessage(HttpMethod.Get, BaseUrl + path)
+        {
+            Version = HttpVersion.Version20,
+            VersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+        };
         request.Headers.TryAddWithoutValidation("Cookie", "sessionKey=" + sessionKey.Trim());
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
+        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
         request.Headers.TryAddWithoutValidation("User-Agent", BrowserUserAgent);
-        request.Headers.TryAddWithoutValidation("Referer", "https://claude.ai");
+        request.Headers.TryAddWithoutValidation("sec-ch-ua", ClientHintBrands);
+        request.Headers.TryAddWithoutValidation("sec-ch-ua-mobile", "?0");
+        request.Headers.TryAddWithoutValidation("sec-ch-ua-platform", "\"Windows\"");
+        request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "same-origin");
+        request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "cors");
+        request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "empty");
+        request.Headers.TryAddWithoutValidation("Referer", "https://claude.ai/");
         request.Headers.TryAddWithoutValidation("Origin", "https://claude.ai");
 
         using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(await DescribeFailureAsync(response, cancellationToken));
+            string failure = await DescribeFailureAsync(response, cancellationToken);
+            if (failure == Loc.T("ClaudeChallenged"))
+            {
+                _challengedUntil = DateTimeOffset.Now + ChallengeBackoff;
+            }
+            throw new InvalidOperationException(failure);
         }
 
         await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);

@@ -1,3 +1,4 @@
+using System.Security.Principal;
 using LibreHardwareMonitor.Hardware;
 using KeyboardScreen.Core;
 
@@ -6,18 +7,37 @@ namespace KeyboardScreen.App.Avalonia.Platform;
 /// <summary>
 /// Sensor readings via LibreHardwareMonitorLib. Opening the driver can fail
 /// and CPU temperatures usually need administrator rights, so every reading
-/// is optional; the theme shows an em dash for whatever is missing.
+/// is optional; the theme shows an em dash for whatever is missing. Without
+/// the driver the library can also enumerate sensors that read a flat zero -
+/// those are filtered as missing rather than shown as real values, and the
+/// CPU clock falls back to the Windows performance counter.
 /// </summary>
 public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDisposable
 {
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromSeconds(2);
 
     private readonly object _gate = new();
+    private readonly ProcessorClockFallback _clockFallback = new();
     private Computer? _computer;
     private bool _openFailed;
     private string? _openError;
     private HardwareSnapshot? _cached;
     private DateTimeOffset _lastUpdate;
+
+    private static readonly bool IsAdministrator = DetectAdministrator();
+
+    private static bool DetectAdministrator()
+    {
+        try
+        {
+            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 
     public HardwareSnapshot Read()
     {
@@ -49,7 +69,7 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
                     _computer.Open();
                 }
 
-                _cached = Collect(_computer, now);
+                _cached = Collect(_computer, now, _clockFallback);
                 _lastUpdate = now;
                 return _cached;
             }
@@ -70,7 +90,7 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
         }
     }
 
-    private static HardwareSnapshot Collect(Computer computer, DateTimeOffset now)
+    private static HardwareSnapshot Collect(Computer computer, DateTimeOffset now, ProcessorClockFallback clockFallback)
     {
         HardwareComponentSnapshot? cpu = null;
         HardwareComponentSnapshot? gpu = null;
@@ -121,6 +141,17 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
             cpu = cpu with { FanRpm = motherboardFan };
         }
 
+        // Without the kernel driver AMD clocks read as zero; the Windows
+        // performance counter still knows the effective frequency.
+        if (cpu is { ClockGhz: null } && clockFallback.ReadGhz() is { } fallbackGhz)
+        {
+            cpu = cpu with { ClockGhz = fallbackGhz };
+        }
+
+        string? limitedHint = !IsAdministrator && cpu is { TemperatureC: null }
+            ? Loc.T("HardwareLimitedSensors")
+            : null;
+
         return new HardwareSnapshot(
             cpu is not null || gpu is not null || ramTotal is not null,
             cpu,
@@ -128,7 +159,8 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
             ramUsed,
             ramTotal,
             diskUsed,
-            now);
+            now,
+            ErrorMessage: limitedHint);
     }
 
     private static HardwareComponentSnapshot ReadCpu(IHardware hardware)
@@ -142,8 +174,8 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
         return new HardwareComponentSnapshot(
             hardware.Name,
             load,
-            temperature,
-            clockMhz / 1000.0);
+            Plausible(temperature, 1, 120),
+            Plausible(clockMhz, 100, 9000) / 1000.0);
     }
 
     private static HardwareComponentSnapshot ReadGpu(IHardware hardware)
@@ -151,12 +183,18 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
         return new HardwareComponentSnapshot(
             hardware.Name,
             FindValue(hardware, SensorType.Load, "GPU Core") ?? FirstValue(hardware, SensorType.Load),
-            FindValue(hardware, SensorType.Temperature, "GPU Core") ?? FirstValue(hardware, SensorType.Temperature),
-            (FindValue(hardware, SensorType.Clock, "GPU Core") ?? FirstValue(hardware, SensorType.Clock)) / 1000.0,
+            Plausible(FindValue(hardware, SensorType.Temperature, "GPU Core")
+                ?? FirstValue(hardware, SensorType.Temperature), 1, 120),
+            Plausible(FindValue(hardware, SensorType.Clock, "GPU Core")
+                ?? FirstValue(hardware, SensorType.Clock), 50, 6000) / 1000.0,
             FirstValue(hardware, SensorType.Fan, minimum: 1),
-            FindValue(hardware, SensorType.SmallData, "GPU Memory Used"),
-            FindValue(hardware, SensorType.SmallData, "GPU Memory Total"));
+            Plausible(FindValue(hardware, SensorType.SmallData, "GPU Memory Used"), 1, double.MaxValue),
+            Plausible(FindValue(hardware, SensorType.SmallData, "GPU Memory Total"), 1, double.MaxValue));
     }
+
+    /// <summary>A sensor that reads outside its physical range is no reading at all.</summary>
+    private static double? Plausible(double? value, double minimum, double maximum) =>
+        value is { } reading && reading >= minimum && reading <= maximum ? reading : null;
 
     private static (double? Used, double? Total) ReadMemory(IHardware hardware)
     {
@@ -233,6 +271,7 @@ public sealed class LibreHardwareMonitorSource : IHardwareSnapshotSource, IDispo
         lock (_gate)
         {
             TryClose();
+            _clockFallback.Dispose();
         }
     }
 }
