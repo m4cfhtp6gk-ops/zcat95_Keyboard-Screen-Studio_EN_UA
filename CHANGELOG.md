@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.6.0 - 2026-08-22
+
+### Added
+
+- Knob theme switching (off by default): the Linx68 volume knob steps
+  through the themes - right for next, left for previous, press to pause
+  or resume the carousel - following the carousel's set when configured,
+  otherwise the whole catalog. A toggle mutes the volume keys while the
+  knob drives themes; an optional VID:PID binds the feature to this
+  keyboard alone; and a dedicated-keys mode listens for VIA/QMK-remapped
+  F13-F24 so volume is never involved.
+
+### Fixed
+
+- Performance graphs: the per-panel numbers drew off the canvas and had
+  never been visible; they now render next to each curve with an
+  on-by-default "numeric readout" toggle.
+- Hardware monitor: the dashes explain themselves - the screen asks for
+  administrator rights when that is the blocker, or says the sensors do
+  not answer when the process is already elevated; a "restart as
+  administrator" button relaunches the app elevated.
+
 ## v1.5.2 - 2026-08-22
 
 ### Fixed
