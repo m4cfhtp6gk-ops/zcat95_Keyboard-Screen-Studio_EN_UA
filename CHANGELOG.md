@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.5.1 - 2026-08-22
+
+### Fixed
+
+- Stale hryvnia rates (about 39 UAH/USD shown against the actual ~45): the
+  currency source is now selectable - Currency-API on the jsDelivr CDN (new
+  default, daily, with a fallback to ExchangeRate-API), the ExchangeRate-API
+  open endpoint, or the NBU official rate with other pairs crossed through
+  UAH - and the screen footer shows which day the rates are for, so a stale
+  feed is visible instead of silently wrong.
+
 ## v1.5.0 - 2026-08-22
 
 ### Added
