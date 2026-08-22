@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.2 - 2026-08-22
+
+### Fixed
+
+- Hardware monitor: flat-zero sensor readings (AMD without the kernel
+  driver) draw as missing instead of 0.00 GHz / 0°; CPU frequency falls
+  back to the Windows performance counter and works without administrator
+  rights; a plain hint says temperatures and fans need the app run as
+  administrator; LibreHardwareMonitorLib moved to the current 0.9.7
+  prerelease for newer AMD (engineering-sample) support.
+- Claude limits: requests now carry the full browser header set over
+  HTTP/2, and after a Cloudflare challenge the app backs off for five
+  minutes instead of retrying every refresh - keeping the last good
+  reading and saying the key is fine.
+
 ## v1.5.1 - 2026-08-22
 
 ### Fixed

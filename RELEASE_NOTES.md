@@ -1,21 +1,29 @@
-# v1.5.1
+# v1.5.2
 
-A fix for stale hryvnia exchange rates: the currency screen was showing about
-39 UAH per USD from a stale upstream feed while the actual rate was around 45.
+Two fixes from the field: the hardware monitor showing zeros instead of
+missing readings, and the Claude limits screen stuck behind Cloudflare.
 
 ## Fixed
 
-- **Currency rates source is now selectable**, like the stock source:
-  - **Currency-API** (daily dataset on the jsDelivr CDN, 200+ currencies, no
-    key) — the new default, with a silent fallback to ExchangeRate-API when
-    the CDN is unreachable;
-  - **ExchangeRate-API** open endpoint — the previous source, still available;
-  - **NBU official rate** — Ukraine's official daily table; USD→UAH is the
-    official number itself, other pairs cross through UAH.
-  Existing setups switch to the fresh default automatically.
-- **The data date is now on the screen**: the currency footer shows which day
-  the rates are for ("Дані 22 серп. · 08:53"), so a stale feed is visible
-  instead of silently wrong.
+- **Hardware monitor** (AMD showing 0.00 GHz, 0° and no fan):
+  - Flat-zero sensor readings — what LibreHardwareMonitor reports on AMD
+    without the kernel driver — now draw as the em dash instead of posing as
+    real values.
+  - CPU frequency now works without administrator rights: when the sensor
+    clock is missing, it falls back to Windows' own performance counter times
+    the base clock — the same figure Task Manager shows, boost included.
+  - When temperatures need more rights, the theme's summary and the settings
+    card now say so plainly: run the app as administrator for CPU temperature
+    and fan speeds.
+  - The sensor library moved to LibreHardwareMonitor's current build with two
+    years of newer AMD support, engineering samples included.
+- **Claude limits blocked by Cloudflare**:
+  - The request now carries the complete header set of the browser the
+    session cookie came from, over HTTP/2 — the half-browser fingerprint was
+    what kept tripping the challenge.
+  - After a challenge the app pauses for five minutes instead of retrying
+    every refresh, keeps the last good reading on screen, and the message
+    says the key is fine.
 
 ## Platforms
 
