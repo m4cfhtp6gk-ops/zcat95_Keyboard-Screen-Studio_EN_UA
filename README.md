@@ -14,7 +14,7 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 
 ## Status
 
-- **Windows:** v1.3.0, on Avalonia UI. This is the released platform.
+- **Windows:** v1.4.0, on Avalonia UI. This is the released platform.
 - **macOS:** the cross-platform project and packaging scripts are kept in the
   tree. Intel and Apple Silicon builds still need testing on real hardware and
   are not published as a stable release.
@@ -23,14 +23,18 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 
 ## Features
 
-- 26 built-in themes across monitoring, time, information, music, dot matrix
+- 27 built-in themes across monitoring, time, information, music, dot matrix
   and picture-clock categories — including a detailed hardware monitor with
   rotating pages, currency rates, Binance crypto with sparklines, a pomodoro
-  timer, and a GitHub contribution grid.
+  timer, a GitHub contribution grid, and Ukrainian air-raid alerts fed by
+  alerts.in.ua (informational only — never your sole warning source).
 - A night schedule that can switch the theme and dim the screen between
-  configurable hours, Telegram message popups from your own account drawn
-  over any theme, and opt-in Windows notifications (Claude limits, keyboard
-  offline, price alerts) with anti-spam cooldowns.
+  configurable hours, a theme carousel that rotates a chosen set of screens,
+  Telegram message popups from your own account drawn over any theme, and
+  opt-in Windows notifications (Claude limits, keyboard offline, price
+  alerts) with anti-spam cooldowns.
+- A per-theme refresh interval, a 12/24-hour clock and °C/°F units, and
+  settings export/import that strips secrets from the backup file.
 - Live 142×428 preview that keeps the keyboard firmware's status-bar safe area.
 - Custom accent colour, screen font, content safe area and picture-clock layout.
 - Light, dark and follow-the-system application themes, independent of what the
@@ -51,7 +55,7 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - "Image API" enabled in the keyboard menu, with the address it shows entered
   into KSS.
 
-Download `KeyboardScreenStudio-v1.3.0-win-x64.zip` from Releases, unpack it and
+Download `KeyboardScreenStudio-v1.4.0-win-x64.zip` from Releases, unpack it and
 run `KeyboardScreenStudio.exe`. The release is self-contained — no separate .NET
 installation is required.
 

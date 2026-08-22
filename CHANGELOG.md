@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.4.0 - 2026-08-22
+
+### Added
+
+- Air Alerts theme: Ukrainian civil-defence alert status from alerts.in.ua —
+  a location's ALERT/Clear state with the start time, or the country-wide
+  count and list of regions under alert. Needs a free alerts.in.ua token
+  (stored locally, sent to that service only, excluded from settings export);
+  informational only, never a sole warning source.
+- Theme carousel: rotate a chosen set of themes on a wall-clock interval
+  (10-600 s); media automation and the night schedule still take precedence.
+- Per-theme refresh intervals (1-600 s) with sensible defaults, so the clock
+  can tick every second while weather or rates refresh once a minute.
+- Display units: 12/24-hour clock and Celsius/Fahrenheit toggles applied
+  across all themes.
+- Settings export/import as JSON with secrets (claude.ai session key, GitHub
+  token, Telegram credentials) stripped from the export and preserved
+  locally on import.
+
+### Changed
+
+- 27 built-in themes (was 26); string catalogues at 624 keys in all three
+  languages; third-party notices now cover alerts.in.ua.
+
 ## v1.3.0 - 2026-08-22
 
 ### Added
