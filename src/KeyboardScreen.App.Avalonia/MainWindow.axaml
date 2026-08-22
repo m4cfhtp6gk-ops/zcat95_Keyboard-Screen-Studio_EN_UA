@@ -1122,6 +1122,53 @@
                     </Border>
 
                     <Border Classes="card" Padding="16">
+                      <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize KnobHeading}" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Top" MinWidth="58" OnContent="" OffContent="" IsChecked="{Binding KnobEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <StackPanel Spacing="12" IsVisible="{Binding KnobEnabled}">
+                          <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobModeLabel}" />
+                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobModeOptions}" SelectedItem="{Binding KnobModePreference, Mode=TwoWay}" />
+                          </Grid>
+                          <StackPanel Spacing="12" IsVisible="{Binding IsKnobVolumeMode}">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <StackPanel VerticalAlignment="Center" Spacing="4">
+                                <TextBlock Classes="secondary" Text="{infra:Localize KnobSuppressLabel}" />
+                                <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobSuppressHint}" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" MinWidth="58" OnContent="" OffContent="" IsChecked="{Binding KnobSuppressVolume, Mode=TwoWay}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                              <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobVidPidLabel}" />
+                              <TextBox Grid.Column="1" MaxLength="16" PlaceholderText="3151:4015" Text="{Binding KnobVidPid, Mode=TwoWay}" />
+                            </Grid>
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobVidPidHint}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <StackPanel Spacing="12" IsVisible="{Binding IsKnobHotKeyMode}">
+                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                              <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyForwardLabel}" />
+                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyForward, Mode=TwoWay}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                              <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyBackwardLabel}" />
+                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyBackward, Mode=TwoWay}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                              <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyToggleLabel}" />
+                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyToggle, Mode=TwoWay}" />
+                            </Grid>
+                          </StackPanel>
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobViaHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Classes="card" Padding="16">
                       <StackPanel Spacing="10">
                         <StackPanel Spacing="4">
                           <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DiagnosticsHeading}" />

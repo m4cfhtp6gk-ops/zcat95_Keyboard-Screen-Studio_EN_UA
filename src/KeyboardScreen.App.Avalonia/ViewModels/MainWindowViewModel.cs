@@ -187,6 +187,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _calendarUrl = string.Empty;
     private string _additionalDevices = string.Empty;
     private string _additionalPushStatus = string.Empty;
+    private KnobInputListener? _knobListener;
+    private bool _knobEnabled;
+    private KnobMode _knobMode = KnobMode.VolumeKnob;
+    private bool _knobSuppressVolume = true;
+    private string _knobVidPid = string.Empty;
+    private string _knobKeyForward = "F13";
+    private string _knobKeyBackward = "F14";
+    private string _knobKeyToggle = "F15";
     private Dictionary<string, string> _themeAccentOverrides = new(StringComparer.OrdinalIgnoreCase);
     private string _worldClockLabel1 = string.Empty, _worldClockLabel2 = string.Empty,
         _worldClockLabel3 = string.Empty, _worldClockLabel4 = string.Empty;
@@ -1548,6 +1556,95 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _additionalDevices, value)) ScheduleCommit(); }
     }
 
+    public bool KnobEnabled
+    {
+        get => _knobEnabled;
+        set
+        {
+            if (SetProperty(ref _knobEnabled, value))
+            {
+                RestartKnobListener();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public bool KnobSuppressVolume
+    {
+        get => _knobSuppressVolume;
+        set
+        {
+            if (SetProperty(ref _knobSuppressVolume, value))
+            {
+                RestartKnobListener();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    public string KnobVidPid
+    {
+        get => _knobVidPid;
+        set
+        {
+            if (SetProperty(ref _knobVidPid, value))
+            {
+                RestartKnobListener();
+                ScheduleCommit();
+            }
+        }
+    }
+
+    /// <summary>Display-text picker over the stored enum, like <see cref="StockSourcePreference"/>.</summary>
+    public string KnobModePreference
+    {
+        get => KnobModeOptions[Math.Clamp((int)_knobMode, 0, KnobModeOptions.Count - 1)];
+        set
+        {
+            IReadOnlyList<string> options = KnobModeOptions;
+            for (int index = 0; index < options.Count; index++)
+            {
+                if (string.Equals(options[index], value, StringComparison.Ordinal))
+                {
+                    if (SetProperty(ref _knobMode, (KnobMode)index, nameof(KnobModePreference)))
+                    {
+                        OnPropertyChanged(nameof(IsKnobVolumeMode));
+                        OnPropertyChanged(nameof(IsKnobHotKeyMode));
+                        RestartKnobListener();
+                        ScheduleCommit();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    public IReadOnlyList<string> KnobModeOptions =>
+        [Loc.T("KnobModeVolume"), Loc.T("KnobModeHotKeys")];
+
+    public bool IsKnobVolumeMode => _knobMode == KnobMode.VolumeKnob;
+    public bool IsKnobHotKeyMode => _knobMode == KnobMode.HotKeys;
+
+    public IReadOnlyList<string> KnobKeyOptions => KnobControl.HotKeyNames;
+
+    public string KnobKeyForward
+    {
+        get => _knobKeyForward;
+        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+    }
+
+    public string KnobKeyBackward
+    {
+        get => _knobKeyBackward;
+        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+    }
+
+    public string KnobKeyToggle
+    {
+        get => _knobKeyToggle;
+        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RestartKnobListener(); ScheduleCommit(); } }
+    }
+
     /// <summary>The selected theme's own accent (#RRGGBB), or empty for the global one.</summary>
     public string CurrentThemeAccentColor
     {
@@ -2394,6 +2491,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _gitHubSource.Dispose();
         _airAlertSource.Dispose();
         _calendarSource.Dispose();
+        _knobListener?.Dispose();
         _telegramPopupDelay?.Cancel();
         _telegramPopupDelay?.Dispose();
         if (_telegramService is not null)
@@ -2615,6 +2713,23 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         PingHost3 = pingHosts[2];
         PingHost4 = pingHosts[3];
         AdditionalDevices = string.Join(", ", _settings.AdditionalEndpoints ?? []);
+        _settings.Knob ??= new KnobSettings();
+        _knobEnabled = _settings.Knob.Enabled;
+        _knobMode = _settings.Knob.Mode;
+        _knobSuppressVolume = _settings.Knob.SuppressVolume;
+        _knobVidPid = _settings.Knob.VidPid;
+        _knobKeyForward = _settings.Knob.KeyForward;
+        _knobKeyBackward = _settings.Knob.KeyBackward;
+        _knobKeyToggle = _settings.Knob.KeyToggle;
+        OnPropertyChanged(nameof(KnobEnabled));
+        OnPropertyChanged(nameof(KnobSuppressVolume));
+        OnPropertyChanged(nameof(KnobVidPid));
+        OnPropertyChanged(nameof(KnobModePreference));
+        OnPropertyChanged(nameof(IsKnobVolumeMode));
+        OnPropertyChanged(nameof(IsKnobHotKeyMode));
+        OnPropertyChanged(nameof(KnobKeyForward));
+        OnPropertyChanged(nameof(KnobKeyBackward));
+        OnPropertyChanged(nameof(KnobKeyToggle));
         _themeAccentOverrides = new Dictionary<string, string>(
             _settings.ThemeAccentOverrides ?? new Dictionary<string, string>(),
             StringComparer.OrdinalIgnoreCase);
@@ -2696,6 +2811,62 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         UpdateRenderer();
         _loading = false;
         SelectTheme(_settings.SelectedThemeId);
+        RestartKnobListener();
+    }
+
+    /// <summary>
+    /// (Re)creates the knob listener to match the current settings. With the
+    /// feature off no listener exists at all - no hook, no registration.
+    /// </summary>
+    private void RestartKnobListener()
+    {
+        _knobListener?.Dispose();
+        _knobListener = null;
+        if (!KnobEnabled || _loading || !OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            _knobListener = new KnobInputListener(
+                new KnobSettings
+                {
+                    Enabled = true,
+                    Mode = _knobMode,
+                    SuppressVolume = KnobSuppressVolume,
+                    VidPid = KnobVidPid,
+                    KeyForward = KnobKeyForward,
+                    KeyBackward = KnobKeyBackward,
+                    KeyToggle = KnobKeyToggle
+                },
+                action => Dispatcher.UIThread.Post(() => HandleKnobAction(action)));
+        }
+        catch (Exception)
+        {
+            _knobListener = null;
+        }
+    }
+
+    private void HandleKnobAction(KnobAction action)
+    {
+        if (action == KnobAction.ToggleCarousel)
+        {
+            CarouselEnabled = !CarouselEnabled;
+            return;
+        }
+
+        IReadOnlyList<string> cycle = KnobControl.ResolveCycleList(
+            _settings.Carousel,
+            _themes.Select(theme => theme.Id).ToArray());
+        string? nextId = KnobControl.Next(cycle, SelectedTheme?.Id,
+            action == KnobAction.NextTheme ? 1 : -1);
+        if (nextId is not null)
+        {
+            // The same path the UI takes, so SelectedThemeId persists and the
+            // preview re-renders immediately.
+            SelectTheme(nextId);
+        }
     }
 
     private void SelectTheme(string? id)
@@ -2916,6 +3087,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             .Take(4)
             .ToList();
         _settings.ThemeAccentOverrides = new Dictionary<string, string>(_themeAccentOverrides, StringComparer.OrdinalIgnoreCase);
+        _settings.Knob = new KnobSettings
+        {
+            Enabled = KnobEnabled,
+            Mode = _knobMode,
+            SuppressVolume = KnobSuppressVolume,
+            VidPid = KnobVidPid.Trim(),
+            KeyForward = KnobKeyForward,
+            KeyBackward = KnobKeyBackward,
+            KeyToggle = KnobKeyToggle
+        };
         _settings.Currency = new CurrencySettings
         {
             SourceKind = _currencySourceKind,
