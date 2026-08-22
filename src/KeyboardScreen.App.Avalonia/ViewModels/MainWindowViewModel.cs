@@ -141,6 +141,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private bool _claudeCountLocalTokens = true;
     private ClaudeUsageSnapshot? _claudeUsage;
     private string _currencyBase = "USD";
+    private CurrencySourceKind _currencySourceKind = CurrencySourceKind.CurrencyApi;
     private string _currencyQuotes = "EUR, UAH, PLN";
     private CurrencySnapshot? _currencySnapshot;
     private string _cryptoSymbol1 = "BTCUSDT";
@@ -1567,6 +1568,30 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _currencyBase, value)) ScheduleCommit(); }
     }
 
+    /// <summary>Display-text picker over the stored enum, like <see cref="StockSourcePreference"/>.</summary>
+    public string CurrencySourcePreference
+    {
+        get => CurrencySourceOptions[Math.Clamp((int)_currencySourceKind, 0, CurrencySourceOptions.Count - 1)];
+        set
+        {
+            IReadOnlyList<string> options = CurrencySourceOptions;
+            for (int index = 0; index < options.Count; index++)
+            {
+                if (string.Equals(options[index], value, StringComparison.Ordinal))
+                {
+                    if (SetProperty(ref _currencySourceKind, (CurrencySourceKind)index, nameof(CurrencySourcePreference)))
+                    {
+                        ScheduleCommit();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    public IReadOnlyList<string> CurrencySourceOptions =>
+        [Loc.T("CurrencySourceCdn"), Loc.T("CurrencySourceErApi"), Loc.T("CurrencySourceNbu")];
+
     public string CurrencyQuotes
     {
         get => _currencyQuotes;
@@ -2475,6 +2500,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             : _settings.ClaudeUsage.ModelScope;
         ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
         _settings.Currency ??= new CurrencySettings();
+        _currencySourceKind = _settings.Currency.SourceKind;
+        OnPropertyChanged(nameof(CurrencySourcePreference));
         CurrencyBase = string.IsNullOrWhiteSpace(_settings.Currency.BaseCurrency)
             ? "USD"
             : _settings.Currency.BaseCurrency;
@@ -2844,6 +2871,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.ThemeAccentOverrides = new Dictionary<string, string>(_themeAccentOverrides, StringComparer.OrdinalIgnoreCase);
         _settings.Currency = new CurrencySettings
         {
+            SourceKind = _currencySourceKind,
             BaseCurrency = string.IsNullOrWhiteSpace(CurrencyBase) ? "USD" : CurrencyBase.Trim().ToUpperInvariant(),
             QuoteCurrencies = SplitCurrencyCodes(CurrencyQuotes)
         };

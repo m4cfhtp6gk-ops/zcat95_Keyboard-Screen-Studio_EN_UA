@@ -834,19 +834,26 @@ Assert(CurrencyTheme.FormatRate(1523.4) == "1523", "large rates drop the fractio
 
 var currencyResponses = new Queue<string>(new[]
 {
-    """{"result":"success","base_code":"USD","rates":{"USD":1,"EUR":0.9214,"UAH":41.32,"PLN":3.968}}"""
+    """{"result":"success","base_code":"USD","time_last_update_unix":1787990402,"rates":{"USD":1,"EUR":0.8613,"UAH":45.05,"PLN":3.664}}"""
 });
 var currencyHandler = new ClaudeHandler(currencyResponses);
 using (var currencyClient = new HttpClient(currencyHandler))
 using (var currencySource = new CurrencySnapshotSource(currencyClient) { BaseUrl = "https://rates.test/v6/latest/" })
 {
     // USD duplicates the base and "bad" is not a code: both must be dropped.
-    var currencySettings = new CurrencySettings { BaseCurrency = "usd", QuoteCurrencies = ["EUR", "uah", "PLN", "USD", "bad"] };
+    var currencySettings = new CurrencySettings
+    {
+        SourceKind = CurrencySourceKind.ExchangeRateApi,
+        BaseCurrency = "usd",
+        QuoteCurrencies = ["EUR", "uah", "PLN", "USD", "bad"]
+    };
     var currencySnapshot = await currencySource.ReadAsync(currencySettings);
     Assert(currencyHandler.Requests[0] == "https://rates.test/v6/latest/USD", "the base currency must form the request path");
     Assert(currencySnapshot.Available && currencySnapshot.Rates.Count == 3, "three valid quote currencies should parse");
-    Assert(currencySnapshot.Rates[1].Code == "UAH" && Math.Abs(currencySnapshot.Rates[1].Rate - 41.32) < 0.0001,
+    Assert(currencySnapshot.Rates[1].Code == "UAH" && Math.Abs(currencySnapshot.Rates[1].Rate - 45.05) < 0.0001,
         "the UAH rate was parsed incorrectly");
+    Assert(currencySnapshot.DataDate == DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(1787990402).ToLocalTime().Date),
+        "the ExchangeRate-API data date must come from time_last_update_unix");
     var currencyCached = await currencySource.ReadAsync(currencySettings);
     Assert(ReferenceEquals(currencySnapshot, currencyCached), "currency reads inside the cache window must not call the API");
     Assert(currencyHandler.Requests.Count == 1, "exactly one rates request expected");
@@ -857,6 +864,72 @@ using (var currencySource = new CurrencySnapshotSource(currencyClient) { BaseUrl
     Assert(currencyEmpty.JpegBytes is [0xFF, 0xD8, ..], "the empty currency view did not render");
 }
 
+// The default source: the currency-api dataset with lowercase codes.
+var cdnHandler = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"date":"2026-08-22","usd":{"eur":0.8613,"uah":45.02,"pln":3.664,"usd":1}}"""
+}));
+using (var cdnClient = new HttpClient(cdnHandler))
+using (var cdnSource = new CurrencySnapshotSource(cdnClient) { CurrencyApiBaseUrl = "https://cdn.test/currencies/" })
+{
+    var cdnSnapshot = await cdnSource.ReadAsync(new CurrencySettings
+    {
+        BaseCurrency = "USD",
+        QuoteCurrencies = ["EUR", "UAH"]
+    });
+    Assert(cdnHandler.Requests[0] == "https://cdn.test/currencies/usd.json",
+        "the currency-api request must use the lowercase base");
+    Assert(cdnSnapshot.Available && cdnSnapshot.Rates.Count == 2
+        && Math.Abs(cdnSnapshot.Rates[1].Rate - 45.02) < 0.0001,
+        "currency-api lowercase rates must parse");
+    Assert(cdnSnapshot.DataDate == new DateOnly(2026, 8, 22), "the currency-api data date must parse");
+}
+
+// The NBU official table: UAH per unit, other pairs crossed through UAH.
+const string nbuJson = """
+    [
+      {"r030":840,"txt":"Долар США","rate":45.05,"cc":"USD","exchangedate":"22.08.2026"},
+      {"r030":978,"txt":"Євро","rate":52.31,"cc":"EUR","exchangedate":"22.08.2026"},
+      {"r030":985,"txt":"Злотий","rate":12.29,"cc":"PLN","exchangedate":"22.08.2026"}
+    ]
+    """;
+using (var nbuClient = new HttpClient(new ClaudeHandler(new Queue<string>(new[] { nbuJson }))))
+using (var nbuSource = new CurrencySnapshotSource(nbuClient) { NbuBaseUrl = "https://nbu.test/exchange?json" })
+{
+    var nbuSnapshot = await nbuSource.ReadAsync(new CurrencySettings
+    {
+        SourceKind = CurrencySourceKind.Nbu,
+        BaseCurrency = "USD",
+        QuoteCurrencies = ["UAH", "EUR"]
+    });
+    Assert(nbuSnapshot.Available && nbuSnapshot.Rates.Count == 2, "the NBU table must produce both quotes");
+    Assert(Math.Abs(nbuSnapshot.Rates[0].Rate - 45.05) < 0.0001, "USD to UAH must be the official rate itself");
+    Assert(Math.Abs(nbuSnapshot.Rates[1].Rate - 45.05 / 52.31) < 0.0001, "USD to EUR must cross through UAH");
+    Assert(nbuSnapshot.DataDate == new DateOnly(2026, 8, 22), "the NBU exchangedate must parse");
+}
+
+// A blocked CDN must fall back to ExchangeRate-API without surfacing an error.
+var fallbackHandler = new RoutingHandler(url =>
+    url.Contains("cdn.test", StringComparison.Ordinal)
+        ? null
+        : """{"result":"success","time_last_update_unix":1787990402,"rates":{"UAH":45.05}}""");
+using (var fallbackClient = new HttpClient(fallbackHandler))
+using (var fallbackSource = new CurrencySnapshotSource(fallbackClient)
+{
+    CurrencyApiBaseUrl = "https://cdn.test/currencies/",
+    BaseUrl = "https://rates.test/v6/latest/"
+})
+{
+    var fallbackSnapshot = await fallbackSource.ReadAsync(new CurrencySettings
+    {
+        BaseCurrency = "USD",
+        QuoteCurrencies = ["UAH"]
+    });
+    Assert(fallbackSnapshot.Available && !fallbackSnapshot.IsStale
+        && Math.Abs(fallbackSnapshot.Rates[0].Rate - 45.05) < 0.0001,
+        "a blocked CDN must fall back to ExchangeRate-API silently");
+}
+
 using (var noQuotesClient = new HttpClient(new ClaudeHandler(new Queue<string>())))
 using (var noQuotesSource = new CurrencySnapshotSource(noQuotesClient))
 {
@@ -864,7 +937,7 @@ using (var noQuotesSource = new CurrencySnapshotSource(noQuotesClient))
     Assert(!noQuotes.Available && noQuotes.ErrorMessage is not null,
         "no configured quotes must surface a message without a request");
 }
-Console.WriteLine("PASS currency source: normalization, parsing, cache");
+Console.WriteLine("PASS currency source: three providers, NBU cross-rates, CDN fallback, data dates, cache");
 
 // ---- crypto source ---------------------------------------------------------
 Assert(BinanceStockSnapshotSource.TrimQuoteAsset("BTCUSDT") == "BTC", "BTCUSDT must display as BTC");
@@ -1845,6 +1918,15 @@ sealed class ClaudeHandler : HttpMessageHandler
             Content = new StringContent(_responses.Dequeue())
         });
     }
+}
+
+/// <summary>Routes by URL: a body string means 200, null means 503.</summary>
+sealed class RoutingHandler(Func<string, string?> route) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(route(request.RequestUri!.ToString()) is { } body
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) }
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new StringContent(string.Empty) });
 }
 
 sealed class StatusHandler(System.Net.HttpStatusCode status) : HttpMessageHandler

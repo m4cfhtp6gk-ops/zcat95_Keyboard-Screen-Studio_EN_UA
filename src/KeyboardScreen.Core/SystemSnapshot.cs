@@ -60,8 +60,9 @@ public sealed record SystemSnapshot(
         Currency: new CurrencySnapshot(
             Available: true,
             "USD",
-            [new CurrencyRate("EUR", 0.9214), new CurrencyRate("UAH", 41.32), new CurrencyRate("PLN", 3.968)],
-            DateTimeOffset.Now),
+            [new CurrencyRate("EUR", 0.8613), new CurrencyRate("UAH", 45.05), new CurrencyRate("PLN", 3.664)],
+            DateTimeOffset.Now,
+            DataDate: DateOnly.FromDateTime(DateTime.Today)),
         Crypto: new CryptoSnapshot(
             [
                 new CryptoCoinSnapshot("BTCUSDT", "BTC", 97_412.55, 2.41,

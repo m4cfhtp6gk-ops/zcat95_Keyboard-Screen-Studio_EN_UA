@@ -783,6 +783,15 @@
                           <TextBox Grid.Column="1" MaxLength="64" Text="{Binding CurrencyQuotes, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CurrencyQuotesHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize CurrencySourceLabel}" />
+                          <ComboBox
+                              Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding CurrencySourceOptions}"
+                              SelectedItem="{Binding CurrencySourcePreference, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize CurrencySourceHint}" TextWrapping="Wrap" />
                         <TextBlock Classes="secondary" Text="{Binding SourceSummary}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
