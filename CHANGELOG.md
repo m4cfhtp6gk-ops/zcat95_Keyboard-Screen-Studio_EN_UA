@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.5.0 - 2026-08-22
+
+### Added
+
+- Alert priority: an alert in the selected region takes over the screen by
+  itself - full-screen or a Telegram-style popup banner - until the all-clear
+  or for a set number of minutes, outranking the carousel, media automation
+  and the night schedule at full brightness. Region dropdown (raion/city
+  alerts count for their oblast) and an alert-duration line after the
+  all-clear.
+- Calendar theme: upcoming events from a user-supplied ICS link (webcal://
+  works) with the common repeat rules; the link is treated as a credential
+  and stripped from settings exports.
+- Countdown theme: up to three events, the nearest large in days/hours/
+  minutes left.
+- World Clock theme: up to four cities with offsets, day marks and a night
+  tint.
+- Ping Monitor theme: latency to up to four hosts with loss-preserving bar
+  history.
+- Disks theme: fill bars for every ready volume.
+- Weather: sunrise/sunset and the European AQI (colored by band) on the
+  five-day screen.
+- Stocks: per-symbol quantities and a portfolio row with the day's change.
+- Per-theme accent colors; extra keyboards mirroring every pushed frame.
+
+### Changed
+
+- 32 built-in themes (was 27); string catalogues at 721 keys in all three
+  languages; exports also strip the alerts token and calendar link;
+  third-party notices cover the air-quality endpoint and calendar feeds.
+
 ## v1.4.0 - 2026-08-22
 
 ### Added
