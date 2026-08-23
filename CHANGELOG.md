@@ -12,8 +12,14 @@
 ### Fixed
 
 - The limits screen no longer depends on getting past Cloudflare. Absent
-  windows, elapsed windows and the known epoch-in-percentage bug are all
-  reported as "no data" instead of wrong numbers.
+  windows and the known epoch-in-percentage bug are reported as "no
+  data", and an elapsed window reads as 0% instead of vanishing.
+- The cookie source no longer impersonates Chrome, recognises a
+  Cloudflare challenge by its `cf-mitigated` header instead of an English
+  body phrase (a challenge was being misreported as a rejected key),
+  keys its cache on the cookie's value rather than its length, cannot
+  report a stale HTTP status, and no longer extends its own backoff when
+  the diagnostic button is pressed.
 
 ## v1.7.2 - 2026-08-23
 

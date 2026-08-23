@@ -304,6 +304,7 @@
   "ComposerEmptyLine3": "添加小组件",
   "ScreenGitHubToday": "今日",
   "ClaudeStatuslineNotSetUp": "Claude Code 尚未报告用量",
+  "ClaudeStatuslineStale": "Claude Code 已有一段时间未运行",
   "ClaudeStatuslineNoLimits": "Claude Code 数据中没有用量",
   "ClaudeStatuslineUnreadable": "无法读取 Claude Code 数据",
   "ScreenClaudeChallenged": "Cloudflare 拦截",

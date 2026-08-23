@@ -304,6 +304,7 @@
   "ComposerEmptyLine3": "в налаштуваннях теми",
   "ScreenGitHubToday": "Сьогодні",
   "ClaudeStatuslineNotSetUp": "Claude Code ще не повідомив ліміти",
+  "ClaudeStatuslineStale": "Claude Code давно не працював",
   "ClaudeStatuslineNoLimits": "У даних Claude Code немає лімітів",
   "ClaudeStatuslineUnreadable": "Не вдалося прочитати дані Claude Code",
   "ScreenClaudeChallenged": "Блок Cloudflare",

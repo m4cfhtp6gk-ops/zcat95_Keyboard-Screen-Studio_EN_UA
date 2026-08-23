@@ -731,16 +731,17 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
     var cached = await claudeSource.ReadAsync(claudeSettings);
     Assert(ReferenceEquals(claudeSnapshot, cached), "a second read inside the cache window must not call the API");
     Assert(claudeHandler.Requests.Count == 2, "the cached read issued extra requests");
-    Assert(claudeHandler.ClientHints.All(hint => hint.Contains("Chromium")),
-        "every claude.ai request must carry the sec-ch-ua client hints");
     Assert(claudeHandler.Versions.All(version => version.Major == 2),
         "claude.ai requests must ask for HTTP/2 like the browser the cookie came from");
-    // The fingerprint has to be coherent and current: a year-old Chrome major,
-    // or hints that disagree with the user-agent, is exactly what gets flagged.
-    string claudeUaMajor = claudeHandler.UserAgents[0].Split("Chrome/")[1].Split('.')[0];
-    Assert(int.Parse(claudeUaMajor) >= 151, "the Chrome fingerprint regressed to a stale major version");
-    Assert(claudeHandler.ClientHints.All(hint => hint.Contains("v=\"" + claudeUaMajor + "\"")),
-        "sec-ch-ua must claim the same Chrome major as the User-Agent");
+    // Deliberately honest: claiming Chrome while presenting a .NET TLS and
+    // HTTP/2 fingerprint is the contradiction bot heuristics score against, and
+    // pinning a Chrome major turned into a release-chasing treadmill.
+    Assert(claudeHandler.UserAgents.All(agent => agent.StartsWith("KeyboardScreenStudio/")),
+        "the client must identify itself honestly, not as a browser");
+    Assert(claudeHandler.UserAgents.All(agent => !agent.Contains("Chrome")),
+        "no browser impersonation in the user-agent");
+    Assert(claudeHandler.ClientHints.All(string.IsNullOrEmpty),
+        "browser client hints must not be sent by a non-browser client");
 }
 
 // ---- Claude limits without claude.ai (Claude Code status line) ------------
@@ -748,7 +749,10 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
 // documented quirk of that payload is exercised here, because each one would
 // otherwise reach the screen as a wrong number rather than as "no data".
 {
-    DateTimeOffset statusNow = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
+    // Anchored on the real clock: ClaudeUsageWindow.HasReset compares against
+    // DateTimeOffset.Now, so a fabricated "now" would make elapsed windows look
+    // like future ones.
+    DateTimeOffset statusNow = DateTimeOffset.Now;
     long inFiveHours = statusNow.AddHours(5).ToUnixTimeSeconds();
     long alreadyPassed = statusNow.AddHours(-1).ToUnixTimeSeconds();
 
@@ -781,12 +785,39 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
     Assert(bogus.Session is null, "a percentage outside 0-100 must be discarded");
     Assert(bogus.Week is not null, "one bad window must not discard the other");
 
-    // Claude Code only rewrites the file while it runs, so an elapsed window is
-    // history and must not be shown as current.
-    var stale = ClaudeStatuslineUsage.Parse(
+    // An elapsed window has RESET - it is 0%, not missing. Dropping it would
+    // read as "the feed is broken" and would disagree with the cookie path,
+    // which renders the same state as zero.
+    var elapsed = ClaudeStatuslineUsage.Parse(
         "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":90,\"resets_at\":" + alreadyPassed + "}}}",
         statusNow);
-    Assert(!stale.Available, "a window whose reset has passed must not be reported as current");
+    Assert(elapsed.Available && elapsed.Session is { HasReset: true }
+        && Math.Abs(elapsed.Session.EffectivePercent) < 0.001,
+        "a window past its reset must read as 0%, not disappear");
+
+    // Claude Code rewrites the file on every render, so a file that has not
+    // moved in hours is a finished session and must say so.
+    var old = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":60,\"resets_at\":" + inFiveHours + "}}}",
+        statusNow, statusNow.AddHours(-4));
+    Assert(old.Available && old.IsStale, "numbers from a long-finished session must be flagged stale");
+    var recent = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":60,\"resets_at\":" + inFiveHours + "}}}",
+        statusNow, statusNow.AddMinutes(-2));
+    Assert(recent.Available && !recent.IsStale, "a file written moments ago is current");
+
+    // The shim must survive a realistic payload: Out-File would have wrapped
+    // this at the host width and cut the JSON mid-object.
+    string shim = ClaudeStatuslineUsage.ShimCommand("C:\\tmp\\u.json");
+    Assert(!shim.Contains("Out-File"), "Out-File truncates to the console width and corrupts the JSON");
+    Assert(shim.Contains("Set-Content") && shim.Contains("-NoNewline"),
+        "the shim must write the blob verbatim");
+    Assert(shim.Contains(ClaudeStatuslineSetup.Marker),
+        "the shim must be recognisable regardless of where it writes");
+    string longBlob = "{\"cwd\":\"" + new string('x', 300) + "\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":12,\"resets_at\":"
+        + inFiveHours + "}}}";
+    Assert(ClaudeStatuslineUsage.Parse(longBlob, statusNow).Available,
+        "a realistic long payload must parse (this is what truncation broke)");
 
     Assert(!ClaudeStatuslineUsage.Parse("not json at all", statusNow).Available,
         "a truncated or unwritten file must degrade, not throw");

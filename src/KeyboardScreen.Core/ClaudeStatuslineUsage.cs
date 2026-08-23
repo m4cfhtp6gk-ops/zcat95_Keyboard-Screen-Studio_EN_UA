@@ -27,6 +27,9 @@ namespace KeyboardScreen.Core;
 /// </summary>
 public static class ClaudeStatuslineUsage
 {
+    /// <summary>Past this, the numbers describe a Claude Code session that has ended.</summary>
+    public static readonly TimeSpan StaleAfter = TimeSpan.FromHours(1);
+
     /// <summary>Where the shim writes the blob, next to Claude Code's own files.</summary>
     public static string DefaultPath()
     {
@@ -69,7 +72,12 @@ public static class ClaudeStatuslineUsage
             return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeStatuslineNoLimits"));
         }
 
-        return new ClaudeUsageSnapshot(true, session, week, null, writtenAt ?? now);
+        // Claude Code rewrites the file on every render while it runs, so a file
+        // that has not moved in hours describes a session that is over.
+        bool stale = writtenAt is { } written && now - written > StaleAfter;
+        return new ClaudeUsageSnapshot(
+            true, session, week, null, writtenAt ?? now,
+            stale, stale ? Loc.T("ClaudeStatuslineStale") : null);
     }
 
     /// <summary>Reads the file the shim maintains; a missing file simply means Claude Code has not run.</summary>
@@ -108,10 +116,11 @@ public static class ClaudeStatuslineUsage
             return null;
         }
 
-        DateTimeOffset? resetsAt = ReadResetsAt(window);
-        // A window whose reset has already passed describes a period that is
-        // over; showing it as current would be a lie of omission.
-        return resetsAt is { } reset && reset <= now ? null : new ClaudeUsageWindow(kind, percent, resetsAt);
+        // An elapsed window is not missing data - it is a window that has reset,
+        // which the snapshot already models as 0%. Dropping it here would read as
+        // "Claude Code is not reporting" when the truth is "you are back to zero",
+        // and would differ from what the same state shows on the cookie path.
+        return new ClaudeUsageWindow(kind, percent, ReadResetsAt(window));
     }
 
     /// <summary>Documented as 0-100; anything else is the known epoch-in-percentage bug and is dropped.</summary>
@@ -147,12 +156,14 @@ public static class ClaudeStatuslineUsage
     public static string ShimCommand(string? targetPath = null)
     {
         string target = targetPath ?? DefaultPath();
-        // PowerShell reads the whole of stdin, writes it, and stays silent. The
-        // trailing comment is what lets a rerun recognise its own command, so it
-        // must not depend on the file name - that is configurable.
-        return "powershell -NoProfile -Command \"$input | Out-File -Encoding utf8 -FilePath '"
+        // ReadToEnd + Set-Content, deliberately: Out-File wraps to the host width
+        // (80 columns with no console attached in Windows PowerShell), which cuts
+        // the status-line JSON mid-object and makes every read unparseable.
+        // The trailing comment is what lets a rerun recognise its own command, so
+        // it must not depend on the file name - that is configurable.
+        return "powershell -NoProfile -Command \"[Console]::In.ReadToEnd() | Set-Content -LiteralPath '"
             + target.Replace("'", "''")
-            + "'\" #"
+            + "' -Encoding utf8 -NoNewline\" #"
             + ClaudeStatuslineSetup.Marker;
     }
 }

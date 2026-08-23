@@ -18,10 +18,21 @@ block.
 ## Fixed
 
 - The limits screen no longer depends on getting past Cloudflare, which
-  is what kept breaking it: the previous approaches - browser-coherent
-  headers, a current Chrome fingerprint, and full cookie handling - are
-  all still in, but none of them can survive `cf_clearance` being bound
-  to the browser that solved the challenge.
+  is what kept breaking it. `cf_clearance` is bound to the browser that
+  solved the challenge - TLS fingerprint included - so no amount of
+  header work could have made a .NET client pass as that browser.
+- **The app no longer pretends to be Chrome.** Claiming a browser
+  user-agent and browser client hints while presenting a .NET connection
+  fingerprint is a contradiction that bot detection scores against; the
+  cookie source now identifies itself honestly.
+- A Cloudflare challenge is recognised by its `cf-mitigated` header
+  rather than only by an English phrase in the page body, so a challenge
+  is no longer misreported as a rejected session key - which had been
+  sending people off to regenerate a key that was never the problem.
+- Pressing "test connection" during a block no longer extends that
+  block, the reported status can no longer be a leftover from an earlier
+  call, and re-pasting a refreshed cookie is no longer ignored by a
+  cache keyed on the cookie's length.
 
 ## Notes
 

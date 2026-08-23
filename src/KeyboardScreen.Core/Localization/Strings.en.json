@@ -304,6 +304,7 @@
   "ComposerEmptyLine3": "in the theme settings",
   "ScreenGitHubToday": "Today",
   "ClaudeStatuslineNotSetUp": "Claude Code has not reported limits yet",
+  "ClaudeStatuslineStale": "Claude Code has not run for a while",
   "ClaudeStatuslineNoLimits": "No limits in the Claude Code data",
   "ClaudeStatuslineUnreadable": "Could not read the Claude Code data",
   "ScreenClaudeChallenged": "Cloudflare block",

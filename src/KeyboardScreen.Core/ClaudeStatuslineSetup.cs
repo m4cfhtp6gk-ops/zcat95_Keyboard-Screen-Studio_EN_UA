@@ -69,9 +69,13 @@ public static class ClaudeStatuslineSetup
         try
         {
             JsonObject root = ReadObject(path);
-            if (root["statusLine"] is JsonObject existing)
+            if (root["statusLine"] is { } existing)
             {
-                string current = existing["command"]?.GetValue<string>() ?? string.Empty;
+                // Any shape counts as somebody's configuration - a status line
+                // stored as a bare string must not slip past this guard.
+                string current = existing is JsonObject configured
+                    ? configured["command"]?.GetValue<string>() ?? existing.ToJsonString()
+                    : existing.ToJsonString();
                 if (current.Contains(Marker, StringComparison.OrdinalIgnoreCase))
                 {
                     return new Result(Outcome.AlreadyInstalled, path, current);
@@ -103,7 +107,10 @@ public static class ClaudeStatuslineSetup
             File.WriteAllText(temp, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             if (File.Exists(path))
             {
-                File.Replace(temp, path, path + ".kss.bak", ignoreMetadataErrors: true);
+                // No backup file: this directory belongs to Claude Code, and
+                // leaving a settings.json.kss.bak behind after every install is
+                // litter in somebody else's house.
+                File.Replace(temp, path, destinationBackupFileName: null, ignoreMetadataErrors: true);
             }
             else
             {
