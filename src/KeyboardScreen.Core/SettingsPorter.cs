@@ -18,9 +18,9 @@ public static class SettingsPorter
     {
         ArgumentNullException.ThrowIfNull(settings);
         AppSettings clone = Clone(settings);
+        // Claude usage carries no secret any more: it reads this machine's own
+        // Claude Code transcripts, so there is nothing here to strip.
         clone.ClaudeUsage ??= new ClaudeUsageSettings();
-        clone.ClaudeUsage.SessionKey = string.Empty;
-        clone.ClaudeUsage.OrganizationId = string.Empty;
         clone.GitHub ??= new GitHubSettings();
         clone.GitHub.Token = string.Empty;
         clone.Telegram ??= new TelegramSettings();
@@ -51,11 +51,6 @@ public static class SettingsPorter
 
         // A stripped file must not wipe the secrets this machine already has.
         imported.ClaudeUsage ??= new ClaudeUsageSettings();
-        if (string.IsNullOrWhiteSpace(imported.ClaudeUsage.SessionKey))
-        {
-            imported.ClaudeUsage.SessionKey = current.ClaudeUsage?.SessionKey ?? string.Empty;
-            imported.ClaudeUsage.OrganizationId = current.ClaudeUsage?.OrganizationId ?? string.Empty;
-        }
 
         imported.GitHub ??= new GitHubSettings();
         if (string.IsNullOrWhiteSpace(imported.GitHub.Token))

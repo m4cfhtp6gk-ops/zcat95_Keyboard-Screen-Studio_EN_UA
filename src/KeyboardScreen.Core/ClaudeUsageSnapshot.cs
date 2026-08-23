@@ -14,13 +14,15 @@ public enum ClaudeUsageWindowKind
 }
 
 /// <summary>
-/// One Claude limit window.
+/// One Claude usage window.
 ///
-/// <see cref="UtilizationPercent"/> is what the account actually reports. Token
-/// counts are not part of any limit response, so <see cref="TokensUsed"/> is
-/// summed from the local Claude Code transcripts and only covers this machine —
-/// it is a floor on real usage, never the account total, and it is null when no
-/// transcripts were read.
+/// <see cref="TokensUsed"/> is summed from the local Claude Code transcripts and
+/// only covers this machine — a floor on real usage, never the account total.
+/// <see cref="UtilizationPercent"/> is that figure measured against the budget
+/// the user set, not a quota reported by any server: no local file records the
+/// account's real limits, and every remote path that claimed to has since
+/// stopped working. A percentage of your own target is honest; a percentage of
+/// a guessed quota would not be.
 /// </summary>
 public sealed record ClaudeUsageWindow(
     ClaudeUsageWindowKind Kind,
@@ -39,20 +41,19 @@ public sealed record ClaudeUsageWindow(
 
 /// <summary>The three limit windows drawn by <see cref="ClaudeUsageTheme"/>.</summary>
 /// <summary>
-/// What one diagnostic round-trip found. Deliberately verbatim: the point is to
-/// replace guesswork with the status code and body the server actually sent.
+/// What one diagnostic pass found on this machine. There is no server in this
+/// path any more, so the useful facts are local: whether Claude Code's
+/// transcript directory is where we expect it, and how much it actually yielded.
 /// </summary>
-/// <param name="Cookies">Cookie names and value lengths only - never the values.</param>
+/// <param name="Detail">The directory checked, or the reason it produced nothing.</param>
 public sealed record ClaudeConnectionReport(
     bool Success,
-    string Stage,
-    int StatusCode,
-    string Message,
-    string Cookies)
+    string Detail,
+    long TokensThisWeek = 0)
 {
     public string ToDisplayString() => Success
-        ? Loc.T("ClaudeCheckLineOk", Message, Cookies)
-        : Loc.T("ClaudeCheckLineFailed", Stage, StatusCode, Message, Cookies);
+        ? Loc.T("ClaudeCheckLineOk", ClaudeUsageTheme.FormatTokens(TokensThisWeek), Detail)
+        : Loc.T("ClaudeCheckLineFailed", Detail);
 }
 
 public sealed record ClaudeUsageSnapshot(

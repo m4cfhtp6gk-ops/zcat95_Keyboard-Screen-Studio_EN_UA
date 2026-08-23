@@ -490,64 +490,41 @@
 
                     <Border IsVisible="{Binding IsClaudeTheme}" Classes="card">
                       <StackPanel Spacing="14">
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="6">
-                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
-                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyHint}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <Button Grid.Column="1" VerticalAlignment="Top" Command="{Binding OpenClaudeSiteCommand}" Content="{infra:Localize ClaudeOpenSite}" />
-                        </Grid>
-                        <StackPanel Spacing="8">
-                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                            <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSourceLabel}" />
-                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
-                                      ItemsSource="{Binding ClaudeSourceOptions}"
-                                      SelectedItem="{Binding ClaudeSourcePreference, Mode=TwoWay}" />
-                          </Grid>
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSourceHint}" TextWrapping="Wrap" />
-                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding !IsClaudeCookieSource}">
-                            <Button Click="ClaudeStatuslineSetupButton_OnClick" Content="{infra:Localize ClaudeStatuslineSetup}" />
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
-                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
-                          </Grid>
-                        </StackPanel>
-                        <StackPanel Spacing="10" IsVisible="{Binding IsClaudeCookieSource}">
-                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideHeading}" />
-                          <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
-                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep1}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep1Hint}" /></StackPanel>
-                            <Border Grid.Row="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" /></Border>
-                            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep2}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep2Hint}" TextWrapping="Wrap" /></StackPanel>
-                            <Border Grid.Row="4" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" /></Border>
-                            <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep3}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep3Hint}" /></StackPanel>
-                          </Grid>
-                        </StackPanel>
                         <StackPanel Spacing="6">
-                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyLabel}" />
-                          <TextBox PasswordChar="*"
-                                   PlaceholderText="{infra:Localize ClaudeSessionKeyPlaceholder}"
-                                   Text="{Binding ClaudeSessionKey, Mode=TwoWay}" />
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCookieHint}" TextWrapping="Wrap" />
-                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Button Click="ClaudeCheckButton_OnClick" Content="{infra:Localize ClaudeCheckButton}" />
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
-                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
-                          </Grid>
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeLocalSourceHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                          <Button Click="ClaudeCheckButton_OnClick" Content="{infra:Localize ClaudeCheckButton}" />
+                          <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                     Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
+                        </Grid>
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+                        <StackPanel Spacing="6">
+                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeBudgetHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeBudgetHint}" TextWrapping="Wrap" />
                         </StackPanel>
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                          <StackPanel VerticalAlignment="Center" Spacing="4">
-                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
-                          </StackPanel>
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudePlanLabel}" />
+                          <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
+                                    ItemsSource="{Binding ClaudePlanOptions}"
+                                    SelectedItem="{Binding ClaudePlanPreference, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSessionBudgetLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeSessionBudgetInput, Mode=TwoWay}" />
+                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeWeekBudgetLabel}" />
+                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeWeekBudgetInput, Mode=TwoWay}" />
+                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
                           <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeModelScopeHint}" TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="5">
-                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeCountTokensLabel}" />
-                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCountTokensHint}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ClaudeCountLocalTokens, Mode=TwoWay}" />
-                        </Grid>
                       </StackPanel>
                     </Border>
 

@@ -423,14 +423,14 @@ public sealed class ComposerTheme : IScreenTheme
         Card(c, r);
         if (s.ClaudeUsage is not { Available: true } usage)
         {
-            // The one failure worth naming: a Cloudflare challenge looks like
-            // "not connected" but the key is fine and the retry is automatic.
-            bool challenged = s.ClaudeUsage?.ErrorMessage == Loc.T("ClaudeChallenged");
-            c.AlignedText(Loc.T(challenged ? "ScreenClaudeChallenged" : "ScreenClaudeNotConnected"),
+            // There is only one way to be unavailable now: Claude Code has not
+            // written any transcripts on this machine. Nothing to retry, nothing
+            // to re-authenticate - so say the one thing that would fix it.
+            c.AlignedText(Loc.T("ScreenClaudeNotConnected"),
                 10, DimGray,
                 new Rect(r.Left + 9, r.Top + 10, r.Width - 18, 16),
                 FontWeights.Medium, TextAlignment.Center);
-            c.AlignedText(Loc.T(challenged ? "ScreenClaudeRetryLater" : "ScreenClaudeConnectHint"),
+            c.AlignedText(Loc.T("ScreenClaudeConnectHint"),
                 8.5, DimGray,
                 new Rect(r.Left + 9, r.Top + 30, r.Width - 18, 14),
                 FontWeights.Medium, TextAlignment.Center);

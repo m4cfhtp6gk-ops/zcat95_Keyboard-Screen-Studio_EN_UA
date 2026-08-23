@@ -154,9 +154,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private UiThemeMode _uiThemeMode = UiThemeMode.System;
     private string _updateStatusText = string.Empty;
     private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
-    private string _claudeSessionKey = string.Empty;
     private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
-    private bool _claudeCountLocalTokens = true;
+    private ClaudePlanKind _claudePlan = ClaudePlanKind.Pro;
+    private long _claudeSessionBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Session;
+    private long _claudeWeekBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Week;
     private ClaudeUsageSnapshot? _claudeUsage;
     private string _currencyBase = "USD";
     private CurrencySourceKind _currencySourceKind = CurrencySourceKind.CurrencyApi;
@@ -284,7 +285,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenFontsFolderCommand = new RelayCommand(() => _desktopServices.OpenFolder(_fontCatalog.FolderPath));
         OpenAuthorCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/zcat95"));
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
-        OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         OpenAlertsSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://alerts.in.ua"));
         StartKnobDetectCommand = new RelayCommand(StartKnobDetect);
         KnobDetectNextCommand = new RelayCommand(() => SetKnobDetectStep(2));
@@ -331,7 +331,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenFontsFolderCommand { get; }
     public ICommand OpenAuthorCommand { get; }
     public ICommand OpenTokscaleDocsCommand { get; }
-    public ICommand OpenClaudeSiteCommand { get; }
     public ICommand OpenAlertsSiteCommand { get; }
     public ICommand StartKnobDetectCommand { get; }
     public ICommand KnobDetectNextCommand { get; }
@@ -1399,34 +1398,113 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsClaudeTheme => SelectedTheme?.Id == "claude-usage";
 
-    /// <summary>
-    /// The claude.ai session cookie. It is written to this machine's settings
-    /// file and sent to claude.ai only; the risk notice says so before it is asked for.
-    /// </summary>
-    public string ClaudeSessionKey
-    {
-        get => _claudeSessionKey;
-        set
-        {
-            if (SetProperty(ref _claudeSessionKey, value))
-            {
-                // A different account means the cached organization is wrong.
-                _settings.ClaudeUsage.OrganizationId = string.Empty;
-                ScheduleCommit();
-            }
-        }
-    }
-
     public string ClaudeModelScope
     {
         get => _claudeModelScope;
         set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
     }
 
-    public bool ClaudeCountLocalTokens
+    public IReadOnlyList<string> ClaudePlanOptions =>
+        [Loc.T("ClaudePlanPro"), Loc.T("ClaudePlanMax5"), Loc.T("ClaudePlanMax20"), Loc.T("ClaudePlanCustom")];
+
+    public string ClaudePlanPreference
     {
-        get => _claudeCountLocalTokens;
-        set { if (SetProperty(ref _claudeCountLocalTokens, value)) ScheduleCommit(); }
+        get => ClaudePlanOptions[(int)_claudePlan];
+        set
+        {
+            IReadOnlyList<string> options = ClaudePlanOptions;
+            int index = Math.Max(0, options.ToList().IndexOf(value));
+            var plan = (ClaudePlanKind)index;
+            if (_claudePlan == plan)
+            {
+                return;
+            }
+
+            _claudePlan = plan;
+            // Switching preset must move the visible numbers with it, otherwise
+            // the boxes keep showing the old plan's budget and read as broken.
+            if (plan != ClaudePlanKind.Custom)
+            {
+                (long session, long week) = ClaudeUsageSettings.PresetFor(plan);
+                _claudeSessionBudget = session;
+                _claudeWeekBudget = week;
+                OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
+                OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
+            }
+
+            OnPropertyChanged();
+            ScheduleCommit();
+        }
+    }
+
+    /// <summary>Budgets are typed in millions: nobody wants to count zeroes.</summary>
+    public string ClaudeSessionBudgetInput
+    {
+        get => FormatMillions(_claudeSessionBudget);
+        set
+        {
+            if (!TryParseMillions(value, out long tokens) || tokens == _claudeSessionBudget)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            _claudeSessionBudget = tokens;
+            SwitchToCustomPlan();
+            OnPropertyChanged();
+            ScheduleCommit();
+        }
+    }
+
+    public string ClaudeWeekBudgetInput
+    {
+        get => FormatMillions(_claudeWeekBudget);
+        set
+        {
+            if (!TryParseMillions(value, out long tokens) || tokens == _claudeWeekBudget)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            _claudeWeekBudget = tokens;
+            SwitchToCustomPlan();
+            OnPropertyChanged();
+            ScheduleCommit();
+        }
+    }
+
+    /// <summary>Editing a budget by hand is what "custom" means; say so in the picker.</summary>
+    private void SwitchToCustomPlan()
+    {
+        if (_claudePlan == ClaudePlanKind.Custom)
+        {
+            return;
+        }
+
+        _claudePlan = ClaudePlanKind.Custom;
+        OnPropertyChanged(nameof(ClaudePlanPreference));
+    }
+
+    private static string FormatMillions(long tokens) =>
+        (tokens / 1_000_000d).ToString("0.##", Loc.Culture);
+
+    private static bool TryParseMillions(string? text, out long tokens)
+    {
+        tokens = 0;
+        if (!double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, Loc.Culture, out double millions)
+            && !double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out millions))
+        {
+            return false;
+        }
+
+        if (millions is <= 0 or > 100_000)
+        {
+            return false;
+        }
+
+        tokens = (long)Math.Round(millions * 1_000_000d);
+        return tokens > 0;
     }
 
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
@@ -2711,14 +2789,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
         StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _claudeSourceKind = _settings.ClaudeUsage.SourceKind;
-        OnPropertyChanged(nameof(ClaudeSourcePreference));
-        OnPropertyChanged(nameof(IsClaudeCookieSource));
-        ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
+        _claudePlan = _settings.ClaudeUsage.Plan;
+        // Read the effective values, so the boxes show the preset the plan
+        // implies rather than the zero that means "follow the preset".
+        _claudeSessionBudget = _settings.ClaudeUsage.EffectiveSessionBudget;
+        _claudeWeekBudget = _settings.ClaudeUsage.EffectiveWeekBudget;
+        OnPropertyChanged(nameof(ClaudePlanPreference));
+        OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
+        OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : _settings.ClaudeUsage.ModelScope;
-        ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
         _settings.Currency ??= new CurrencySettings();
         _currencySourceKind = _settings.Currency.SourceKind;
         OnPropertyChanged(nameof(CurrencySourcePreference));
@@ -3111,50 +3192,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private string _claudeCheckResult = string.Empty;
-    private ClaudeUsageSourceKind _claudeSourceKind = ClaudeUsageSourceKind.StatusLine;
-    private bool _claudeStatuslineReplacePending;
 
-    public IReadOnlyList<string> ClaudeSourceOptions =>
-        [Loc.T("ClaudeSourceStatusLine"), Loc.T("ClaudeSourceWebCookie")];
-
-    public string ClaudeSourcePreference
-    {
-        get => ClaudeSourceOptions[(int)_claudeSourceKind];
-        set
-        {
-            IReadOnlyList<string> options = ClaudeSourceOptions;
-            int index = Math.Max(0, options.ToList().IndexOf(value));
-            var kind = (ClaudeUsageSourceKind)index;
-            if (_claudeSourceKind == kind)
-            {
-                return;
-            }
-
-            _claudeSourceKind = kind;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsClaudeCookieSource));
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>The cookie card only makes sense while the cookie source is chosen.</summary>
-    public bool IsClaudeCookieSource => _claudeSourceKind == ClaudeUsageSourceKind.WebCookie;
-
-    /// <summary>
-    /// Points Claude Code's status line at the file this app reads. A status
-    /// line the user set up themselves is never replaced without a second press.
-    /// </summary>
-    public void SetUpClaudeStatusline()
-    {
-        ClaudeStatuslineSetup.Result result = ClaudeStatuslineSetup.Install(
-            replace: _claudeStatuslineReplacePending);
-        // A foreign status line asks once; pressing again is the confirmation.
-        _claudeStatuslineReplacePending =
-            result.Outcome == ClaudeStatuslineSetup.Outcome.ForeignStatusLine;
-        ClaudeCheckResult = result.Describe();
-    }
-
-    /// <summary>The last diagnostic line, so a Cloudflare block can be read instead of guessed at.</summary>
+    /// <summary>The last diagnostic line: which directory was read, and what it held.</summary>
     public string ClaudeCheckResult
     {
         get => _claudeCheckResult;
@@ -3166,13 +3205,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
         var settings = new ClaudeUsageSettings
         {
-            SourceKind = _claudeSourceKind,
-            SessionKey = ClaudeSessionKey.Trim(),
-            // Resolve the organization from scratch: a stale id is one of the
-            // things a check has to be able to catch.
-            OrganizationId = string.Empty,
-            ModelScope = ClaudeModelScope,
-            CountLocalTokens = ClaudeCountLocalTokens
+            Plan = _claudePlan,
+            SessionTokenBudget = _claudeSessionBudget,
+            WeekTokenBudget = _claudeWeekBudget,
+            ModelScope = ClaudeModelScope
         };
 
         try
@@ -3423,12 +3459,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _settings.ClaudeUsage.SourceKind = _claudeSourceKind;
-        _settings.ClaudeUsage.SessionKey = ClaudeSessionKey.Trim();
+        _settings.ClaudeUsage.Plan = _claudePlan;
+        _settings.ClaudeUsage.SessionTokenBudget = _claudeSessionBudget;
+        _settings.ClaudeUsage.WeekTokenBudget = _claudeWeekBudget;
         _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : ClaudeModelScope.Trim();
-        _settings.ClaudeUsage.CountLocalTokens = ClaudeCountLocalTokens;
         _settings.Stocks = new StockSettings
         {
             SourceKind = StockSource,

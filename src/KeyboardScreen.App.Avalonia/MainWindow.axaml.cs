@@ -283,9 +283,6 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
-    private void ClaudeStatuslineSetupButton_OnClick(object? sender, RoutedEventArgs e) =>
-        _viewModel.SetUpClaudeStatusline();
-
     private async void ClaudeCheckButton_OnClick(object? sender, RoutedEventArgs e) =>
         await _viewModel.CheckClaudeConnectionAsync();
 
