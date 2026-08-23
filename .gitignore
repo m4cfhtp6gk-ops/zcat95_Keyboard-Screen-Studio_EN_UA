@@ -29,3 +29,6 @@ src/KeyboardScreen.App/Assets/Fonts/PingFang.ttc
 AI_CONTEXT.md
 AI_CHANGELOG.md
 PROJECT_CONTEXT.md
+
+# Python bytecode from the localization generator
+tools/loc/__pycache__/

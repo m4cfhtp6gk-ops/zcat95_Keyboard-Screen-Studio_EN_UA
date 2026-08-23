@@ -497,7 +497,21 @@
                           </StackPanel>
                           <Button Grid.Column="1" VerticalAlignment="Top" Command="{Binding OpenClaudeSiteCommand}" Content="{infra:Localize ClaudeOpenSite}" />
                         </Grid>
-                        <StackPanel Spacing="10">
+                        <StackPanel Spacing="8">
+                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
+                            <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSourceLabel}" />
+                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
+                                      ItemsSource="{Binding ClaudeSourceOptions}"
+                                      SelectedItem="{Binding ClaudeSourcePreference, Mode=TwoWay}" />
+                          </Grid>
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSourceHint}" TextWrapping="Wrap" />
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding !IsClaudeCookieSource}">
+                            <Button Click="ClaudeStatuslineSetupButton_OnClick" Content="{infra:Localize ClaudeStatuslineSetup}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Spacing="10" IsVisible="{Binding IsClaudeCookieSource}">
                           <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideHeading}" />
                           <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
                             <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>

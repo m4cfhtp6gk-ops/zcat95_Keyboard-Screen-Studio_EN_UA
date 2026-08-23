@@ -15,8 +15,12 @@ Assert(defaults.MinimizeToTray && defaults.CloseToTray, "first-run tray defaults
 Assert(defaults.Weather.UseAutomaticLocation, "first-run weather must use automatic location");
 Assert(defaults.Weather.LocationQuery == WeatherSettings.DefaultLocationQuery, "first-run weather city is incorrect");
 Assert(defaults.Language.Length == 0, "first-run language must defer to the operating system");
-Assert(defaults.ClaudeUsage.ModelScope == "Fable" && !defaults.ClaudeUsage.IsConfigured,
-    "Claude usage must start unconfigured with the Fable row");
+Assert(defaults.ClaudeUsage.ModelScope == "Fable", "Claude usage must start on the Fable row");
+// The credential-free source is the default, so there is nothing to configure
+// before a first read: an unprepared machine reports "no data", not "no key".
+Assert(defaults.ClaudeUsage.SourceKind == ClaudeUsageSourceKind.StatusLine
+    && defaults.ClaudeUsage.IsConfigured && defaults.ClaudeUsage.SessionKey.Length == 0,
+    "Claude usage must default to the local status-line source with no key");
 Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe area is incorrect");
 Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
 Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");
@@ -710,7 +714,7 @@ using (var claudeClient = new HttpClient(claudeHandler))
 using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
        { BaseUrl = "https://claude.test/api" })
 {
-    var claudeSettings = new ClaudeUsageSettings { SessionKey = "sk-ant-test" };
+    var claudeSettings = new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test" };
     var claudeSnapshot = await claudeSource.ReadAsync(claudeSettings);
     Assert(claudeSnapshot.Available, "Claude usage snapshot must be available");
     Assert(claudeSettings.OrganizationId == "org-123", "the organization id should be resolved and cached");
@@ -738,6 +742,168 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
     Assert(claudeHandler.ClientHints.All(hint => hint.Contains("v=\"" + claudeUaMajor + "\"")),
         "sec-ch-ua must claim the same Chrome major as the User-Agent");
 }
+
+// ---- Claude limits without claude.ai (Claude Code status line) ------------
+// Claude Code hands its status line the same numbers /usage shows. Every
+// documented quirk of that payload is exercised here, because each one would
+// otherwise reach the screen as a wrong number rather than as "no data".
+{
+    DateTimeOffset statusNow = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
+    long inFiveHours = statusNow.AddHours(5).ToUnixTimeSeconds();
+    long alreadyPassed = statusNow.AddHours(-1).ToUnixTimeSeconds();
+
+    var full = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":23.5,\"resets_at\":" + inFiveHours
+            + "},\"seven_day\":{\"used_percentage\":41.2,\"resets_at\":" + inFiveHours + "}}}",
+        statusNow);
+    Assert(full.Available && Math.Abs(full.Session!.UtilizationPercent - 23.5) < 0.001,
+        "the five-hour window must be read from the status line payload");
+    Assert(Math.Abs(full.Week!.UtilizationPercent - 41.2) < 0.001, "the seven-day window must be read");
+    Assert(full.Session.ResetsAt == DateTimeOffset.FromUnixTimeSeconds(inFiveHours).ToLocalTime(),
+        "resets_at is Unix epoch seconds here, not ISO 8601");
+
+    // Documented: rate_limits appears only for subscribers, after the first API
+    // response, and either window can be absent on its own.
+    Assert(!ClaudeStatuslineUsage.Parse("{\"model\":{\"id\":\"fable\"}}", statusNow).Available,
+        "a payload without rate_limits must report no data, not zeroes");
+    var onlyWeek = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"seven_day\":{\"used_percentage\":10,\"resets_at\":" + inFiveHours + "}}}",
+        statusNow);
+    Assert(onlyWeek.Available && onlyWeek.Session is null && onlyWeek.Week is not null,
+        "one window must survive the other being absent");
+
+    // Known Claude Code bug: used_percentage can carry an epoch timestamp while
+    // a window has no data. It must never render as "1776950400%".
+    var bogus = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":1776950400,\"resets_at\":" + inFiveHours
+            + "},\"seven_day\":{\"used_percentage\":40,\"resets_at\":" + inFiveHours + "}}}",
+        statusNow);
+    Assert(bogus.Session is null, "a percentage outside 0-100 must be discarded");
+    Assert(bogus.Week is not null, "one bad window must not discard the other");
+
+    // Claude Code only rewrites the file while it runs, so an elapsed window is
+    // history and must not be shown as current.
+    var stale = ClaudeStatuslineUsage.Parse(
+        "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":90,\"resets_at\":" + alreadyPassed + "}}}",
+        statusNow);
+    Assert(!stale.Available, "a window whose reset has passed must not be reported as current");
+
+    Assert(!ClaudeStatuslineUsage.Parse("not json at all", statusNow).Available,
+        "a truncated or unwritten file must degrade, not throw");
+    Assert(ClaudeStatuslineUsage.Read(Path.Combine(Path.GetTempPath(), "kss-no-such-usage.json")).Available == false,
+        "a missing file simply means Claude Code has not reported yet");
+    Assert(ClaudeStatuslineUsage.ShimCommand("C:\\Users\\me\\.claude\\u.json").Contains("C:\\Users\\me\\.claude\\u.json"),
+        "the shim command must point at the chosen file");
+
+    string statusFile = Path.Combine(Path.GetTempPath(), "kss-statusline-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        File.WriteAllText(statusFile,
+            "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":7,\"resets_at\":" + inFiveHours + "}}}");
+        var fromDisk = ClaudeStatuslineUsage.Read(statusFile, statusNow);
+        Assert(fromDisk.Available && Math.Abs(fromDisk.Session!.UtilizationPercent - 7) < 0.001,
+            "reading the shim's file must produce the same snapshot as parsing it");
+    }
+    finally
+    {
+        if (File.Exists(statusFile)) File.Delete(statusFile);
+    }
+}
+// Setting this up edits a file another program owns, so the rules are strict:
+// unrelated settings survive, a status line the user configured is never taken
+// over silently, and a rerun recognises its own work.
+{
+    string setupDirectory = Path.Combine(Path.GetTempPath(), "kss-cc-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(setupDirectory);
+    try
+    {
+        string settingsFile = Path.Combine(setupDirectory, "settings.json");
+        string usageFile = Path.Combine(setupDirectory, "usage.json");
+
+        // No file yet: one is created carrying just our status line.
+        var fresh = ClaudeStatuslineSetup.Install(settingsFile, usageFile);
+        Assert(fresh.Outcome == ClaudeStatuslineSetup.Outcome.Installed, "a missing settings file must be created");
+        Assert(ClaudeStatuslineSetup.IsInstalled(settingsFile), "the shim must be detectable after install");
+
+        // Rerunning is a no-op, not a duplicate.
+        Assert(ClaudeStatuslineSetup.Install(settingsFile, usageFile).Outcome
+            == ClaudeStatuslineSetup.Outcome.AlreadyInstalled, "a second install must report it is already done");
+
+        // Unrelated settings must survive the edit untouched.
+        File.WriteAllText(settingsFile,
+            "{\"model\":\"opus\",\"permissions\":{\"allow\":[\"Bash\"]},\"hooks\":{\"Stop\":[]}}");
+        Assert(ClaudeStatuslineSetup.Install(settingsFile, usageFile).Outcome
+            == ClaudeStatuslineSetup.Outcome.Installed, "installing into an existing file must succeed");
+        using (var written = System.Text.Json.JsonDocument.Parse(File.ReadAllText(settingsFile)))
+        {
+            var rootElement = written.RootElement;
+            Assert(rootElement.GetProperty("model").GetString() == "opus", "unrelated settings must survive");
+            Assert(rootElement.TryGetProperty("permissions", out _) && rootElement.TryGetProperty("hooks", out _),
+                "permissions and hooks must survive the edit");
+            Assert(rootElement.GetProperty("statusLine").GetProperty("command").GetString()!
+                .Contains(ClaudeStatuslineSetup.Marker), "the status line command must point at our file");
+        }
+
+        // Somebody else's status line is left alone until a second, explicit go.
+        File.WriteAllText(settingsFile,
+            "{\"statusLine\":{\"type\":\"command\",\"command\":\"my-own-statusline.sh\"}}");
+        var foreign = ClaudeStatuslineSetup.Install(settingsFile, usageFile);
+        Assert(foreign.Outcome == ClaudeStatuslineSetup.Outcome.ForeignStatusLine
+            && foreign.ExistingCommand == "my-own-statusline.sh",
+            "an existing third-party status line must be reported, not overwritten");
+        Assert(File.ReadAllText(settingsFile).Contains("my-own-statusline.sh"),
+            "the user's own status line must still be in the file");
+        Assert(ClaudeStatuslineSetup.Install(settingsFile, usageFile, replace: true).Outcome
+            == ClaudeStatuslineSetup.Outcome.Installed, "an explicit replace must go through");
+
+        // Malformed settings must fail loudly rather than destroy the file.
+        File.WriteAllText(settingsFile, "{ this is not json");
+        Assert(ClaudeStatuslineSetup.Install(settingsFile, usageFile).Outcome
+            == ClaudeStatuslineSetup.Outcome.Failed, "unparseable settings must be reported as a failure");
+        Assert(File.ReadAllText(settingsFile) == "{ this is not json",
+            "a failed install must leave the original file untouched");
+    }
+    finally
+    {
+        if (Directory.Exists(setupDirectory)) Directory.Delete(setupDirectory, recursive: true);
+    }
+}
+
+// The source routes to the local file when the status line is chosen, and never
+// touches the network in that mode.
+{
+    string routingFile = Path.Combine(Path.GetTempPath(), "kss-route-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        long resetsAt = DateTimeOffset.Now.AddHours(3).ToUnixTimeSeconds();
+        File.WriteAllText(routingFile,
+            "{\"rate_limits\":{\"five_hour\":{\"used_percentage\":55,\"resets_at\":" + resetsAt + "}}}");
+        var offlineHandler = new ClaudeHandler(new Queue<string>());
+        using var offlineClient = new HttpClient(offlineHandler);
+        using var routed = new ClaudeUsageSnapshotSource(offlineClient,
+            new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+            { BaseUrl = "https://claude.test/api", StatuslinePath = routingFile };
+        var local = await routed.ReadAsync(new ClaudeUsageSettings
+        {
+            SourceKind = ClaudeUsageSourceKind.StatusLine,
+            SessionKey = string.Empty
+        });
+        Assert(local.Available && Math.Abs(local.Session!.UtilizationPercent - 55) < 0.001,
+            "the status-line source must supply the snapshot");
+        Assert(offlineHandler.Requests.Count == 0,
+            "the status-line source must never reach the network (the mock would have thrown)");
+        Assert(new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.StatusLine }.IsConfigured,
+            "the status-line source needs no credentials to count as configured");
+        Assert(!new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie }.IsConfigured,
+            "the cookie source still requires a key");
+    }
+    finally
+    {
+        if (File.Exists(routingFile)) File.Delete(routingFile);
+    }
+}
+Console.WriteLine("PASS Claude limits from the Claude Code status line: absent windows, epoch-percentage bug, elapsed windows");
+Console.WriteLine("PASS Claude Code setup: settings preserved, foreign status line kept, offline routing");
 
 // Cookies: a bare key becomes sessionKey=, a pasted browser Cookie header is
 // kept whole (that is where cf_clearance lives), and server-issued cookies are
@@ -774,7 +940,7 @@ Assert(!ClaudeCookies.Describe("sessionKey=supersecret").Contains("supersecret")
     using var cookieSource = new ClaudeUsageSnapshotSource(cookieClient,
         new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
         { BaseUrl = "https://claude.test/api" };
-    await cookieSource.ReadAsync(new ClaudeUsageSettings { SessionKey = "sk-ant-test" });
+    await cookieSource.ReadAsync(new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test" });
     Assert(cookieHandler.Cookies.Count == 2, "the check should have issued both calls");
     Assert(!cookieHandler.Cookies[0].Contains("__cf_bm"), "nothing is carried before the server sets it");
     Assert(cookieHandler.Cookies[1].Contains("__cf_bm=carried-over"),
@@ -792,12 +958,12 @@ Assert(!ClaudeCookies.Describe("sessionKey=supersecret").Contains("supersecret")
         new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
         { BaseUrl = "https://claude.test/api" };
     ClaudeConnectionReport report = await checkSource.CheckAsync(
-        new ClaudeUsageSettings { SessionKey = "sk-ant-test" });
+        new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test" });
     Assert(!report.Success && report.StatusCode == 403 && report.Stage == "/organizations",
         "the diagnostic must name the failing call and its status");
     Assert(report.Message == Loc.T("ClaudeChallenged"), "a challenge must be reported as such");
     Assert(report.ToDisplayString().Contains("403"), "the displayed line must carry the status code");
-    ClaudeConnectionReport noKey = await checkSource.CheckAsync(new ClaudeUsageSettings());
+    ClaudeConnectionReport noKey = await checkSource.CheckAsync(new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie });
     Assert(!noKey.Success && noKey.Message == Loc.T("ClaudeCheckNoKey"),
         "an empty key must be reported without a request");
 }
@@ -811,12 +977,12 @@ using (var challengedSource = new ClaudeUsageSnapshotSource(challengedClient, ne
        { BaseUrl = "https://claude.test/api" })
 {
     var challenged = await challengedSource.ReadAsync(
-        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+        new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test", OrganizationId = "org-9" });
     Assert(!challenged.Available && challenged.ErrorMessage == Loc.T("ClaudeChallenged"),
         "a Cloudflare challenge must surface the challenge message, not an expired key");
     int requestsAfterChallenge = challengedHandler.RequestCount;
     var duringBackoff = await challengedSource.ReadAsync(
-        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+        new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test", OrganizationId = "org-9" });
     Assert(challengedHandler.RequestCount == requestsAfterChallenge,
         "reads during the challenge backoff must stay off the wire");
     Assert(duringBackoff.ErrorMessage == Loc.T("ClaudeChallenged"),
@@ -834,7 +1000,7 @@ using (var modernSource = new ClaudeUsageSnapshotSource(modernClient, new Claude
        { BaseUrl = "https://claude.test/api" })
 {
     var modernSnapshot = await modernSource.ReadAsync(
-        new ClaudeUsageSettings { SessionKey = "sk-ant-test", OrganizationId = "org-9" });
+        new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie, SessionKey = "sk-ant-test", OrganizationId = "org-9" });
     Assert(Math.Abs(modernSnapshot.ModelWeek!.UtilizationPercent - 64) < 0.001, "limits[] must override the nulled legacy key");
     Assert(modernSnapshot.ModelWeek.ScopeName == "Fable", "the scoped window should be the requested model");
 }
@@ -842,7 +1008,7 @@ using (var modernSource = new ClaudeUsageSnapshotSource(modernClient, new Claude
 // An unconfigured source reports unavailable without touching the network.
 using (var idleSource = new ClaudeUsageSnapshotSource(new HttpClient(new ClaudeHandler(new Queue<string>()))))
 {
-    var idle = await idleSource.ReadAsync(new ClaudeUsageSettings());
+    var idle = await idleSource.ReadAsync(new ClaudeUsageSettings { SourceKind = ClaudeUsageSourceKind.WebCookie });
     Assert(!idle.Available, "a source with no session key must not be available");
 }
 

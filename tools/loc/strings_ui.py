@@ -800,6 +800,24 @@ UI = [
      "Гучніше",
      "音量+"),
 
+    # ---- claude status-line source (v1.8.0) ----------------------------------
+    ("ClaudeSourceLabel",     "Limits from", "Ліміти з", "用量来源"),
+    ("ClaudeSourceStatusLine","Claude Code (no login)", "Claude Code (без входу)", "Claude Code（无需登录）"),
+    ("ClaudeSourceWebCookie", "claude.ai (session cookie)", "claude.ai (кука сесії)", "claude.ai（会话 Cookie）"),
+    ("ClaudeSourceHint",
+     "Claude Code reports the same 5-hour and weekly limits /usage shows, straight from your machine - no cookie, no login, and nothing for Cloudflare to block. The claude.ai source additionally reports the per-model week.",
+     "Claude Code повідомляє ті самі 5-годинний і тижневий ліміти, що показує /usage, просто з вашого комп'ютера - без куки, без входу, і Cloudflare тут ні до чого. Джерело claude.ai додатково дає тижневе вікно по моделі.",
+     "Claude Code 会直接在本机报告 /usage 显示的 5 小时与每周用量——无需 Cookie、无需登录，Cloudflare 也无从拦截。claude.ai 数据源另外提供按模型的每周窗口。"),
+    ("ClaudeStatuslineSetup",  "Set up Claude Code", "Налаштувати Claude Code", "配置 Claude Code"),
+    ("ClaudeStatuslineInstalled", "Done - Claude Code will report its limits from now on. Restart Claude Code if it is running.",
+                                  "Готово - Claude Code віднині повідомлятиме ліміти. Перезапустіть Claude Code, якщо він працює.",
+                                  "完成——Claude Code 之后会报告用量。若 Claude Code 正在运行，请重启它。"),
+    ("ClaudeStatuslineAlready",   "Already set up", "Вже налаштовано", "已经配置好"),
+    ("ClaudeStatuslineForeign",   "You already have a status line: {0}. It was left alone - press again to replace it.",
+                                  "У вас уже є рядок стану: {0}. Його не чіпали - натисніть ще раз, щоб замінити.",
+                                  "您已有状态行：{0}。未做改动——再次点击可替换它。"),
+    ("ClaudeStatuslineFailed",    "Could not write the Claude Code settings", "Не вдалося записати налаштування Claude Code", "无法写入 Claude Code 设置"),
+
     # ---- claude connection check (v1.7.2) ------------------------------------
     ("ClaudeCheckButton",  "Test connection", "Перевірити з'єднання", "测试连接"),
     ("ClaudeCheckRunning", "Checking...", "Перевіряю...", "正在检查……"),

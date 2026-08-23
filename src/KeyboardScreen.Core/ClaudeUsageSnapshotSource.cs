@@ -67,11 +67,21 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     /// <summary>Overridable for tests; production always talks to claude.ai.</summary>
     public string BaseUrl { get; init; } = "https://claude.ai/api";
 
+    /// <summary>Overridable for tests; production reads what the status-line shim writes.</summary>
+    public string? StatuslinePath { get; init; }
+
     public async Task<ClaudeUsageSnapshot> ReadAsync(
         ClaudeUsageSettings settings,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
+
+        if (settings.SourceKind == ClaudeUsageSourceKind.StatusLine)
+        {
+            // Nothing to cache, throttle or back off: this is a local file that
+            // Claude Code rewrites on its own schedule.
+            return ClaudeStatuslineUsage.Read(StatuslinePath);
+        }
 
         if (!settings.IsConfigured)
         {
@@ -222,6 +232,17 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (settings.SourceKind == ClaudeUsageSourceKind.StatusLine)
+        {
+            ClaudeUsageSnapshot local = ClaudeStatuslineUsage.Read(StatuslinePath);
+            return new ClaudeConnectionReport(
+                local.Available,
+                StatuslinePath ?? ClaudeStatuslineUsage.DefaultPath(),
+                0,
+                local.Available ? Loc.T("ClaudeCheckOk") : local.ErrorMessage ?? Loc.T("ClaudeStatuslineNotSetUp"),
+                "-");
+        }
+
         if (!settings.IsConfigured)
         {
             return new ClaudeConnectionReport(false, "-", 0, Loc.T("ClaudeCheckNoKey"), "-");
