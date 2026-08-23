@@ -1,39 +1,42 @@
-# v1.6.0
+# v1.7.0
 
-Switch themes with the keyboard's own volume knob, visible numbers on the
-performance graphs, and a hardware page that explains its dashes.
+Assemble your own screen from widgets, and settings that survive crashes.
 
 ## Added
 
-- **Knob theme switching** (off by default): turn the Linx68 volume knob
-  right for the next theme, left for the previous, press it to pause or
-  resume the carousel. The cycle follows the carousel's set when one is
-  configured, otherwise the whole catalog.
-  - A "mute the volume keys" toggle decides whether the knob only switches
-    themes or also changes the system volume.
-  - An optional **VID:PID** field binds the feature to the Linx68 alone, so
-    other keyboards' and headsets' volume keys keep working normally.
-  - A **dedicated-keys mode** for VIA/QMK users: remap the encoder to
-    F13/F14 and its press to F15 in the keyboard's configurator, and volume
-    is never involved at all. Software volume changes (tray slider, players)
-    never touch themes in any mode.
+- **Screen builder** — a new "My Screen" theme built from widgets. In the
+  theme's settings you stack widgets top to bottom and reorder them freely;
+  the preview shows the result live and a height budget line says how much
+  of the 142×428 screen is used.
+  - **21 widget kinds**: clock, date, CPU / RAM / GPU load, network speed,
+    hardware temperature/clock/fan, weather now, currency rates, crypto
+    price, ping, air-alert status, Claude limits, pomodoro, now playing,
+    next calendar event, nearest countdown, world clocks, GitHub today,
+    custom text and a spacer.
+  - Each widget reuses the data, formatting and translations of its parent
+    theme, so everything you already configured (city, currencies, hosts,
+    tokens) just shows up.
+  - The assembled screen is a normal catalog theme: the carousel, the
+    volume-knob switching, per-theme accent colour and refresh interval,
+    and the air-alert takeover all work with it unchanged.
+  - The app fetches only the data sources your placed widgets actually
+    need — an alert widget polls alerts, a screen without one does not.
 
 ## Fixed
 
-- **Performance graphs**: the per-panel numbers had never been visible — a
-  right-aligned text call without a width drew them off the canvas. They now
-  render next to each curve, with a "numeric readout" toggle (on by default)
-  in the theme's settings.
-- **Hardware monitor**: the em dashes now say why. Without administrator
-  rights the screen asks for them; already elevated with a board that still
-  reports nothing, it says the sensors do not answer. The settings card
-  gained a "restart as administrator" button that relaunches the app
-  elevated — the only thing that loads the driver behind CPU temperatures
-  and fan speeds.
+- **Settings now survive crashes and power loss.** Saves are written to a
+  side file and swapped in atomically, and the previous good save is kept
+  as a backup; a settings file torn mid-write restores from that backup
+  instead of silently resetting every token, layout and binding to
+  defaults.
+- **The auto-refresh loop no longer dies on unexpected errors** in the
+  push path; it reports the failure and retries on the next tick instead
+  of stopping until the app restarts.
 
 ## Platforms
 
 - Windows x64: self-contained portable build — unpack and run
   `KeyboardScreenStudio.exe`, no .NET installation required.
-- macOS: builds and is checked in CI; the knob listener is Windows-only and
-  no macOS binary is published.
+- macOS: builds and is checked in CI; the screen builder renders there
+  too, while the knob listener stays Windows-only. No macOS binary is
+  published.

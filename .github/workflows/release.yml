@@ -73,6 +73,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Re-running the release (e.g. to fix the notes) replaces the
+          # existing one for this tag instead of failing on it.
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release delete $env:RELEASE_TAG --yes
+          }
+          $global:LASTEXITCODE = 0
           gh release create $env:RELEASE_TAG `
             "${{ steps.package.outputs.archive }}" `
             "${{ steps.package.outputs.checksum }}" `
