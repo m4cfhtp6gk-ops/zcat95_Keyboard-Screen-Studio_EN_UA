@@ -8,7 +8,7 @@ Keyboard Screen Studio（KSS）是一款面向 Linx68 键盘竖屏的桌面工�
 
 ## 当前状态
 
-- **Windows：** v1.7.1，已迁移到 Avalonia UI，作为当前正式发布平台。
+- **Windows：** v1.7.2，已迁移到 Avalonia UI，作为当前正式发布平台。
 - **macOS：** 已保留跨平台项目和发布脚本，Intel 与 Apple Silicon 包仍待真实设备测试，暂不作为稳定版本发布。
 - **Linux：** 暂未发布；核心数据、渲染与平台接口已为后续适配留出空间。
 
@@ -30,7 +30,7 @@ Keyboard Screen Studio（KSS）是一款面向 Linx68 键盘竖屏的桌面工�
 - 电脑与键盘处于同一局域网。
 - 在键盘菜单中启用“图像 API”，然后将显示的 IP 地址填入 KSS。
 
-下载 Release 中的 `KeyboardScreenStudio-v1.7.1-win-x64.zip`，解压后运行 `KeyboardScreenStudio.exe`。发布包为自包含版本，无需另装 .NET。
+下载 Release 中的 `KeyboardScreenStudio-v1.7.2-win-x64.zip`，解压后运行 `KeyboardScreenStudio.exe`。发布包为自包含版本，无需另装 .NET。
 
 ## 从源码构建
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.7.2 - 2026-08-23
+
+### Fixed
+
+- Claude limits: cookies issued by claude.ai and Cloudflare are kept and
+  sent with the following requests, and the session-key field accepts a
+  whole browser `Cookie:` line (the one carrying `cf_clearance`). This
+  helps but cannot be a cure: `cf_clearance` is bound to the browser that
+  solved the challenge, TLS fingerprint included.
+
+### Added
+
+- A "Test connection" button in the Claude settings reporting the failing
+  call, HTTP status, challenge detection and the cookies sent (names and
+  lengths only).
+
 ## v1.7.1 - 2026-08-23
 
 ### Fixed

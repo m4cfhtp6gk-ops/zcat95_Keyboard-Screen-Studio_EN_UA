@@ -38,6 +38,23 @@ public sealed record ClaudeUsageWindow(
 }
 
 /// <summary>The three limit windows drawn by <see cref="ClaudeUsageTheme"/>.</summary>
+/// <summary>
+/// What one diagnostic round-trip found. Deliberately verbatim: the point is to
+/// replace guesswork with the status code and body the server actually sent.
+/// </summary>
+/// <param name="Cookies">Cookie names and value lengths only - never the values.</param>
+public sealed record ClaudeConnectionReport(
+    bool Success,
+    string Stage,
+    int StatusCode,
+    string Message,
+    string Cookies)
+{
+    public string ToDisplayString() => Success
+        ? Loc.T("ClaudeCheckLineOk", Message, Cookies)
+        : Loc.T("ClaudeCheckLineFailed", Stage, StatusCode, Message, Cookies);
+}
+
 public sealed record ClaudeUsageSnapshot(
     bool Available,
     ClaudeUsageWindow? Session = null,

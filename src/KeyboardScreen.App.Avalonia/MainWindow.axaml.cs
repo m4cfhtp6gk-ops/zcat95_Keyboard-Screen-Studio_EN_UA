@@ -283,6 +283,9 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
+    private async void ClaudeCheckButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await _viewModel.CheckClaudeConnectionAsync();
+
     private void ComposerAddButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.AddComposerWidget();
 

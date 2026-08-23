@@ -739,6 +739,69 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
         "sec-ch-ua must claim the same Chrome major as the User-Agent");
 }
 
+// Cookies: a bare key becomes sessionKey=, a pasted browser Cookie header is
+// kept whole (that is where cf_clearance lives), and server-issued cookies are
+// carried into the next request without ever shadowing the user's own values.
+Assert(ClaudeCookies.Normalize("sk-ant-abc") == "sessionKey=sk-ant-abc",
+    "a bare key must become a sessionKey cookie");
+Assert(ClaudeCookies.Normalize("Cookie: sessionKey=sk-1; cf_clearance=xyz; __cf_bm=q")
+        == "sessionKey=sk-1; cf_clearance=xyz; __cf_bm=q",
+    "a pasted Cookie header must survive intact, minus the header name");
+Assert(ClaudeCookies.HasChallengeCookie("sessionKey=sk-1; cf_clearance=xyz")
+    && !ClaudeCookies.HasChallengeCookie("sessionKey=sk-1"),
+    "the Cloudflare cookies must be recognised");
+Assert(ClaudeCookies.Merge("sessionKey=mine", new Dictionary<string, string>
+    {
+        ["__cf_bm"] = "fresh",
+        ["sessionKey"] = "stale"
+    }) == "sessionKey=mine; __cf_bm=fresh",
+    "server cookies must be added but must never replace what the user pasted");
+Assert(ClaudeCookies.ReadSetCookie("__cf_bm=abc; Path=/; HttpOnly") is { Name: "__cf_bm", Value: "abc" },
+    "Set-Cookie attributes must be ignored");
+Assert(ClaudeCookies.ReadSetCookie("sessionKey=; Max-Age=0") is null,
+    "a cookie deletion must not overwrite a good value");
+Assert(!ClaudeCookies.Describe("sessionKey=supersecret").Contains("supersecret"),
+    "the diagnostic must never print cookie values");
+
+// The Cloudflare cookie from one response must ride along on the next request.
+{
+    var cookieHandler = new ClaudeHandler(new Queue<string>([
+        "[{\"uuid\":\"org-1\"}]",
+        "{\"five_hour\":{\"utilization\":10}}"
+    ]))
+    { SetCookie = "__cf_bm=carried-over; Path=/; HttpOnly" };
+    using var cookieClient = new HttpClient(cookieHandler);
+    using var cookieSource = new ClaudeUsageSnapshotSource(cookieClient,
+        new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+        { BaseUrl = "https://claude.test/api" };
+    await cookieSource.ReadAsync(new ClaudeUsageSettings { SessionKey = "sk-ant-test" });
+    Assert(cookieHandler.Cookies.Count == 2, "the check should have issued both calls");
+    Assert(!cookieHandler.Cookies[0].Contains("__cf_bm"), "nothing is carried before the server sets it");
+    Assert(cookieHandler.Cookies[1].Contains("__cf_bm=carried-over"),
+        "a Cloudflare cookie set on one response must be sent with the next request");
+    Assert(cookieHandler.Cookies[1].Contains("sessionKey=sk-ant-test"),
+        "the session key must still be sent alongside it");
+}
+
+// The diagnostic reports the stage and status instead of a generic failure.
+{
+    var checkHandler = new StatusBodyHandler(System.Net.HttpStatusCode.Forbidden,
+        "<html><title>Just a moment...</title></html>");
+    using var checkClient = new HttpClient(checkHandler);
+    using var checkSource = new ClaudeUsageSnapshotSource(checkClient,
+        new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), "kss-no-transcripts")))
+        { BaseUrl = "https://claude.test/api" };
+    ClaudeConnectionReport report = await checkSource.CheckAsync(
+        new ClaudeUsageSettings { SessionKey = "sk-ant-test" });
+    Assert(!report.Success && report.StatusCode == 403 && report.Stage == "/organizations",
+        "the diagnostic must name the failing call and its status");
+    Assert(report.Message == Loc.T("ClaudeChallenged"), "a challenge must be reported as such");
+    Assert(report.ToDisplayString().Contains("403"), "the displayed line must carry the status code");
+    ClaudeConnectionReport noKey = await checkSource.CheckAsync(new ClaudeUsageSettings());
+    Assert(!noKey.Success && noKey.Message == Loc.T("ClaudeCheckNoKey"),
+        "an empty key must be reported without a request");
+}
+
 // A Cloudflare challenge must trigger a backoff: the very next read stays off
 // the wire, keeps the message, and never calls the key expired.
 var challengedHandler = new StatusBodyHandler(System.Net.HttpStatusCode.Forbidden,
@@ -2207,6 +2270,9 @@ sealed class ClaudeHandler : HttpMessageHandler
     public List<string> UserAgents { get; } = [];
     public List<Version> Versions { get; } = [];
 
+    /// <summary>Sent as Set-Cookie on every response when set, like Cloudflare's __cf_bm.</summary>
+    public string? SetCookie { get; init; }
+
     public ClaudeHandler(Queue<string> responses)
     {
         _responses = responses;
@@ -2223,10 +2289,15 @@ sealed class ClaudeHandler : HttpMessageHandler
         {
             throw new InvalidOperationException("No mocked Claude response remains.");
         }
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(_responses.Dequeue())
-        });
+        };
+        if (SetCookie is { Length: > 0 })
+        {
+            response.Headers.TryAddWithoutValidation("Set-Cookie", SetCookie);
+        }
+        return Task.FromResult(response);
     }
 }
 

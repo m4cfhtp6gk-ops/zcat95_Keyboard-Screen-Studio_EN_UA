@@ -3107,6 +3107,39 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SelectedTheme = item;
     }
 
+    private string _claudeCheckResult = string.Empty;
+
+    /// <summary>The last diagnostic line, so a Cloudflare block can be read instead of guessed at.</summary>
+    public string ClaudeCheckResult
+    {
+        get => _claudeCheckResult;
+        private set => SetProperty(ref _claudeCheckResult, value);
+    }
+
+    public async Task CheckClaudeConnectionAsync()
+    {
+        ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
+        var settings = new ClaudeUsageSettings
+        {
+            SessionKey = ClaudeSessionKey.Trim(),
+            // Resolve the organization from scratch: a stale id is one of the
+            // things a check has to be able to catch.
+            OrganizationId = string.Empty,
+            ModelScope = ClaudeModelScope,
+            CountLocalTokens = ClaudeCountLocalTokens
+        };
+
+        try
+        {
+            ClaudeConnectionReport report = await _claudeUsageSource.CheckAsync(settings);
+            ClaudeCheckResult = report.ToDisplayString();
+        }
+        catch (Exception ex)
+        {
+            ClaudeCheckResult = ex.Message;
+        }
+    }
+
     private ComposerTheme? _composerTheme;
     private int _selectedComposerChoiceIndex;
 

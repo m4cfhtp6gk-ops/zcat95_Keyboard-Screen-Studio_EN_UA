@@ -800,6 +800,20 @@ UI = [
      "Гучніше",
      "音量+"),
 
+    # ---- claude connection check (v1.7.2) ------------------------------------
+    ("ClaudeCheckButton",  "Test connection", "Перевірити з'єднання", "测试连接"),
+    ("ClaudeCheckRunning", "Checking...", "Перевіряю...", "正在检查……"),
+    ("ClaudeCheckNoKey",   "No session key entered", "Ключ сесії не введено", "尚未填写会话密钥"),
+    ("ClaudeCheckOk",      "Limits received", "Ліміти отримано", "已获取用量"),
+    ("ClaudeCheckLineOk",     "OK - {0}. Cookies: {1}", "OK - {0}. Куки: {1}", "成功 - {0}。Cookie：{1}"),
+    ("ClaudeCheckLineFailed", "Failed on {0}, HTTP {1}: {2}. Cookies: {3}",
+                              "Збій на {0}, HTTP {1}: {2}. Куки: {3}",
+                              "在 {0} 失败，HTTP {1}：{2}。Cookie：{3}"),
+    ("ClaudeCookieHint",
+     "Blocked by Cloudflare? Copy the whole Cookie line from the browser devtools (Network tab, any claude.ai request) and paste it here - it carries cf_clearance, which a bare sessionKey does not.",
+     "Блокує Cloudflare? Скопіюйте весь рядок Cookie з devtools браузера (вкладка Network, будь-який запит до claude.ai) і вставте сюди - у ньому є cf_clearance, якого немає в самому sessionKey.",
+     "被 Cloudflare 拦截？请在浏览器开发者工具的 Network 标签中复制任意 claude.ai 请求的整行 Cookie 并粘贴到此处——其中包含单独的 sessionKey 所没有的 cf_clearance。"),
+
     # ---- composer editor (v1.7.0) --------------------------------------------
     ("ComposerHeading",         "Screen builder", "Конструктор екрана", "屏幕构建器"),
     ("ComposerHint",            "Stack widgets top to bottom - the preview shows the result live.",
