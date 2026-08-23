@@ -14,20 +14,29 @@ namespace KeyboardScreen.Core;
 /// </summary>
 public sealed class ClaudeUsageSnapshotSource : IDisposable
 {
-    private static readonly TimeSpan CacheWindow = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan CacheWindow = TimeSpan.FromSeconds(120);
 
-    /// <summary>Hold-off after a Cloudflare challenge; hammering it only prolongs the block.</summary>
+    /// <summary>
+    /// First hold-off after a Cloudflare challenge; each consecutive challenge
+    /// doubles it up to <see cref="MaxChallengeBackoff"/>. Hammering a challenge
+    /// only prolongs the block, and backing off is what lets it clear.
+    /// </summary>
     private static readonly TimeSpan ChallengeBackoff = TimeSpan.FromMinutes(5);
+
+    private static readonly TimeSpan MaxChallengeBackoff = TimeSpan.FromMinutes(60);
 
     // The session cookie comes out of a Chrome-family browser, so the request
     // carries the matching, complete header set. A browser user-agent with the
     // client-hint headers missing is exactly what the challenge heuristics key
-    // on, and this is the user's own authenticated session.
+    // on, and this is the user's own authenticated session. The version has to
+    // track the real current Chrome: a year-old browser claiming fresh client
+    // hints is itself a bot signal.
+    private const string ChromeMajor = "151";
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/139.0.0.0 Safari/537.36";
+        "Chrome/" + ChromeMajor + ".0.0.0 Safari/537.36";
     private const string ClientHintBrands =
-        "\"Chromium\";v=\"139\", \"Google Chrome\";v=\"139\", \"Not?A_Brand\";v=\"99\"";
+        "\"Google Chrome\";v=\"" + ChromeMajor + "\", \"Chromium\";v=\"" + ChromeMajor + "\", \"Not_A Brand\";v=\"24\"";
 
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -37,6 +46,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private DateTimeOffset _lastFetch = DateTimeOffset.MinValue;
     private string _cachedFor = string.Empty;
     private DateTimeOffset _challengedUntil = DateTimeOffset.MinValue;
+    private int _challengeStrikes;
 
     public ClaudeUsageSnapshotSource(HttpClient? client = null, ClaudeCodeTokenReader? tokenReader = null)
     {
@@ -89,6 +99,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             ClaudeUsageSnapshot snapshot = Parse(document.RootElement, settings.ModelScope, now);
             snapshot = WithLocalTokens(snapshot, settings, now);
 
+            _challengeStrikes = 0;
             _cached = snapshot;
             _cachedFor = fingerprint;
             _lastFetch = now;
@@ -152,7 +163,11 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             string failure = await DescribeFailureAsync(response, cancellationToken);
             if (failure == Loc.T("ClaudeChallenged"))
             {
-                _challengedUntil = DateTimeOffset.Now + ChallengeBackoff;
+                double factor = Math.Pow(2, Math.Min(4, _challengeStrikes));
+                TimeSpan backoff = ChallengeBackoff * factor;
+                _challengedUntil = DateTimeOffset.Now +
+                    (backoff < MaxChallengeBackoff ? backoff : MaxChallengeBackoff);
+                _challengeStrikes++;
             }
             throw new InvalidOperationException(failure);
         }

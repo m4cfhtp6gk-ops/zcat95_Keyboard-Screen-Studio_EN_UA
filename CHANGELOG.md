@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.1 - 2026-08-23
+
+### Fixed
+
+- Claude limits: requests identify as the current Chrome (151) instead of
+  a year-old build, Cloudflare challenges back off gradually (5 minutes
+  doubling up to an hour), the usage is polled half as often, and the
+  composer widget names the Cloudflare state instead of a generic "not
+  connected".
+
 ## v1.7.0 - 2026-08-23
 
 ### Added

@@ -303,6 +303,8 @@
   "ComposerEmptyLine2": "Add widgets",
   "ComposerEmptyLine3": "in the theme settings",
   "ScreenGitHubToday": "Today",
+  "ScreenClaudeChallenged": "Cloudflare block",
+  "ScreenClaudeRetryLater": "auto-retry soon",
   "LanguageHeading": "Language",
   "CommonCancel": "Cancel",
   "AccentTitle": "Choose accent color",

@@ -303,6 +303,8 @@
   "ComposerEmptyLine2": "请在主题设置中",
   "ComposerEmptyLine3": "添加小组件",
   "ScreenGitHubToday": "今日",
+  "ScreenClaudeChallenged": "Cloudflare 拦截",
+  "ScreenClaudeRetryLater": "稍后自动重试",
   "LanguageHeading": "语言",
   "CommonCancel": "取消",
   "AccentTitle": "选择主题强调色",

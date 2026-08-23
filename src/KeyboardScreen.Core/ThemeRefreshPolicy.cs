@@ -15,7 +15,10 @@ public static class ThemeRefreshPolicy
     /// <summary>Built-in cadence; 0 means "follow the global refresh setting".</summary>
     public static int DefaultSeconds(string? themeId) => themeId switch
     {
-        "weather-five-day" or "stocks" or "currency" or "ai-quota" or "claude-usage" => 60,
+        "weather-five-day" or "stocks" or "currency" or "ai-quota" => 60,
+        // Claude limits shift slowly, and every poll is a chance for Cloudflare
+        // to challenge the non-browser client - fewer requests, fewer blocks.
+        "claude-usage" => 120,
         "crypto" or "clock-weather-dot" or "clock-dot-progress" or "alerts" or "ping" => 30,
         "disks" or "countdown" => 60,
         "github" or "calendar" => 300,

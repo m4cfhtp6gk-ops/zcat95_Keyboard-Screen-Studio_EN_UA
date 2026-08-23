@@ -731,6 +731,12 @@ using (var claudeSource = new ClaudeUsageSnapshotSource(claudeClient, new Claude
         "every claude.ai request must carry the sec-ch-ua client hints");
     Assert(claudeHandler.Versions.All(version => version.Major == 2),
         "claude.ai requests must ask for HTTP/2 like the browser the cookie came from");
+    // The fingerprint has to be coherent and current: a year-old Chrome major,
+    // or hints that disagree with the user-agent, is exactly what gets flagged.
+    string claudeUaMajor = claudeHandler.UserAgents[0].Split("Chrome/")[1].Split('.')[0];
+    Assert(int.Parse(claudeUaMajor) >= 151, "the Chrome fingerprint regressed to a stale major version");
+    Assert(claudeHandler.ClientHints.All(hint => hint.Contains("v=\"" + claudeUaMajor + "\"")),
+        "sec-ch-ua must claim the same Chrome major as the User-Agent");
 }
 
 // A Cloudflare challenge must trigger a backoff: the very next read stays off
@@ -1984,6 +1990,11 @@ composerTheme.Widgets = ComposerWidgets.Catalog
     .ToList();
 Assert(renderer.Render(composerTheme, new SystemSnapshot(DateTimeOffset.Now, 10, 20)).JpegBytes.Length > 0,
     "composer must render placeholders when optional snapshots are missing");
+// A Cloudflare challenge must read as its own state, not as "not connected".
+composerTheme.Widgets = [new() { Kind = "claude" }];
+Assert(renderer.Render(composerTheme, new SystemSnapshot(DateTimeOffset.Now, 5, 5,
+        ClaudeUsage: ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeChallenged")))).JpegBytes.Length > 0,
+    "the claude widget must render its Cloudflare-challenged state");
 composerTheme.Widgets = savedComposerWidgets;
 
 // The layout persists through the settings file and the porter keeps it.
@@ -2193,6 +2204,7 @@ sealed class ClaudeHandler : HttpMessageHandler
     public List<string> Requests { get; } = [];
     public List<string> Cookies { get; } = [];
     public List<string> ClientHints { get; } = [];
+    public List<string> UserAgents { get; } = [];
     public List<Version> Versions { get; } = [];
 
     public ClaudeHandler(Queue<string> responses)
@@ -2205,6 +2217,7 @@ sealed class ClaudeHandler : HttpMessageHandler
         Requests.Add(request.RequestUri?.ToString() ?? string.Empty);
         Cookies.Add(request.Headers.TryGetValues("Cookie", out var values) ? string.Join("; ", values) : string.Empty);
         ClientHints.Add(request.Headers.TryGetValues("sec-ch-ua", out var hints) ? string.Join("; ", hints) : string.Empty);
+        UserAgents.Add(request.Headers.TryGetValues("User-Agent", out var agents) ? string.Join(" ", agents) : string.Empty);
         Versions.Add(request.Version);
         if (_responses.Count == 0)
         {
