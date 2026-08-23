@@ -6,7 +6,9 @@
 
 - Claude limits: cookies issued by claude.ai and Cloudflare are kept and
   sent with the following requests, and the session-key field accepts a
-  whole browser `Cookie:` line (the one carrying `cf_clearance`).
+  whole browser `Cookie:` line (the one carrying `cf_clearance`). This
+  helps but cannot be a cure: `cf_clearance` is bound to the browser that
+  solved the challenge, TLS fingerprint included.
 
 ### Added
 
