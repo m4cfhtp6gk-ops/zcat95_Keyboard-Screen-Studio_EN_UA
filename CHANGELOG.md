@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.8.0 - 2026-08-23
+
+### Added
+
+- Claude limits read from Claude Code's own status-line report: no
+  cookie, no token, no request to claude.ai. Now the default source,
+  with one-click setup that preserves any existing status line and every
+  other Claude Code setting.
+
+### Fixed
+
+- The limits screen no longer depends on getting past Cloudflare. Absent
+  windows and the known epoch-in-percentage bug are reported as "no
+  data", and an elapsed window reads as 0% instead of vanishing.
+- The cookie source no longer impersonates Chrome, recognises a
+  Cloudflare challenge by its `cf-mitigated` header instead of an English
+  body phrase (a challenge was being misreported as a rejected key),
+  keys its cache on the cookie's value rather than its length, cannot
+  report a stale HTTP status, and no longer extends its own backoff when
+  the diagnostic button is pressed.
+
 ## v1.7.2 - 2026-08-23
 
 ### Fixed

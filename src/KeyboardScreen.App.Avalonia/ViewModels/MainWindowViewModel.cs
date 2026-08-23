@@ -2711,6 +2711,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
         StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        _claudeSourceKind = _settings.ClaudeUsage.SourceKind;
+        OnPropertyChanged(nameof(ClaudeSourcePreference));
+        OnPropertyChanged(nameof(IsClaudeCookieSource));
         ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
@@ -3108,6 +3111,48 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private string _claudeCheckResult = string.Empty;
+    private ClaudeUsageSourceKind _claudeSourceKind = ClaudeUsageSourceKind.StatusLine;
+    private bool _claudeStatuslineReplacePending;
+
+    public IReadOnlyList<string> ClaudeSourceOptions =>
+        [Loc.T("ClaudeSourceStatusLine"), Loc.T("ClaudeSourceWebCookie")];
+
+    public string ClaudeSourcePreference
+    {
+        get => ClaudeSourceOptions[(int)_claudeSourceKind];
+        set
+        {
+            IReadOnlyList<string> options = ClaudeSourceOptions;
+            int index = Math.Max(0, options.ToList().IndexOf(value));
+            var kind = (ClaudeUsageSourceKind)index;
+            if (_claudeSourceKind == kind)
+            {
+                return;
+            }
+
+            _claudeSourceKind = kind;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsClaudeCookieSource));
+            ScheduleCommit();
+        }
+    }
+
+    /// <summary>The cookie card only makes sense while the cookie source is chosen.</summary>
+    public bool IsClaudeCookieSource => _claudeSourceKind == ClaudeUsageSourceKind.WebCookie;
+
+    /// <summary>
+    /// Points Claude Code's status line at the file this app reads. A status
+    /// line the user set up themselves is never replaced without a second press.
+    /// </summary>
+    public void SetUpClaudeStatusline()
+    {
+        ClaudeStatuslineSetup.Result result = ClaudeStatuslineSetup.Install(
+            replace: _claudeStatuslineReplacePending);
+        // A foreign status line asks once; pressing again is the confirmation.
+        _claudeStatuslineReplacePending =
+            result.Outcome == ClaudeStatuslineSetup.Outcome.ForeignStatusLine;
+        ClaudeCheckResult = result.Describe();
+    }
 
     /// <summary>The last diagnostic line, so a Cloudflare block can be read instead of guessed at.</summary>
     public string ClaudeCheckResult
@@ -3121,6 +3166,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
         var settings = new ClaudeUsageSettings
         {
+            SourceKind = _claudeSourceKind,
             SessionKey = ClaudeSessionKey.Trim(),
             // Resolve the organization from scratch: a stale id is one of the
             // things a check has to be able to catch.
@@ -3377,6 +3423,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
+        _settings.ClaudeUsage.SourceKind = _claudeSourceKind;
         _settings.ClaudeUsage.SessionKey = ClaudeSessionKey.Trim();
         _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
             ? ClaudeUsageSettings.DefaultModelScope

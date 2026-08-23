@@ -25,18 +25,12 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
     private static readonly TimeSpan MaxChallengeBackoff = TimeSpan.FromMinutes(60);
 
-    // The session cookie comes out of a Chrome-family browser, so the request
-    // carries the matching, complete header set. A browser user-agent with the
-    // client-hint headers missing is exactly what the challenge heuristics key
-    // on, and this is the user's own authenticated session. The version has to
-    // track the real current Chrome: a year-old browser claiming fresh client
-    // hints is itself a bot signal.
-    private const string ChromeMajor = "151";
-    private const string BrowserUserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/" + ChromeMajor + ".0.0.0 Safari/537.36";
-    private const string ClientHintBrands =
-        "\"Google Chrome\";v=\"" + ChromeMajor + "\", \"Chromium\";v=\"" + ChromeMajor + "\", \"Not_A Brand\";v=\"24\"";
+    // Deliberately NOT pretending to be Chrome. Claiming a browser user-agent
+    // and browser client hints while presenting a .NET TLS and HTTP/2 fingerprint
+    // is a self-contradiction bot heuristics score against, and pinning a Chrome
+    // major means chasing a release every few weeks. An honest product token is
+    // what an API client is supposed to send.
+    private const string ProductUserAgent = "KeyboardScreenStudio/1.8 (+https://github.com/zcat95)";
 
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -61,11 +55,19 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         _tokenReader = tokenReader ?? new ClaudeCodeTokenReader();
     }
 
-    /// <summary>Cookies claude.ai and Cloudflare have issued this run, newest value winning.</summary>
-    private readonly Dictionary<string, string> _serverCookies = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Cookies claude.ai and Cloudflare have issued this run, newest value
+    /// winning. Concurrent: the refresh loop and the "test connection" button
+    /// can be inside a request at the same moment.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _serverCookies =
+        new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Overridable for tests; production always talks to claude.ai.</summary>
     public string BaseUrl { get; init; } = "https://claude.ai/api";
+
+    /// <summary>Overridable for tests; production reads what the status-line shim writes.</summary>
+    public string? StatuslinePath { get; init; }
 
     public async Task<ClaudeUsageSnapshot> ReadAsync(
         ClaudeUsageSettings settings,
@@ -73,12 +75,25 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
+        if (settings.SourceKind == ClaudeUsageSourceKind.StatusLine)
+        {
+            // Nothing to cache, throttle or back off: this is a local file that
+            // Claude Code rewrites on its own schedule.
+            return ClaudeStatuslineUsage.Read(StatuslinePath);
+        }
+
         if (!settings.IsConfigured)
         {
             return ClaudeUsageSnapshot.Unavailable();
         }
 
-        string fingerprint = settings.SessionKey.Length + ":" + settings.ModelScope;
+        // Hash the value, not its length: a freshly pasted cookie is usually the
+        // same length as the stale one, and a length-keyed cache would serve the
+        // old failure right through the window in which the new cookie works.
+        string fingerprint = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(settings.SessionKey)))
+            + ":" + settings.ModelScope;
         DateTimeOffset now = DateTimeOffset.Now;
         if (_cached is not null
             && string.Equals(_cachedFor, fingerprint, StringComparison.Ordinal)
@@ -127,7 +142,11 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     public async Task<string> ResolveOrganizationIdAsync(string sessionKey, CancellationToken cancellationToken = default)
     {
         using JsonDocument document = await GetJsonAsync("/organizations", sessionKey, cancellationToken);
-        JsonElement root = document.RootElement;
+        return FirstOrganizationId(document.RootElement);
+    }
+
+    private static string FirstOrganizationId(JsonElement root)
+    {
         if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
         {
             throw new InvalidOperationException(Loc.T("ClaudeNoOrganization"));
@@ -146,8 +165,15 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         throw new InvalidOperationException(Loc.T("ClaudeNoOrganization"));
     }
 
-    private async Task<JsonDocument> GetJsonAsync(string path, string sessionKey, CancellationToken cancellationToken)
+    private async Task<JsonDocument> GetJsonAsync(
+        string path,
+        string sessionKey,
+        CancellationToken cancellationToken,
+        bool armBackoff = true)
     {
+        // "No response yet": a transport failure must not report the previous
+        // call's status code.
+        _lastStatusCode = 0;
         using var request = new HttpRequestMessage(HttpMethod.Get, BaseUrl + path)
         {
             Version = HttpVersion.Version20,
@@ -159,14 +185,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         request.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
         request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
-        request.Headers.TryAddWithoutValidation("User-Agent", BrowserUserAgent);
-        request.Headers.TryAddWithoutValidation("sec-ch-ua", ClientHintBrands);
-        request.Headers.TryAddWithoutValidation("sec-ch-ua-mobile", "?0");
-        request.Headers.TryAddWithoutValidation("sec-ch-ua-platform", "\"Windows\"");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "same-origin");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "cors");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "empty");
-        request.Headers.TryAddWithoutValidation("Referer", "https://claude.ai/");
+        request.Headers.TryAddWithoutValidation("User-Agent", ProductUserAgent);
+        request.Headers.TryAddWithoutValidation("Referer", "https://claude.ai/settings/usage");
         request.Headers.TryAddWithoutValidation("Origin", "https://claude.ai");
 
         using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
@@ -175,7 +195,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         if (!response.IsSuccessStatusCode)
         {
             string failure = await DescribeFailureAsync(response, cancellationToken);
-            if (failure == Loc.T("ClaudeChallenged"))
+            // Pressing "test connection" during a block must not extend it.
+            if (armBackoff && failure == Loc.T("ClaudeChallenged"))
             {
                 double factor = Math.Pow(2, Math.Min(4, _challengeStrikes));
                 TimeSpan backoff = ChallengeBackoff * factor;
@@ -222,22 +243,38 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (settings.SourceKind == ClaudeUsageSourceKind.StatusLine)
+        {
+            ClaudeUsageSnapshot local = ClaudeStatuslineUsage.Read(StatuslinePath);
+            return new ClaudeConnectionReport(
+                local.Available,
+                StatuslinePath ?? ClaudeStatuslineUsage.DefaultPath(),
+                0,
+                local.Available ? Loc.T("ClaudeCheckOk") : local.ErrorMessage ?? Loc.T("ClaudeStatuslineNotSetUp"),
+                "-");
+        }
+
         if (!settings.IsConfigured)
         {
             return new ClaudeConnectionReport(false, "-", 0, Loc.T("ClaudeCheckNoKey"), "-");
         }
 
         string stage = "/organizations";
+        _lastStatusCode = 0;
         try
         {
-            string organizationId = string.IsNullOrWhiteSpace(settings.OrganizationId)
-                ? await ResolveOrganizationIdAsync(settings.SessionKey, cancellationToken)
-                : settings.OrganizationId;
-            settings.OrganizationId = organizationId;
+            using (JsonDocument organizations = await GetJsonAsync(
+                "/organizations", settings.SessionKey, cancellationToken, armBackoff: false))
+            {
+                settings.OrganizationId = FirstOrganizationId(organizations.RootElement);
+            }
 
             stage = "/usage";
             using JsonDocument document = await GetJsonAsync(
-                $"/organizations/{organizationId}/usage", settings.SessionKey, cancellationToken);
+                $"/organizations/{settings.OrganizationId}/usage",
+                settings.SessionKey,
+                cancellationToken,
+                armBackoff: false);
             ClaudeUsageSnapshot snapshot = Parse(document.RootElement, settings.ModelScope, DateTimeOffset.Now);
             return new ClaudeConnectionReport(
                 snapshot.Available,
@@ -265,9 +302,16 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
+            // Cloudflare marks a challenge with the cf-mitigated HEADER; looking
+            // for it in the body never matched, so every challenge without the
+            // English interstitial was misreported as a dead session key and sent
+            // the user off to regenerate a key that was fine.
+            if (response.Headers.Contains("cf-mitigated"))
+            {
+                return Loc.T("ClaudeChallenged");
+            }
+
             string body = await ReadPreviewAsync(response, cancellationToken);
-            // Cloudflare answers a challenge with 403 as well; the key is fine and
-            // the next refresh usually succeeds, so say so instead of "expired".
             return body.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
                 || body.Contains("cf-mitigated", StringComparison.OrdinalIgnoreCase)
                     ? Loc.T("ClaudeChallenged")

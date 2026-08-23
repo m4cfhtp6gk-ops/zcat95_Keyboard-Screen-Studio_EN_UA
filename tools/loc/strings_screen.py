@@ -266,6 +266,10 @@ SCREEN = [
     ("ComposerEmptyLine2", "Add widgets", "Додайте віджети", "请在主题设置中"),
     ("ComposerEmptyLine3", "in the theme settings", "в налаштуваннях теми", "添加小组件"),
     ("ScreenGitHubToday",  "Today", "Сьогодні", "今日"),
+    ("ClaudeStatuslineNotSetUp",   "Claude Code has not reported limits yet", "Claude Code ще не повідомив ліміти", "Claude Code 尚未报告用量"),
+    ("ClaudeStatuslineStale",      "Claude Code has not run for a while", "Claude Code давно не працював", "Claude Code 已有一段时间未运行"),
+    ("ClaudeStatuslineNoLimits",   "No limits in the Claude Code data", "У даних Claude Code немає лімітів", "Claude Code 数据中没有用量"),
+    ("ClaudeStatuslineUnreadable", "Could not read the Claude Code data", "Не вдалося прочитати дані Claude Code", "无法读取 Claude Code 数据"),
     ("ScreenClaudeChallenged", "Cloudflare block", "Блок Cloudflare", "Cloudflare 拦截"),
     ("ScreenClaudeRetryLater", "auto-retry soon", "повтор скоро", "稍后自动重试"),
 ]
