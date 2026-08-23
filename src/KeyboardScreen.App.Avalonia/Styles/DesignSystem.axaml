@@ -50,6 +50,32 @@
     <Setter Property="Padding" Value="24" />
   </Style>
 
+  <!--
+    Settings groups that are long, optional and credential-shaped (Telegram,
+    notifications, the knob, diagnostics) collapse by default. Nobody opening
+    this page for the device address should scroll past an MTProto login form
+    to reach it. Matches Border.card so the page still reads as one stack.
+  -->
+  <Style Selector="Expander.settings-group">
+    <Setter Property="Background" Value="{DynamicResource KssCardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssCardBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KssCornerRadius}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Expander.settings-group /template/ ToggleButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="24,16" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
+  </Style>
+  <Style Selector="Expander.settings-group ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Padding" Value="24,0,24,20" />
+  </Style>
+
   <Style Selector="Border.elevated">
     <Setter Property="Background" Value="{DynamicResource KssPanelSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource KssCardBorderBrush}" />

@@ -268,6 +268,35 @@
                   </StackPanel>
 
                   <StackPanel x:Name="ThemePage" Classes="page-content" IsVisible="{Binding IsThemePage}" Spacing="16" x:CompileBindings="False">
+                    <Border IsVisible="{Binding IsComposerTheme}" Classes="card">
+                      <StackPanel Spacing="10">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ComposerHeading}" />
+                        <TextBlock Classes="secondary" Text="{infra:Localize ComposerHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <ComboBox x:CompileBindings="False" HorizontalAlignment="Stretch"
+                                    ItemsSource="{Binding ComposerChoices}"
+                                    SelectedIndex="{Binding SelectedComposerChoiceIndex, Mode=TwoWay}" />
+                          <Button Grid.Column="1" Click="ComposerAddButton_OnClick" Content="{infra:Localize ComposerAdd}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding ComposerRows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <StackPanel Spacing="4" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
+                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
+                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
+                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
+                                </Grid>
+                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" Watermark="{infra:Localize ComposerTextPlaceholder}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding ComposerBudgetText}" />
+                      </StackPanel>
+                    </Border>
+
                     <Border Classes="card">
                       <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,72" ColumnSpacing="12">
@@ -1044,35 +1073,6 @@
                       </StackPanel>
                     </Border>
 
-                    <Border IsVisible="{Binding IsComposerTheme}" Classes="card">
-                      <StackPanel Spacing="10">
-                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ComposerHeading}" />
-                        <TextBlock Classes="secondary" Text="{infra:Localize ComposerHint}" TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                          <ComboBox x:CompileBindings="False" HorizontalAlignment="Stretch"
-                                    ItemsSource="{Binding ComposerChoices}"
-                                    SelectedIndex="{Binding SelectedComposerChoiceIndex, Mode=TwoWay}" />
-                          <Button Grid.Column="1" Click="ComposerAddButton_OnClick" Content="{infra:Localize ComposerAdd}" />
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding ComposerRows}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <StackPanel Spacing="4" Margin="0,0,0,6">
-                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
-                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
-                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
-                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
-                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
-                                </Grid>
-                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" Watermark="{infra:Localize ComposerTextPlaceholder}" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding ComposerBudgetText}" />
-                      </StackPanel>
-                    </Border>
-
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">
@@ -1147,11 +1147,10 @@
                       </StackPanel>
                     </Border>
 
-                    <Border Classes="card" Padding="16">
+                    <Expander Classes="settings-group" Header="{infra:Localize KnobHeading}">
                       <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="4">
-                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize KnobHeading}" />
                             <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobHint}" TextWrapping="Wrap" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1" VerticalAlignment="Top" MinWidth="58" OnContent="" OffContent="" IsChecked="{Binding KnobEnabled, Mode=TwoWay}" />
@@ -1232,12 +1231,11 @@
                           <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobViaHint}" TextWrapping="Wrap" />
                         </StackPanel>
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card" Padding="16">
+                    <Expander Classes="settings-group" Header="{infra:Localize DiagnosticsHeading}">
                       <StackPanel Spacing="10">
                         <StackPanel Spacing="4">
-                          <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DiagnosticsHeading}" />
                           <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize DiagnosticsHint}" />
                         </StackPanel>
                         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,6,Auto" >
@@ -1249,12 +1247,11 @@
                         <TextBlock Classes="secondary" FontSize="11" Text="{Binding DiagnosticsDetailText}" />
                         <TextBlock Classes="secondary" FontSize="11" Text="{Binding AdditionalPushStatus}" IsVisible="{Binding AdditionalPushStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card">
+                    <Expander Classes="settings-group" Header="{infra:Localize TelegramHeading}">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
-                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize TelegramHeading}" />
                           <TextBlock Classes="secondary" Text="{infra:Localize TelegramHint}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Spacing="10">
@@ -1321,13 +1318,12 @@
                         </Grid>
                         <Button IsVisible="{Binding IsTelegramConnected}" Command="{Binding TelegramLogoutCommand}" Content="{infra:Localize TelegramLogout}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card">
+                    <Expander Classes="settings-group" Header="{infra:Localize NotifyHeading}">
                       <StackPanel Spacing="14">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="6">
-                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize NotifyHeading}" />
                             <TextBlock Classes="secondary" Text="{infra:Localize NotifyHint}" TextWrapping="Wrap" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifyEnabled, Mode=TwoWay}" />
@@ -1372,7 +1368,7 @@
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyWindowsOnly}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
                     <Border Classes="card">
                       <StackPanel Spacing="14">

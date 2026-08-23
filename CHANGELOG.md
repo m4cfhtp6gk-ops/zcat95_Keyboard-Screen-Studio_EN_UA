@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Claude limits now come from Claude Code's own transcripts on this PC. No
+  cookie, no session key, no status-line setup, no request to claude.ai -
+  and nothing that can be rate-limited or challenged. The meters fill
+  against a token budget you set, with plan presets as a starting point,
+  because no local file records the account's real quota. Counts cover this
+  machine only, so they are a floor on real usage.
+- "Screen setup" and "Theme settings" were the wrong way round: the first
+  was a read-only status page, the second held the actual screen setup.
+  They are now "Overview" and "Screen setup", and the accent hint no longer
+  points at the wrong page.
+- The screen builder's editor moved from Automation onto the theme page,
+  next to the other theme settings.
+- Telegram, notifications, the knob and diagnostics collapse in Other
+  settings, so the device address is not below an MTProto login form.
+- Scrollbars are visible and draggable again, at the 10 px the design system
+  always specified. They had been set to zero opacity and no hit-testing, so
+  nothing indicated that 25 of the 33 themes were below the fold.
+
+### Fixed
+
+- The first-run IP field corrupted any address with a three-digit octet -
+  192.168.1.50 became 192..168.150 - and "Save and continue" then did
+  nothing at all, silently, because the validation line was never filled in.
+  Pasting a whole address works now too.
+- The picture theme's clock was frozen: the refresh loop skipped that screen
+  as "static", but it always draws a clock. Fixed on both platforms; the
+  photo is cached so the restored refresh does not re-read it every frame.
+- A failed push was recorded as delivered, so a network blip on an unchanged
+  frame meant the keyboard never received that content again.
+- The device badge no longer claims "Disconnected" before anything has been
+  tried, or forever when automatic push is off.
+- There is now a manual "Send now", by the preview and in the tray menu. The
+  command existed but had never been bound to anything.
+- A bad weather city reported "this theme uses only local time and settings"
+  instead of the real error.
+- Secondary text in the light theme now meets WCAG AA; it measured 3.89:1.
+- The shipped default font id matched nothing, so the font list was empty on
+  every first launch.
+- An exception during startup no longer wedges every later settings change
+  into a silent no-op, and is written to the crash log instead of a
+  Debug.WriteLine that Release builds compile out.
+
 ## v1.8.0 - 2026-08-23
 
 ### Added
