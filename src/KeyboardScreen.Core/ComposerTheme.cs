@@ -423,7 +423,16 @@ public sealed class ComposerTheme : IScreenTheme
         Card(c, r);
         if (s.ClaudeUsage is not { Available: true } usage)
         {
-            c.AlignedText(Loc.T("ScreenClaudeNotConnected"), 10, DimGray, r,
+            // The one failure worth naming: a Cloudflare challenge looks like
+            // "not connected" but the key is fine and the retry is automatic.
+            bool challenged = s.ClaudeUsage?.ErrorMessage == Loc.T("ClaudeChallenged");
+            c.AlignedText(Loc.T(challenged ? "ScreenClaudeChallenged" : "ScreenClaudeNotConnected"),
+                10, DimGray,
+                new Rect(r.Left + 9, r.Top + 10, r.Width - 18, 16),
+                FontWeights.Medium, TextAlignment.Center);
+            c.AlignedText(Loc.T(challenged ? "ScreenClaudeRetryLater" : "ScreenClaudeConnectHint"),
+                8.5, DimGray,
+                new Rect(r.Left + 9, r.Top + 30, r.Width - 18, 14),
                 FontWeights.Medium, TextAlignment.Center);
             return;
         }

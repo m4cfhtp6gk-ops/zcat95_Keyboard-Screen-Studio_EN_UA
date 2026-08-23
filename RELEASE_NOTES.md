@@ -1,42 +1,25 @@
-# v1.7.0
+# v1.7.1
 
-Assemble your own screen from widgets, and settings that survive crashes.
-
-## Added
-
-- **Screen builder** — a new "My Screen" theme built from widgets. In the
-  theme's settings you stack widgets top to bottom and reorder them freely;
-  the preview shows the result live and a height budget line says how much
-  of the 142×428 screen is used.
-  - **21 widget kinds**: clock, date, CPU / RAM / GPU load, network speed,
-    hardware temperature/clock/fan, weather now, currency rates, crypto
-    price, ping, air-alert status, Claude limits, pomodoro, now playing,
-    next calendar event, nearest countdown, world clocks, GitHub today,
-    custom text and a spacer.
-  - Each widget reuses the data, formatting and translations of its parent
-    theme, so everything you already configured (city, currencies, hosts,
-    tokens) just shows up.
-  - The assembled screen is a normal catalog theme: the carousel, the
-    volume-knob switching, per-theme accent colour and refresh interval,
-    and the air-alert takeover all work with it unchanged.
-  - The app fetches only the data sources your placed widgets actually
-    need — an alert widget polls alerts, a screen without one does not.
+The Claude limits source stopped getting through Cloudflare again; this
+release refreshes how the app identifies itself and how it behaves when
+challenged.
 
 ## Fixed
 
-- **Settings now survive crashes and power loss.** Saves are written to a
-  side file and swapped in atomically, and the previous good save is kept
-  as a backup; a settings file torn mid-write restores from that backup
-  instead of silently resetting every token, layout and binding to
-  defaults.
-- **The auto-refresh loop no longer dies on unexpected errors** in the
-  push path; it reports the failure and retries on the next tick instead
-  of stopping until the app restarts.
+- **Claude limits: Cloudflare challenges again.** The requests now carry
+  the fingerprint of the current Chrome (151) instead of a year-old one —
+  an outdated browser version claiming fresh client hints is itself a bot
+  signal. When a challenge still happens, the retry backs off gradually
+  (5 minutes doubling up to an hour) instead of knocking every 5 minutes,
+  the usage is fetched half as often (every 2 minutes by default), and
+  the last good reading stays on screen meanwhile.
+- The Claude widget on the assembled screen now says "Cloudflare block ·
+  auto-retry soon" when that is what is happening, instead of a generic
+  "not connected" — the session key is fine in that state and nothing
+  needs re-entering.
 
 ## Platforms
 
 - Windows x64: self-contained portable build — unpack and run
   `KeyboardScreenStudio.exe`, no .NET installation required.
-- macOS: builds and is checked in CI; the screen builder renders there
-  too, while the knob listener stays Windows-only. No macOS binary is
-  published.
+- macOS: builds and is checked in CI; no macOS binary is published.
