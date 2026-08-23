@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.7.0 - 2026-08-23
+
+### Added
+
+- Screen builder: a new "My Screen" theme assembled from widgets. Pick
+  and order 21 widget kinds - clock, date, CPU/RAM/GPU load, network
+  speed, hardware sensors, weather, currency rates, crypto, ping,
+  air-alert status, Claude limits, pomodoro, now playing, next calendar
+  event, nearest countdown, world clocks, GitHub today, custom text and
+  a spacer - in the theme's settings, with a live height budget and an
+  instant preview. The assembled screen is a normal catalog theme: the
+  carousel, the knob, per-theme accent and refresh intervals, and the
+  alert takeover all work with it unchanged.
+
+### Fixed
+
+- Settings survive crashes: saves swap in atomically and keep the
+  previous good file as a backup; a settings file torn by a power loss
+  restores from that backup instead of silently resetting every token
+  and layout to defaults.
+- The auto-refresh loop now survives an unexpected push error instead
+  of stopping until the app restarts.
+
 ## v1.6.0 - 2026-08-22
 
 ### Added
