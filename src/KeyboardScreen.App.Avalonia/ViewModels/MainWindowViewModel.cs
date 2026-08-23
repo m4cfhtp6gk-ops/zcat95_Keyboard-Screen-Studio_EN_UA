@@ -83,8 +83,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _selectedNavigation = "screen";
     private ThemeItemViewModel? _selectedTheme;
     private Bitmap? _previewImage;
-    private string _deviceStatus = Loc.T("StatusDisconnected");
+    // Three states, not two. Seeding this as "Disconnected" asserted a failure
+    // before anything had been attempted, and with AutoPush off nothing ever
+    // pushes, so a healthy setup used to sit on red forever.
+    private string _deviceStatus = Loc.T("DeviceStatusUnknown");
     private bool _deviceConnected;
+    private bool _deviceChecked;
     private string _deviceIp = string.Empty;
     private string _accentColor = "#E4694C";
     private string _selectedFontId = ScreenFontOption.DefaultId;
@@ -3923,7 +3927,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         if (_latestFrame is null || !TryCreateEndpoint(DeviceIp, out Uri? endpoint))
         {
-            SetDeviceStatus(false);
+            // No address is not a failed connection: nothing was attempted.
+            SetDeviceUnknown(hasAddress: false);
             return;
         }
 
@@ -3931,13 +3936,23 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             _lastPushedJpeg is not null &&
             _latestFrame.JpegBytes.AsSpan().SequenceEqual(_lastPushedJpeg))
         {
+            // An identical frame needs no bytes on the wire. The status stays on
+            // the last real result: a failed push is no longer recorded as sent,
+            // so a genuine outage retries on the next tick instead of sticking.
             return;
         }
 
         DevicePushResult result = await _transport.PushAsync(endpoint, _latestFrame, cancellationToken);
         PushDiagnostics.Record(result, _latestFrame.JpegBytes.Length);
         Dispatcher.UIThread.Post(RaiseDiagnosticsProperties);
-        _lastPushedJpeg = _latestFrame.JpegBytes;
+        // Only a delivered frame counts as sent. Recording a failed push here
+        // fed the de-dupe check below, so a Wi-Fi blip on a stable frame meant
+        // the keyboard never received that content again.
+        if (result.Success)
+        {
+            _lastPushedJpeg = _latestFrame.JpegBytes;
+        }
+
         SetDeviceStatus(result.Success);
         await PushToAdditionalDevicesAsync(_latestFrame, cancellationToken);
     }
@@ -3976,8 +3991,26 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private void SetDeviceStatus(bool connected) =>
         Dispatcher.UIThread.Post(() =>
         {
+            _deviceChecked = true;
             DeviceConnected = connected;
             DeviceStatus = Loc.T(connected ? "StatusOnline" : "StatusDisconnected");
+        });
+
+    /// <summary>
+    /// Before the first push there is nothing to report. Distinguishing "no
+    /// address yet" from "tried and failed" is the difference between a hint and
+    /// an accusation.
+    /// </summary>
+    private void SetDeviceUnknown(bool hasAddress) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_deviceChecked)
+            {
+                return;
+            }
+
+            DeviceConnected = false;
+            DeviceStatus = Loc.T(hasAddress ? "DeviceStatusUnknown" : "DeviceStatusNoAddress");
         });
 
     private void ReloadFonts()

@@ -808,5 +808,9 @@
   "ClaudeWeekBudgetLabel": "Тиждень",
   "ClaudeMillionTokens": "млн токенів",
   "ClaudeNoTranscripts": "Claude Code ще не працював на цьому ПК",
-  "ClaudeCheckNoDirectory": "Теки Claude Code немає за шляхом {0}"
+  "ClaudeCheckNoDirectory": "Теки Claude Code немає за шляхом {0}",
+  "GuideInvalidIp": "Це не коректна адреса IPv4 — перевірте чотири числа.",
+  "DeviceStatusUnknown": "Ще не перевірено",
+  "DeviceStatusNoAddress": "Адресу не задано",
+  "PushNow": "Надіслати зараз"
 }

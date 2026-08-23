@@ -56,10 +56,58 @@ public sealed partial class IpAddressEditor : UserControl
 
     private void PartOnTextInput(object? sender, TextInputEventArgs e)
     {
-        if (!string.IsNullOrEmpty(e.Text) && e.Text.Any(character => !char.IsDigit(character)))
+        if (string.IsNullOrEmpty(e.Text))
+        {
+            return;
+        }
+
+        // A whole address arriving at once is a paste. Spreading it across the
+        // four boxes is the only reading that can be intended - the alternative
+        // is the digit filter silently eating the entire paste.
+        if (e.Text.Count(character => character == '.') == 3 && TryParseIPv4(e.Text, out string[] octets))
+        {
+            e.Handled = true;
+            _synchronizing = true;
+            try
+            {
+                for (int i = 0; i < _parts.Length; i++)
+                {
+                    _parts[i].Text = octets[i];
+                }
+            }
+            finally
+            {
+                _synchronizing = false;
+            }
+
+            SetCurrentValue(ValueProperty, string.Join(".", octets));
+            _parts[^1].Focus();
+            _parts[^1].CaretIndex = _parts[^1].Text?.Length ?? 0;
+            return;
+        }
+
+        if (e.Text.Any(character => !char.IsDigit(character)))
         {
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Deliberately requires all four octets. IPAddress.TryParse still accepts
+    /// shorthand - "19" would come back as 0.0.0.19 - so a looser test would
+    /// turn two typed digits into a pasted address.
+    /// </summary>
+    private static bool TryParseIPv4(string text, out string[] octets)
+    {
+        octets = [];
+        if (!IPAddress.TryParse(text.Trim(), out IPAddress? address)
+            || address.AddressFamily != AddressFamily.InterNetwork)
+        {
+            return false;
+        }
+
+        octets = address.ToString().Split('.');
+        return octets.Length == 4;
     }
 
     private void PartOnTextChanged(object? sender, TextChangedEventArgs e)
@@ -109,10 +157,18 @@ public sealed partial class IpAddressEditor : UserControl
             _parts[index - 1].CaretIndex = _parts[index - 1].Text?.Length ?? 0;
             e.Handled = true;
         }
-        else if (e.Key == Key.OemPeriod && index >= 0 && index < _parts.Length - 1)
+        else if ((e.Key == Key.OemPeriod || e.Key == Key.Decimal) && index >= 0 && index < _parts.Length - 1)
         {
-            _parts[index + 1].Focus();
-            _parts[index + 1].SelectAll();
+            // A three-digit octet already advanced the focus on its own. Advancing
+            // again on the dot the user then types would skip the box entirely and
+            // silently turn 192.168.1.50 into 192..168.150, so an empty box just
+            // swallows the separator it has already been given.
+            if (!string.IsNullOrEmpty(textBox.Text))
+            {
+                _parts[index + 1].Focus();
+                _parts[index + 1].SelectAll();
+            }
+
             e.Handled = true;
         }
     }

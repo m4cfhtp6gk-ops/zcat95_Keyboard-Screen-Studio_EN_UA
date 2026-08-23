@@ -808,5 +808,9 @@
   "ClaudeWeekBudgetLabel": "Weekly",
   "ClaudeMillionTokens": "M tokens",
   "ClaudeNoTranscripts": "No Claude Code activity on this PC yet",
-  "ClaudeCheckNoDirectory": "No Claude Code folder at {0}"
+  "ClaudeCheckNoDirectory": "No Claude Code folder at {0}",
+  "GuideInvalidIp": "That is not a valid IPv4 address - check the four numbers.",
+  "DeviceStatusUnknown": "Not checked yet",
+  "DeviceStatusNoAddress": "No address set",
+  "PushNow": "Send now"
 }

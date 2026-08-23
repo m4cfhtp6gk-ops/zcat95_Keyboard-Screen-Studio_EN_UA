@@ -808,5 +808,9 @@
   "ClaudeWeekBudgetLabel": "每周",
   "ClaudeMillionTokens": "百万令牌",
   "ClaudeNoTranscripts": "本机尚无 Claude Code 活动",
-  "ClaudeCheckNoDirectory": "在 {0} 找不到 Claude Code 目录"
+  "ClaudeCheckNoDirectory": "在 {0} 找不到 Claude Code 目录",
+  "GuideInvalidIp": "这不是有效的 IPv4 地址 — 请检查这四个数字。",
+  "DeviceStatusUnknown": "尚未检测",
+  "DeviceStatusNoAddress": "未设置地址",
+  "PushNow": "立即发送"
 }
