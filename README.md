@@ -55,9 +55,10 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - A first-run guide that asks only for the keyboard's IP address.
 - AI usage (in development) reads from a Tokscale installation you set up
   yourself; KSS never stores platform credentials.
-- A Claude limits theme showing the session, weekly and per-model windows as
-  three horizontal meters. It needs a claude.ai session cookie you paste in
-  yourself — see [PRIVACY.md](PRIVACY.md) for exactly what is stored and sent.
+- A Claude usage theme showing the rolling 5-hour window, the last 7 days and
+  one model's share of that week as three horizontal meters. It reads Claude
+  Code's own transcripts on this PC — no login, no key, no network request —
+  and fills against a token budget you set. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 

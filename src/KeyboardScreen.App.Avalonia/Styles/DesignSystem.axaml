@@ -72,7 +72,7 @@
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource KssForegroundBrush}" />
   </Style>
-  <Style Selector="Expander.settings-group ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Expander.settings-group /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Padding" Value="24,0,24,20" />
   </Style>
 

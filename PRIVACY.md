@@ -16,16 +16,16 @@ Optional online features contact third-party services directly:
   through its local JSON commands. For that integration KSS does not sign in to
   any platform, does not read API keys, and does not upload usage data or
   credentials.
-- The Claude limits theme is the one feature that handles a credential. It reads
-  your limits from claude.ai using a session cookie you paste into Screen setup
-  yourself. That cookie is stored in the local settings file as plain text, is
-  sent to claude.ai and to no other host, and is never sent to the project
-  author. Clearing the field in settings stops the integration. The usage
-  endpoint it calls is unofficial and may change or stop working without notice.
-- The token counts shown beside those limits are summed from the Claude Code
-  transcripts under `~/.claude/projects` on this computer. They never leave the
-  machine, and because they only cover Claude Code sessions here they are a
-  floor on account usage rather than the account total.
+- The Claude limits theme handles no credential at all. It reads the Claude Code
+  transcripts under `~/.claude/projects` on this computer, sums the tokens in
+  each usage block, and makes no network request of any kind - there is no
+  session cookie, no API key and no account to sign in to. Nothing read there
+  leaves the machine.
+- Because those transcripts only cover Claude Code on this computer, the totals
+  are a floor on account usage rather than the account total. Anthropic
+  publishes no quota that software can read, so the meters fill against a token
+  budget you set yourself; the percentage is measured against your target, not
+  against an official limit.
 
 Images sent to the keyboard are posted directly from the computer to the
 configured device address over unencrypted HTTP. Use this feature only on a
