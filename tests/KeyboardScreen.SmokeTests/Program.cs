@@ -22,6 +22,10 @@ Assert(defaults.ClaudeUsage.IsConfigured
     && defaults.ClaudeUsage.Plan == ClaudePlanKind.Pro
     && defaults.ClaudeUsage.EffectiveWeekBudget == 25_000_000,
     "Claude usage must default to the Pro budget with nothing to configure");
+// The shipped default used to be an id nothing could produce, so the font
+// drop-down was empty on every first launch while the screen rendered in MiSans.
+Assert(defaults.SelectedFontId == ScreenFontOption.DefaultId,
+    "the default font id must be one the catalogue can actually offer");
 Assert(defaults.SafeArea == new ScreenInsets(10, 52, 10, 12), "first-run safe area is incorrect");
 Assert(ScreenFontOption.DefaultId == "builtin:misans", "default font must be built-in MiSans");
 Assert(ScreenFontOption.Default.FileName == "MiSans-Medium.ttf", "default font must be MiSans-Medium.ttf");

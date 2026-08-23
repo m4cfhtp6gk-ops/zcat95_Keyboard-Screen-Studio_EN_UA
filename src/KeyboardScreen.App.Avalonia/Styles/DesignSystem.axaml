@@ -373,7 +373,38 @@
     <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
     <Setter Property="behaviors:SmoothScrollBehavior.IsEnabled" Value="True" />
   </Style>
+  <!--
+    Was Opacity=0 plus IsHitTestVisible=False on an untyped global selector:
+    every scrollbar in the app invisible AND unclickable, including the 33-item
+    theme list where only about eight rows fit. DESIGN_SYSTEM.md asks for a
+    10 px overlay bar with a 6 px thumb, which is what this is.
+  -->
   <Style Selector="ScrollBar">
+    <Setter Property="Opacity" Value="0.55" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="ScrollBar:pointerover">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="ScrollBar[Orientation=Vertical]">
+    <Setter Property="Width" Value="10" />
+  </Style>
+  <Style Selector="ScrollBar[Orientation=Horizontal]">
+    <Setter Property="Height" Value="10" />
+  </Style>
+  <Style Selector="ScrollBar /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="CornerRadius" Value="3" />
+  </Style>
+  <Style Selector="ScrollBar:pointerover /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource KssControlFocusBrush}" />
+  </Style>
+  <Style Selector="ScrollBar /template/ RepeatButton">
     <Setter Property="Opacity" Value="0" />
     <Setter Property="IsHitTestVisible" Value="False" />
   </Style>

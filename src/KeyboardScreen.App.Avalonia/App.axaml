@@ -26,7 +26,7 @@
           </LinearGradientBrush>
           <SolidColorBrush x:Key="KssWindowBorderBrush">#DDE1E6</SolidColorBrush>
           <SolidColorBrush x:Key="KssForegroundBrush">#15171B</SolidColorBrush>
-          <SolidColorBrush x:Key="KssSecondaryBrush">#747C89</SolidColorBrush>
+          <SolidColorBrush x:Key="KssSecondaryBrush">#5C6472</SolidColorBrush>
           <SolidColorBrush x:Key="KssCardBrush">#F5F6F8</SolidColorBrush>
           <SolidColorBrush x:Key="KssCardBorderBrush">#E2E5EA</SolidColorBrush>
           <SolidColorBrush x:Key="KssControlBrush">#FFFFFF</SolidColorBrush>

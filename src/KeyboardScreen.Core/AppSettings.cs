@@ -27,7 +27,12 @@ public sealed class AppSettings
 	public string AccentColor { get; set; } = "#E4694C";
 
 
-	public string SelectedFontId { get; set; } = "builtin:segoe-variable-display";
+	/// <summary>
+	/// Must be an id the font catalogue can actually produce. It shipped as
+	/// "builtin:segoe-variable-display", which nothing ever matched, so the font
+	/// drop-down was empty on every first launch.
+	/// </summary>
+	public string SelectedFontId { get; set; } = ScreenFontOption.DefaultId;
 
 
 	public bool MinimizeToTray { get; set; } = true;

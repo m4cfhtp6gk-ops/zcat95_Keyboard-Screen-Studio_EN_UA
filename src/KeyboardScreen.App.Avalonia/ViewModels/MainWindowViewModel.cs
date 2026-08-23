@@ -2561,9 +2561,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ReloadFonts();
         ApplySettings();
         _loading = true;
-        await RefreshTokscaleAsync(force: false);
-
-        _loading = false;
+        try
+        {
+            await RefreshTokscaleAsync(force: false);
+        }
+        finally
+        {
+            // Without this, a throw here leaves _loading latched on and
+            // ScheduleCommit early-returns for the rest of the session: every
+            // settings change becomes a silent no-op, saved nowhere.
+            _loading = false;
+        }
         _lifetime = new CancellationTokenSource();
         _ = RunRefreshLoopAsync(_lifetime.Token);
         // A stored session means the user already logged in - reconnect quietly.
@@ -2756,7 +2764,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _loading = true;
         DeviceIp = ExtractDeviceIp(_settings.DeviceEndpoint);
         AccentColor = string.IsNullOrWhiteSpace(_settings.AccentColor) ? "#E4694C" : _settings.AccentColor;
-        SelectedFontId = _settings.SelectedFontId;
+        // ReloadFonts already repaired an unknown id; assigning the stored one
+        // back unvalidated undid that and left the drop-down showing nothing.
+        SelectedFontId = Fonts.Any(font => font.Id == _settings.SelectedFontId)
+            ? _settings.SelectedFontId
+            : ScreenFontOption.DefaultId;
         SelectedLanguage = AppLanguageInfo.For(
             string.IsNullOrWhiteSpace(_settings.Language)
                 ? Loc.Language
@@ -3601,13 +3613,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 await Task.Delay(
                     ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
                     cancellationToken);
-                bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || alertTakeoverArmed ||
-                    _settings.Schedule?.Enabled == true ||
-                    _settings.Carousel?.Enabled == true)
-                {
-                    await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
-                }
+                // No "static image" shortcut. ImageClockStyle has no "off" and
+                // ImageTimePlacement is only Top or Bottom, so the picture theme
+                // always draws a clock - skipping its refresh froze that clock at
+                // whatever minute a setting was last touched. The byte-identical
+                // frame check in PushLatestAsync already keeps a genuinely
+                // unchanged screen off the wire.
+                await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -4184,7 +4196,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                         music.Title,
                         music.Artist)
                     : Loc.T("SummaryNoMediaSession"),
-            "clock-weather-dot" or "weather-five-day" or "image" when weather is { Available: true } =>
+            // No `when` guard: it made the else branch unreachable, so a bad city
+            // fell through to "this theme uses only local time and settings" -
+            // false about the theme and pointing away from the actual cause.
+            "clock-weather-dot" or "weather-five-day" or "image" =>
                 weather is { Available: true }
                     ? Loc.T("SummaryWeather", weather.LocationName, weather.TemperatureC.ToString("0"), weather.ConditionText)
                     : weather?.ErrorMessage ?? Loc.T("SummaryNoWeather"),
