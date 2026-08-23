@@ -51,9 +51,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     public ClaudeUsageSnapshotSource(HttpClient? client = null, ClaudeCodeTokenReader? tokenReader = null)
     {
         _ownsClient = client is null;
-        _client = client ?? new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        // Cookies are handled here rather than by the handler: the Cookie header
+        // is built explicitly from what the user pasted plus what the server has
+        // issued, so a handler-managed jar cannot quietly drop or duplicate it.
+        _client = client ?? new HttpClient(new SocketsHttpHandler { UseCookies = false })
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
         _tokenReader = tokenReader ?? new ClaudeCodeTokenReader();
     }
+
+    /// <summary>Cookies claude.ai and Cloudflare have issued this run, newest value winning.</summary>
+    private readonly Dictionary<string, string> _serverCookies = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Overridable for tests; production always talks to claude.ai.</summary>
     public string BaseUrl { get; init; } = "https://claude.ai/api";
@@ -144,7 +153,10 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             Version = HttpVersion.Version20,
             VersionPolicy = HttpVersionPolicy.RequestVersionOrLower
         };
-        request.Headers.TryAddWithoutValidation("Cookie", "sessionKey=" + sessionKey.Trim());
+        // Everything the user pasted (a bare key, or a whole browser Cookie
+        // header carrying cf_clearance) plus what Cloudflare has issued since.
+        string cookieHeader = ClaudeCookies.Merge(ClaudeCookies.Normalize(sessionKey), _serverCookies);
+        request.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
         request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
         request.Headers.TryAddWithoutValidation("User-Agent", BrowserUserAgent);
@@ -158,6 +170,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         request.Headers.TryAddWithoutValidation("Origin", "https://claude.ai");
 
         using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
+        RememberCookies(response);
+        _lastStatusCode = (int)response.StatusCode;
         if (!response.IsSuccessStatusCode)
         {
             string failure = await DescribeFailureAsync(response, cancellationToken);
@@ -175,6 +189,77 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
     }
+
+    /// <summary>
+    /// Keeps the cookies the server sets - <c>__cf_bm</c> arrives on nearly every
+    /// response, and carrying it back is a large part of continuing to look like
+    /// the browser the session came from.
+    /// </summary>
+    private void RememberCookies(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? setCookies))
+        {
+            return;
+        }
+
+        foreach (string line in setCookies)
+        {
+            if (ClaudeCookies.ReadSetCookie(line) is { } cookie)
+            {
+                _serverCookies[cookie.Name] = cookie.Value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// One live round-trip, reported in full: which call failed, its status, and
+    /// whether the body is a Cloudflare challenge. Nothing is cached and no
+    /// backoff is consulted, because the user pressed the button to find out
+    /// what is happening right now.
+    /// </summary>
+    public async Task<ClaudeConnectionReport> CheckAsync(
+        ClaudeUsageSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.IsConfigured)
+        {
+            return new ClaudeConnectionReport(false, "-", 0, Loc.T("ClaudeCheckNoKey"), "-");
+        }
+
+        string stage = "/organizations";
+        try
+        {
+            string organizationId = string.IsNullOrWhiteSpace(settings.OrganizationId)
+                ? await ResolveOrganizationIdAsync(settings.SessionKey, cancellationToken)
+                : settings.OrganizationId;
+            settings.OrganizationId = organizationId;
+
+            stage = "/usage";
+            using JsonDocument document = await GetJsonAsync(
+                $"/organizations/{organizationId}/usage", settings.SessionKey, cancellationToken);
+            ClaudeUsageSnapshot snapshot = Parse(document.RootElement, settings.ModelScope, DateTimeOffset.Now);
+            return new ClaudeConnectionReport(
+                snapshot.Available,
+                stage,
+                200,
+                snapshot.Available ? Loc.T("ClaudeCheckOk") : Loc.T("ClaudeNoWindows"),
+                ClaudeCookies.Describe(ClaudeCookies.Merge(
+                    ClaudeCookies.Normalize(settings.SessionKey), _serverCookies)));
+        }
+        catch (Exception ex)
+        {
+            return new ClaudeConnectionReport(
+                false,
+                stage,
+                _lastStatusCode,
+                ex.Message,
+                ClaudeCookies.Describe(ClaudeCookies.Merge(
+                    ClaudeCookies.Normalize(settings.SessionKey), _serverCookies)));
+        }
+    }
+
+    private int _lastStatusCode;
 
     private static async Task<string> DescribeFailureAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {

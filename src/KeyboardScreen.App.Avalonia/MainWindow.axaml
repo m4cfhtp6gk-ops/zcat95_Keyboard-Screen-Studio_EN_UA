@@ -513,6 +513,12 @@
                           <TextBox PasswordChar="*"
                                    PlaceholderText="{infra:Localize ClaudeSessionKeyPlaceholder}"
                                    Text="{Binding ClaudeSessionKey, Mode=TwoWay}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCookieHint}" TextWrapping="Wrap" />
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Button Click="ClaudeCheckButton_OnClick" Content="{infra:Localize ClaudeCheckButton}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
+                          </Grid>
                         </StackPanel>
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
                           <StackPanel VerticalAlignment="Center" Spacing="4">

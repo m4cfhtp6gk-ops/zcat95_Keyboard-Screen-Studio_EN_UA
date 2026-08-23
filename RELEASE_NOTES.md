@@ -1,22 +1,26 @@
-# v1.7.1
+# v1.7.2
 
-The Claude limits source stopped getting through Cloudflare again; this
-release refreshes how the app identifies itself and how it behaves when
-challenged.
+Cloudflare kept blocking the Claude limits after v1.7.1. This release
+fixes the mechanism that was actually missing, and adds a button that
+says what is happening instead of leaving it to guesswork.
 
 ## Fixed
 
-- **Claude limits: Cloudflare challenges again.** The requests now carry
-  the fingerprint of the current Chrome (151) instead of a year-old one —
-  an outdated browser version claiming fresh client hints is itself a bot
-  signal. When a challenge still happens, the retry backs off gradually
-  (5 minutes doubling up to an hour) instead of knocking every 5 minutes,
-  the usage is fetched half as often (every 2 minutes by default), and
-  the last good reading stays on screen meanwhile.
-- The Claude widget on the assembled screen now says "Cloudflare block ·
-  auto-retry soon" when that is what is happening, instead of a generic
-  "not connected" — the session key is fine in that state and nothing
-  needs re-entering.
+- **Cookies are now kept, and can be pasted whole.** A browser sends
+  `cf_clearance` and `__cf_bm` alongside `sessionKey`; the app sent only
+  the session key and threw away every cookie Cloudflare handed back, so
+  each request arrived looking like a first-time stranger. Cookies set by
+  the server are now carried into the following requests, and the key
+  field accepts the entire `Cookie:` line copied from the browser's
+  devtools — that line carries `cf_clearance`, which is what a solved
+  challenge actually leaves behind.
+
+## Added
+
+- **"Test connection" in the Claude settings.** One live round-trip that
+  reports which call failed, the HTTP status, whether the body was a
+  Cloudflare challenge, and which cookies were sent (names and lengths
+  only — never values, so the line is safe to share).
 
 ## Platforms
 
