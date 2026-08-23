@@ -197,4 +197,11 @@ CORE = [
     ("ThemeDisksDetails",     "Every ready volume with its used space as a bar - the accent color until 85%, orange to 95%, red beyond. Up to six volumes fit on the screen.",
                               "Кожен готовий том зі смужкою зайнятого місця - акцентний колір до 85%, помаранчевий до 95%, червоний вище. На екран вміщується до шести томів.",
                               "每个就绪磁盘以进度条显示已用空间——85% 以内为主题色，95% 以内为橙色，更高为红色。屏幕最多容纳六个磁盘。"),
+
+    # ---- composer (v1.7.0) ---------------------------------------------------
+    ("ThemeComposerName",        "My Screen", "Мій екран", "自定义屏幕"),
+    ("ThemeComposerDescription", "Build your own layout from widgets", "Зберіть власний екран з віджетів", "用小组件拼装自己的屏幕"),
+    ("ThemeComposerDetails",     "A stack of small widgets you pick and order yourself: clocks, system counters, weather, rates, alerts and more.",
+                                 "Стос маленьких віджетів, які ви самі обираєте і впорядковуєте: годинники, системні лічильники, погода, курси, тривоги та інше.",
+                                 "由你自行挑选和排序的小组件堆叠：时钟、系统指标、天气、汇率、警报等。"),
 ]

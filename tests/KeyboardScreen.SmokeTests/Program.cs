@@ -29,7 +29,8 @@ Assert(profile.SafeArea.Left + profile.SafeArea.Right < profile.Width, "safe are
 Assert(profile.SafeArea.Top + profile.SafeArea.Bottom < profile.Height, "safe area vertical insets are invalid");
 var renderer = new ScreenRenderer(profile);
 var themes = BuiltInThemes.Create(new ImageTheme(), new PomodoroTimer());
-Assert(themes.Count == 32, "built-in theme catalog should contain the 32 supported schemes");
+Assert(themes.Count == 33, "built-in theme catalog should contain the 33 supported schemes");
+Assert(themes.Any(theme => theme.Id == "composer"), "the screen-builder theme must be registered");
 Assert(themes.All(theme => theme.Id != "ambient"), "the removed ambient theme must not be registered");
 Assert(themes.Any(theme => theme.Id == "calendar"), "the ICS calendar theme must be registered");
 Assert(themes.All(theme => theme.Id != "clock-seconds"), "removed seconds progress theme must not be registered");
@@ -1915,6 +1916,114 @@ Assert(KnobControl.PickBinding([new("SHARED", 0x00E9, 0)], [new("SHARED", 0x00E9
 Assert(KnobControl.PickBinding([], [new("SHARED", 0x00E9, 0)]) is null,
     "hearing nothing from the knob must not bind anything");
 Console.WriteLine("PASS knob switching: circular cycle, carousel fallback, VID/PID, hot keys, knob detection");
+
+// ---- screen builder (composer) --------------------------------------------
+// Layout math: widgets stack with gaps, the first that does not fit is
+// dropped together with everything after it, unknown kinds are skipped.
+Rect composerBounds = new(0, 0, 122, 100);
+List<ComposerWidgetSettings> composerList =
+[
+    new() { Kind = "cpu" },        // 42
+    new() { Kind = "no-such" },    // skipped
+    new() { Kind = "ram" },        // 42 -> 42+6+42 = 90, fits
+    new() { Kind = "net" }         // would end at 90+6+46 = 142 > 100, clipped
+];
+var placed = ComposerWidgets.Arrange(composerList, composerBounds);
+Assert(placed.Count == 2 && placed[0].Info.Kind == "cpu" && placed[1].Info.Kind == "ram",
+    "arrange must skip unknown kinds and clip at the height budget");
+Assert(Math.Abs(placed[1].Bounds.Top - 48) < 0.01, "the second widget must sit below the first plus the gap");
+Assert(Math.Abs(ComposerWidgets.UsedHeight(composerList) - (42 + 6 + 42 + 6 + 46)) < 0.01,
+    "used height must count every known widget and the gaps between them");
+Assert(ComposerWidgets.Arrange([], composerBounds).Count == 0, "an empty layout must place nothing");
+
+// Data needs: the render loop fetches exactly what the placed widgets read.
+var composerNeeds = ComposerWidgets.RequiredSources(new ComposerSettings
+{
+    Widgets =
+    [
+        new() { Kind = "clock" },
+        new() { Kind = "currency" },
+        new() { Kind = "currency" },
+        new() { Kind = "alerts" },
+        new() { Kind = "claude" }
+    ]
+});
+Assert(composerNeeds.Count == 3
+    && composerNeeds.Contains("currency") && composerNeeds.Contains("alerts") && composerNeeds.Contains("claude-usage"),
+    "required sources must dedupe and skip widgets that need nothing");
+Assert(ComposerWidgets.RequiredSources(new ComposerSettings { Widgets = [] }).Count == 0,
+    "an empty layout must need no sources");
+
+// Every widget kind renders against the design sample, in batches that fit the
+// screen, plus the empty-layout hint. This exercises all renderer branches.
+var composerTheme = (ComposerTheme)themes.First(theme => theme.Id == "composer");
+IReadOnlyList<ComposerWidgetSettings> savedComposerWidgets = composerTheme.Widgets;
+string[][] composerBatches =
+[
+    ["clock", "date", "cpu", "ram", "gpu", "net", "spacer"],
+    ["hardware", "weather", "currency", "crypto", "ping", "alerts"],
+    ["claude", "pomodoro", "music", "calendar-next", "countdown-next", "world-clock", "github", "text"]
+];
+Assert(composerBatches.SelectMany(batch => batch).Distinct().Count() == ComposerWidgets.Catalog.Count,
+    "the render batches must cover every widget kind in the catalog");
+foreach (string[] batch in composerBatches)
+{
+    composerTheme.Widgets = batch
+        .Select(kind => new ComposerWidgetSettings { Kind = kind, Text = kind == "text" ? "Привіт, світ" : "" })
+        .ToList();
+    var composedFrame = renderer.Render(composerTheme, SystemSnapshot.DesignSample);
+    Assert(composedFrame.JpegBytes is [0xFF, 0xD8, ..], $"composer batch '{string.Join(",", batch)}' did not render");
+}
+composerTheme.Widgets = [];
+Assert(renderer.Render(composerTheme, SystemSnapshot.DesignSample).JpegBytes.Length > 0,
+    "the empty layout must render its hint");
+// Widgets must also survive a snapshot with no optional data at all.
+composerTheme.Widgets = ComposerWidgets.Catalog
+    .Select(info => new ComposerWidgetSettings { Kind = info.Kind })
+    .Take(8)
+    .ToList();
+Assert(renderer.Render(composerTheme, new SystemSnapshot(DateTimeOffset.Now, 10, 20)).JpegBytes.Length > 0,
+    "composer must render placeholders when optional snapshots are missing");
+composerTheme.Widgets = savedComposerWidgets;
+
+// The layout persists through the settings file and the porter keeps it.
+var composerRoundtrip = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(
+    SettingsPorter.ExportJson(new AppSettings
+    {
+        Composer = new ComposerSettings
+        {
+            Widgets = [new() { Kind = "clock" }, new() { Kind = "text", Text = "нотатка" }]
+        }
+    }));
+Assert(composerRoundtrip?.Composer.Widgets is [{ Kind: "clock" }, { Kind: "text", Text: "нотатка" }],
+    "the composer layout must survive export/import untouched");
+Console.WriteLine("PASS screen builder: layout math, data needs, all widget renders, persistence");
+
+// ---- crash-safe settings store --------------------------------------------
+string storeDirectory = Path.Combine(Path.GetTempPath(), "kss-smoke-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var store = new JsonSettingsStore(Path.Combine(storeDirectory, "settings.json"));
+    await store.SaveAsync(new AppSettings { AccentColor = "#112233" });
+    await store.SaveAsync(new AppSettings { AccentColor = "#445566" });
+    Assert((await store.LoadAsync()).AccentColor == "#445566", "the settings store must read back the latest save");
+    Assert(File.Exists(store.Path + ".bak"), "a re-save must leave the previous file as .bak");
+    // A crash mid-write leaves a torn main file; the previous save must win.
+    await File.WriteAllTextAsync(store.Path, "{\"AccentColor\": \"#44");
+    Assert((await store.LoadAsync()).AccentColor == "#112233",
+        "a torn settings file must fall back to the .bak, not to blank settings");
+    File.Delete(store.Path);
+    Assert((await store.LoadAsync()).AccentColor == "#112233",
+        "a deleted settings file must still recover from the .bak");
+}
+finally
+{
+    if (Directory.Exists(storeDirectory))
+    {
+        Directory.Delete(storeDirectory, recursive: true);
+    }
+}
+Console.WriteLine("PASS settings store: atomic swap, backup recovery after torn writes");
 
 // ---- localization ---------------------------------------------------------
 AppLanguage[] shippedLanguages = AppLanguageInfo.All.Select(info => info.Language).ToArray();

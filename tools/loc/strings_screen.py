@@ -260,4 +260,10 @@ SCREEN = [
 
     # ---- fonts ---------------------------------------------------------------
     ("FontDefaultMiSans", "Default (MiSans)", "Типовий (MiSans)", "默认 MiSans"),
+
+    # ---- composer screen (v1.7.0) --------------------------------------------
+    ("ComposerEmptyLine1", "Empty layout", "Порожній екран", "布局为空"),
+    ("ComposerEmptyLine2", "Add widgets", "Додайте віджети", "请在主题设置中"),
+    ("ComposerEmptyLine3", "in the theme settings", "в налаштуваннях теми", "添加小组件"),
+    ("ScreenGitHubToday",  "Today", "Сьогодні", "今日"),
 ]

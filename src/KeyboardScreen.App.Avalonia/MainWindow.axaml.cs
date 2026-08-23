@@ -283,6 +283,33 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
+    private void ComposerAddButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.AddComposerWidget();
+
+    private void ComposerMoveUpButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ComposerRowViewModel row)
+        {
+            _viewModel.MoveComposerRow(row, -1);
+        }
+    }
+
+    private void ComposerMoveDownButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ComposerRowViewModel row)
+        {
+            _viewModel.MoveComposerRow(row, 1);
+        }
+    }
+
+    private void ComposerRemoveButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ComposerRowViewModel row)
+        {
+            _viewModel.RemoveComposerRow(row);
+        }
+    }
+
     private async Task<string?> PickExportPathAsync()
     {
         IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
