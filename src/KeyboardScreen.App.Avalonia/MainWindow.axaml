@@ -1047,6 +1047,35 @@
                       </StackPanel>
                     </Border>
 
+                    <Border IsVisible="{Binding IsComposerTheme}" Classes="card">
+                      <StackPanel Spacing="10">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ComposerHeading}" />
+                        <TextBlock Classes="secondary" Text="{infra:Localize ComposerHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <ComboBox x:CompileBindings="False" HorizontalAlignment="Stretch"
+                                    ItemsSource="{Binding ComposerChoices}"
+                                    SelectedIndex="{Binding SelectedComposerChoiceIndex, Mode=TwoWay}" />
+                          <Button Grid.Column="1" Click="ComposerAddButton_OnClick" Content="{infra:Localize ComposerAdd}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding ComposerRows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <StackPanel Spacing="4" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
+                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
+                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
+                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
+                                </Grid>
+                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" Watermark="{infra:Localize ComposerTextPlaceholder}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding ComposerBudgetText}" />
+                      </StackPanel>
+                    </Border>
+
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">

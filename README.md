@@ -23,8 +23,9 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 
 ## Features
 
-- 32 built-in themes across monitoring, time, information, music, dot matrix
-  and picture-clock categories — including a detailed hardware monitor with
+- 33 built-in themes across monitoring, time, information, music, dot matrix
+  and picture-clock categories — including a screen builder that stacks
+  widgets of your choice into a custom layout, a detailed hardware monitor with
   rotating pages, currency rates, Binance crypto with sparklines, a pomodoro
   timer, a GitHub contribution grid, disk fill bars, a ping monitor, world
   clocks, event countdowns, an ICS calendar feed, and Ukrainian air-raid

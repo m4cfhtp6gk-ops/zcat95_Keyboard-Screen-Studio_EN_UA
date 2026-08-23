@@ -28,6 +28,24 @@ public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action cha
     }
 }
 
+/// <summary>One row of the screen-builder editor: a placed widget.</summary>
+public sealed class ComposerRowViewModel(string kind, string text, Action changed) : ObservableObject
+{
+    private string _text = text;
+
+    public string Kind { get; } = kind;
+
+    public string Name => ComposerWidgets.Find(Kind) is { } info ? Loc.T(info.NameKey) : Kind;
+
+    public bool IsText => Kind == "text";
+
+    public string Text
+    {
+        get => _text;
+        set { if (SetProperty(ref _text, value)) changed(); }
+    }
+}
+
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly ISystemSnapshotSource _systemSource = new WindowsSystemSnapshotSource();
@@ -1412,6 +1430,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
+
+    public bool IsComposerTheme => SelectedTheme?.Id == "composer";
     public bool IsCryptoTheme => SelectedTheme?.Id == "crypto";
     public bool IsPomodoroTheme => SelectedTheme?.Id == "pomodoro";
     public bool IsHardwareTheme => SelectedTheme?.Id == "hardware";
@@ -2448,6 +2468,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _themes = BuiltInThemes.Create(_imageTheme, _pomodoroTimer);
         _perfVisualTheme = (PerformanceVisualTheme?)_themes.FirstOrDefault(theme => theme.Id == "performance-visual");
         _hardwareTheme = (HardwareMonitorTheme?)_themes.FirstOrDefault(theme => theme.Id == "hardware");
+        _composerTheme = (ComposerTheme?)_themes.FirstOrDefault(theme => theme.Id == "composer");
         _telegramService = new TelegramService(
             Path.GetDirectoryName(_settingsStore.Path) is { Length: > 0 } settingsDirectory
                 ? settingsDirectory
@@ -2619,6 +2640,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         ThemeGroups.Clear();
         var byId = _themes.ToDictionary(theme => theme.Id, StringComparer.OrdinalIgnoreCase);
+        AddGroup("ThemeGroupComposer", ["composer"], byId);
         AddGroup("ThemeGroupMonitoring", ["system", "hardware", "disks", "ping", "dashboard", "performance", "network", "system-minimal", "performance-visual"], byId);
         AddGroup("ThemeGroupTime", ["clock", "clock-neon", "clock-flip", "world-clock", "countdown", "pomodoro", "image"], byId);
         AddGroup("ThemeGroupInfo", ["weather-five-day", "stocks", "currency", "crypto", "github", "alerts", "calendar", "ai-quota", "claude-usage"], byId);
@@ -2864,6 +2886,19 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SelectedAiUsageMode = AiUsageModes.First(option => option.Kind == _settings.AiQuota.DataKind);
         AiDisplayName = _settings.AiQuota.DisplayName ?? string.Empty;
         AiProgressTarget = _settings.AiQuota.ProgressTarget;
+        ComposerRows.Clear();
+        foreach (ComposerWidgetSettings widget in _settings.Composer?.Widgets ?? [])
+        {
+            if (ComposerWidgets.Find(widget.Kind) is not null)
+            {
+                ComposerRows.Add(new ComposerRowViewModel(widget.Kind, widget.Text, OnComposerChanged));
+            }
+        }
+        if (_composerTheme is { } composerTheme)
+        {
+            composerTheme.Widgets = CurrentComposerWidgets();
+        }
+        OnPropertyChanged(nameof(ComposerBudgetText));
         UpdateRenderer();
         _loading = false;
         SelectTheme(_settings.SelectedThemeId);
@@ -3072,6 +3107,80 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         SelectedTheme = item;
     }
 
+    private ComposerTheme? _composerTheme;
+    private int _selectedComposerChoiceIndex;
+
+    public ObservableCollection<ComposerRowViewModel> ComposerRows { get; } = [];
+
+    public IReadOnlyList<string> ComposerChoices =>
+        ComposerWidgets.Catalog.Select(info => Loc.T(info.NameKey)).ToArray();
+
+    public int SelectedComposerChoiceIndex
+    {
+        get => _selectedComposerChoiceIndex;
+        set => SetProperty(ref _selectedComposerChoiceIndex, value);
+    }
+
+    public string ComposerBudgetText
+    {
+        get
+        {
+            ScreenInsets safeArea = ReadSafeArea();
+            double budget = _renderer.Profile.Height - safeArea.Top - safeArea.Bottom;
+            double used = ComposerWidgets.UsedHeight(CurrentComposerWidgets());
+            string line = Loc.T("ComposerBudget", $"{used:0}", $"{budget:0}");
+            return used > budget ? line + " · " + Loc.T("ComposerBudgetOverflow") : line;
+        }
+    }
+
+    private List<ComposerWidgetSettings> CurrentComposerWidgets() =>
+        ComposerRows
+            .Select(row => new ComposerWidgetSettings
+            {
+                Kind = row.Kind,
+                Text = row.IsText ? row.Text : string.Empty
+            })
+            .ToList();
+
+    public void AddComposerWidget()
+    {
+        int index = Math.Clamp(SelectedComposerChoiceIndex, 0, ComposerWidgets.Catalog.Count - 1);
+        ComposerRows.Add(new ComposerRowViewModel(
+            ComposerWidgets.Catalog[index].Kind, string.Empty, OnComposerChanged));
+        OnComposerChanged();
+    }
+
+    public void MoveComposerRow(ComposerRowViewModel row, int delta)
+    {
+        int index = ComposerRows.IndexOf(row);
+        int target = index + delta;
+        if (index < 0 || target < 0 || target >= ComposerRows.Count)
+        {
+            return;
+        }
+
+        ComposerRows.Move(index, target);
+        OnComposerChanged();
+    }
+
+    public void RemoveComposerRow(ComposerRowViewModel row)
+    {
+        if (ComposerRows.Remove(row))
+        {
+            OnComposerChanged();
+        }
+    }
+
+    private void OnComposerChanged()
+    {
+        OnPropertyChanged(nameof(ComposerBudgetText));
+        if (_composerTheme is { } theme)
+        {
+            theme.Widgets = CurrentComposerWidgets();
+        }
+        ScheduleCommit();
+    }
+
     private void RaiseNavigationProperties()
     {
         OnPropertyChanged(nameof(IsScreenPage));
@@ -3092,6 +3201,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OnPropertyChanged(nameof(IsAiTheme));
         OnPropertyChanged(nameof(IsClaudeTheme));
         OnPropertyChanged(nameof(IsCurrencyTheme));
+        OnPropertyChanged(nameof(IsComposerTheme));
         OnPropertyChanged(nameof(IsCryptoTheme));
         OnPropertyChanged(nameof(IsPomodoroTheme));
         OnPropertyChanged(nameof(IsHardwareTheme));
@@ -3342,6 +3452,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Telegram = BuildTelegramSettings();
         _settings.Notifications = BuildNotificationSettings();
         _settings.Carousel = BuildCarouselSettings();
+        _settings.Composer = new ComposerSettings { Widgets = CurrentComposerWidgets() };
         _settings.Use12HourClock = Use12HourClock;
         _settings.UseFahrenheit = UseFahrenheit;
         UpdateRenderer();
@@ -3382,6 +3493,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 break;
             }
+            catch (Exception)
+            {
+                // A refresh that dies must not take the loop with it: the render
+                // path reports its own failures, and the next tick retries. The
+                // loop always sleeps at the top, so this cannot spin.
+            }
         }
     }
 
@@ -3419,6 +3536,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         try
         {
             IScreenTheme requestedTheme = SelectedTheme?.Theme ?? _themes[0];
+            // Widgets on the user-assembled screen decide which sources to hit.
+            IReadOnlyCollection<string> composerNeeds = requestedTheme.Id == "composer"
+                ? ComposerWidgets.RequiredSources(_settings.Composer)
+                : [];
             SystemSnapshot system = await Task.Run(async () => await _systemSource.ReadAsync(cancellationToken));
             _musicSource.IgnoreBrowserSessions = IgnoreBrowserMediaSessions;
             MusicSnapshot music = await _musicSource.ReadAsync(cancellationToken);
@@ -3427,7 +3548,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             // An armed alert takeover needs the feed before theme layering,
             // whatever theme is on screen.
             AirAlertSnapshot? airAlerts = null;
-            if (AirAlertTakeover.IsArmed(_settings.AirAlerts) || requestedTheme.Id == "alerts")
+            if (AirAlertTakeover.IsArmed(_settings.AirAlerts) || requestedTheme.Id == "alerts" ||
+                composerNeeds.Contains("alerts"))
             {
                 airAlerts = await _airAlertSource.ReadAsync(
                     _settings.AirAlerts ?? new AirAlertSettings(),
@@ -3458,11 +3580,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 string.Equals(candidate.Id, effectiveId, StringComparison.OrdinalIgnoreCase))
                 ?? requestedTheme;
             _lastEffectiveThemeId = theme.Id;
+            if (theme.Id == "composer" && composerNeeds.Count == 0)
+            {
+                // The carousel or schedule landed on the assembled screen.
+                composerNeeds = ComposerWidgets.RequiredSources(_settings.Composer);
+            }
 
             WeatherSnapshot? weather = null;
             StockSnapshot? stocks = null;
             if (requestedTheme.Id is "clock-weather-dot" or "weather-five-day" ||
                 theme.Id is "clock-weather-dot" or "weather-five-day" ||
+                composerNeeds.Contains("weather") ||
                 ImageWeatherVisible && (requestedTheme.Id == "image" || theme.Id == "image"))
             {
                 WeatherSettings weatherSettings = await _desktopServices.ResolveWeatherSettingsAsync(
@@ -3479,7 +3607,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
 
             ClaudeUsageSnapshot? claudeUsage = null;
-            if (requestedTheme.Id == "claude-usage" || theme.Id == "claude-usage")
+            if (requestedTheme.Id == "claude-usage" || theme.Id == "claude-usage" ||
+                composerNeeds.Contains("claude-usage"))
             {
                 claudeUsage = await _claudeUsageSource.ReadAsync(
                     _settings.ClaudeUsage ?? new ClaudeUsageSettings(),
@@ -3488,7 +3617,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
 
             CurrencySnapshot? currency = null;
-            if (requestedTheme.Id == "currency" || theme.Id == "currency")
+            if (requestedTheme.Id == "currency" || theme.Id == "currency" ||
+                composerNeeds.Contains("currency"))
             {
                 currency = await _currencySource.ReadAsync(
                     _settings.Currency ?? new CurrencySettings(),
@@ -3497,7 +3627,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
 
             CryptoSnapshot? crypto = null;
-            if (requestedTheme.Id == "crypto" || theme.Id == "crypto")
+            if (requestedTheme.Id == "crypto" || theme.Id == "crypto" ||
+                composerNeeds.Contains("crypto"))
             {
                 crypto = await _binanceStockSource.ReadCryptoAsync(
                     _settings.Crypto ?? new CryptoSettings(),
@@ -3506,14 +3637,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
 
             HardwareSnapshot? hardware = null;
-            if (requestedTheme.Id == "hardware" || theme.Id == "hardware")
+            if (requestedTheme.Id == "hardware" || theme.Id == "hardware" ||
+                composerNeeds.Contains("hardware"))
             {
                 hardware = await Task.Run(_hardwareSource.Read, cancellationToken);
                 _hardwareSnapshot = hardware;
             }
 
             GitHubContributionSnapshot? gitHub = null;
-            if (requestedTheme.Id == "github" || theme.Id == "github")
+            if (requestedTheme.Id == "github" || theme.Id == "github" ||
+                composerNeeds.Contains("github"))
             {
                 gitHub = await _gitHubSource.ReadAsync(
                     _settings.GitHub ?? new GitHubSettings(),
@@ -3521,7 +3654,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _gitHubSnapshot = gitHub;
             }
 
-            if (airAlerts is null && theme.Id == "alerts")
+            if (airAlerts is null && (theme.Id == "alerts" || composerNeeds.Contains("alerts")))
             {
                 // The carousel or schedule landed on the alerts theme without
                 // an armed takeover; fetch for the render.
@@ -3539,14 +3672,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
 
             PingSnapshot? ping = null;
-            if (requestedTheme.Id == "ping" || theme.Id == "ping")
+            if (requestedTheme.Id == "ping" || theme.Id == "ping" ||
+                composerNeeds.Contains("ping"))
             {
                 ping = await _pingSource.ReadAsync(_settings.Ping, cancellationToken);
                 _pingSnapshot = ping;
             }
 
             CalendarSnapshot? calendar = null;
-            if (requestedTheme.Id == "calendar" || theme.Id == "calendar")
+            if (requestedTheme.Id == "calendar" || theme.Id == "calendar" ||
+                composerNeeds.Contains("calendar"))
             {
                 calendar = await _calendarSource.ReadAsync(
                     _settings.Calendar ?? new CalendarSettings(),

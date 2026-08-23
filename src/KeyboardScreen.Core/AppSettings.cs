@@ -115,6 +115,8 @@ public sealed class AppSettings
 
 	public KnobSettings Knob { get; set; } = new();
 
+	public ComposerSettings Composer { get; set; } = new();
+
 
 
 

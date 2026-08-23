@@ -27,6 +27,7 @@ public static class BuiltInThemes
 	{
 		return new IScreenTheme[]
 		{
+			new ComposerTheme(pomodoroTimer),
 			new SystemStatusTheme(),
 			new HardwareMonitorTheme(),
 			Make("dashboard", Loc.T("ThemeDashboardName"), Loc.T("ThemeDashboardDescription"), Loc.T("ThemeDashboardDetails"), Dashboard),
