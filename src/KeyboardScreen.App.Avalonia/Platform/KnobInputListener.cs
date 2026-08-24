@@ -39,6 +39,11 @@ public sealed class KnobInputListener : IDisposable
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private const int VkMenu = 0x12;
+    private const int VkLeftWin = 0x5B;
+    private const int VkRightWin = 0x5C;
     private const int VkVolumeMute = 0xAD;
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
@@ -69,9 +74,9 @@ public sealed class KnobInputListener : IDisposable
     private readonly bool _filterByVidPid;
     private readonly ushort _vid;
     private readonly ushort _pid;
-    private readonly int _forwardVk;
-    private readonly int _backwardVk;
-    private readonly int _toggleVk;
+    private readonly KnobShortcut _forward;
+    private readonly KnobShortcut _backward;
+    private readonly KnobShortcut _toggle;
 
     private readonly Thread _thread;
     private readonly WndProcDelegate _wndProc;
@@ -120,9 +125,9 @@ public sealed class KnobInputListener : IDisposable
         // the detector existed, but a learned collection always outranks it.
         _filterByVidPid = _boundDeviceKey.Length == 0
             && KnobControl.TryParseVidPid(settings.VidPid, out _vid, out _pid);
-        _forwardVk = KnobControl.HotKeyToVirtualKey(settings.KeyForward) ?? 0x7C;
-        _backwardVk = KnobControl.HotKeyToVirtualKey(settings.KeyBackward) ?? 0x7D;
-        _toggleVk = KnobControl.HotKeyToVirtualKey(settings.KeyToggle) ?? 0x7E;
+        _forward = KnobControl.ShortcutFor(settings, KnobAction.NextTheme);
+        _backward = KnobControl.ShortcutFor(settings, KnobAction.PreviousTheme);
+        _toggle = KnobControl.ShortcutFor(settings, KnobAction.ToggleCarousel);
 
         // The delegates are kept in fields for the listener's whole lifetime;
         // a collected callback under a live hook crashes the process.
@@ -474,6 +479,22 @@ public sealed class KnobInputListener : IDisposable
     /// volume once, whereas guessing yes would swallow another device's volume
     /// key - the exact thing binding to the knob is meant to prevent.
     /// </summary>
+    /// <summary>Exact match: a chord must not fire when extra modifiers are down.</summary>
+    private static bool Matches(KnobShortcut shortcut, int vk, KnobModifiers held) =>
+        shortcut.IsSet && shortcut.VirtualKey == vk && shortcut.Modifiers == held;
+
+    private static KnobModifiers CurrentModifiers()
+    {
+        var held = KnobModifiers.None;
+        if (IsDown(VkControl)) held |= KnobModifiers.Control;
+        if (IsDown(VkMenu)) held |= KnobModifiers.Alt;
+        if (IsDown(VkShift)) held |= KnobModifiers.Shift;
+        if (IsDown(VkLeftWin) || IsDown(VkRightWin)) held |= KnobModifiers.Windows;
+        return held;
+    }
+
+    private static bool IsDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
     private bool IsFromBoundSource()
     {
         if (_boundDeviceKey.Length == 0 && !_filterByVidPid)
@@ -535,15 +556,27 @@ public sealed class KnobInputListener : IDisposable
 
         if (_mode == KnobMode.HotKeys)
         {
-            if (vk == _forwardVk || vk == _backwardVk || vk == _toggleVk)
+            // Modifiers are separate key events, so the chord is resolved by
+            // asking for their live state at the moment the real key arrives.
+            KnobModifiers held = CurrentModifiers();
+            KnobAction? action =
+                Matches(_forward, vk, held) ? KnobAction.NextTheme
+                : Matches(_backward, vk, held) ? KnobAction.PreviousTheme
+                : Matches(_toggle, vk, held) ? KnobAction.ToggleCarousel
+                : null;
+
+            if (action is { } bound)
             {
                 if (isDown)
                 {
-                    _onAction?.Invoke(vk == _forwardVk ? KnobAction.NextTheme
-                        : vk == _backwardVk ? KnobAction.PreviousTheme
-                        : KnobAction.ToggleCarousel);
+                    _onAction?.Invoke(bound);
                 }
-                return 1; // a dedicated F13-F24 key has no other job
+
+                // Swallowed so the chord does not also reach whatever has focus.
+                // Safe for a deliberate combination; the settings page warns
+                // before letting a bare key be bound, because binding one takes
+                // that key away from the whole system while the app runs.
+                return 1;
             }
 
             return CallNextHookEx(_hook, code, wParam, lParam);
@@ -641,6 +674,9 @@ public sealed class KnobInputListener : IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern nint CreateWindowEx(uint exStyle, string className, string windowName,
         uint style, int x, int y, int width, int height, nint parent, nint menu, nint instance, nint param);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
     private static extern bool DestroyWindow(nint hwnd);

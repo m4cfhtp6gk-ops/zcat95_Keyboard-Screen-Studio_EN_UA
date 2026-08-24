@@ -51,11 +51,11 @@ public sealed record SystemSnapshot(
         ClaudeUsage: new ClaudeUsageSnapshot(
             Available: true,
             Session: new ClaudeUsageWindow(
-                ClaudeUsageWindowKind.Session, 42, DateTimeOffset.Now.AddHours(2).AddMinutes(44), 1_180_000),
+                ClaudeUsageWindowKind.Session, 42, DateTimeOffset.Now.AddHours(2).AddMinutes(44)),
             Week: new ClaudeUsageWindow(
-                ClaudeUsageWindowKind.Week, 73, DateTimeOffset.Now.AddDays(4).AddHours(9), 18_400_000),
+                ClaudeUsageWindowKind.Week, 73, DateTimeOffset.Now.AddDays(4).AddHours(9)),
             ModelWeek: new ClaudeUsageWindow(
-                ClaudeUsageWindowKind.ModelWeek, 91, DateTimeOffset.Now.AddDays(4).AddHours(9), 6_250_000, "Fable"),
+                ClaudeUsageWindowKind.ModelWeek, 91, DateTimeOffset.Now.AddDays(4).AddHours(9), "Opus"),
             UpdatedAt: DateTimeOffset.Now),
         Currency: new CurrencySnapshot(
             Available: true,

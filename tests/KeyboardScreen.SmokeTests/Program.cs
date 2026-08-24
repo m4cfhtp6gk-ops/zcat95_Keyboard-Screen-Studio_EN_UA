@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using KeyboardScreen.Core;
 
 Loc.Instance.Initialize(AppLanguage.English);
@@ -16,12 +17,10 @@ Assert(defaults.Weather.UseAutomaticLocation, "first-run weather must use automa
 Assert(defaults.Weather.LocationQuery == WeatherSettings.DefaultLocationQuery, "first-run weather city is incorrect");
 Assert(defaults.Language.Length == 0, "first-run language must defer to the operating system");
 Assert(defaults.ClaudeUsage.ModelScope == "opus", "Claude usage must start on the Opus row");
-// There is nothing to configure before a first read: the source is a directory
-// on this machine, so an unprepared machine reports "no data", never "no key".
-Assert(defaults.ClaudeUsage.IsConfigured
-    && defaults.ClaudeUsage.Plan == ClaudePlanKind.Pro
-    && defaults.ClaudeUsage.EffectiveWeekBudget == 25_000_000,
-    "Claude usage must default to the Pro budget with nothing to configure");
+// Nothing to configure and no cached organization: the screen borrows the
+// Claude Code login, so a fresh machine reports "not signed in", never "no key".
+Assert(defaults.ClaudeUsage.IsConfigured && defaults.ClaudeUsage.OrganizationId.Length == 0,
+    "Claude usage must start with nothing to configure");
 // The shipped default used to be an id nothing could produce, so the font
 // drop-down was empty on every first launch while the screen rendered in MiSans.
 Assert(defaults.SelectedFontId == ScreenFontOption.DefaultId,
@@ -73,11 +72,9 @@ var claudeError = renderer.Render(
     SystemSnapshot.DesignSample with { ClaudeUsage = ClaudeUsageSnapshot.Unavailable("no key") });
 Assert(claudeError.JpegBytes is [0xFF, 0xD8, ..], "errored Claude usage view did not render");
 Assert(SystemSnapshot.DesignSample.ClaudeUsage?.Windows.Count() == 3, "the sample should carry all three windows");
-Assert(ClaudeUsageTheme.FormatTokens(1_180_000) == "1.2M", "token formatting is incorrect");
-Assert(ClaudeUsageTheme.FormatTokens(940) == "940", "small token counts should stay plain");
 var expired = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
 Assert(expired.EffectivePercent == 0, "a window past its reset time reads as empty");
-Console.WriteLine("PASS Claude usage theme states and token formatting");
+Console.WriteLine("PASS Claude usage theme states");
 Assert(themes.Select(theme => theme.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == themes.Count, "theme ids should be unique");
 
 var aiQuotaTheme = themes.Single(theme => theme.Id == "ai-quota");
@@ -511,7 +508,7 @@ var settingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-settings-{
 try
 {
     var settingsStore = new JsonSettingsStore(settingsPath);
-    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", ClaudeUsage = new ClaudeUsageSettings { Plan = ClaudePlanKind.Max5, SessionTokenBudget = 7_000_000, ModelScope = "sonnet" }, HasAcknowledgedClaudeNotice = true, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
+    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", ClaudeUsage = new ClaudeUsageSettings { ModelScope = "sonnet", OrganizationId = "org-persist" }, HasAcknowledgedClaudeNotice = true, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
     await settingsStore.SaveAsync(settings);
     var loadedSettings = await settingsStore.LoadAsync();
     Assert(loadedSettings.SelectedThemeId == "music", "settings theme did not persist");
@@ -537,10 +534,8 @@ try
     Assert(!loadedSettings.IgnoreBrowserMediaSessions, "browser media filter setting did not persist");
     Assert(loadedSettings.UiThemeMode == UiThemeMode.Dark, "control UI theme mode did not persist");
     Assert(loadedSettings.Language == "uk" && AppLanguageInfo.Parse(loadedSettings.Language) == AppLanguage.Ukrainian, "language setting did not persist");
-    Assert(loadedSettings.ClaudeUsage.Plan == ClaudePlanKind.Max5
-        && loadedSettings.ClaudeUsage.SessionTokenBudget == 7_000_000
-        && loadedSettings.ClaudeUsage.EffectiveWeekBudget == 125_000_000
-        && loadedSettings.ClaudeUsage.ModelScope == "sonnet", "Claude usage settings did not persist");
+    Assert(loadedSettings.ClaudeUsage.ModelScope == "sonnet"
+        && loadedSettings.ClaudeUsage.OrganizationId == "org-persist", "Claude usage settings did not persist");
     Assert(loadedSettings.HasAcknowledgedClaudeNotice, "the Claude notice acknowledgement did not persist");
     Assert(loadedSettings.DotMatrixProgressPeriod == DotMatrixProgressPeriod.Quarter, "dot-matrix progress period did not persist");
     Assert(loadedSettings.DotMatrixProgressHeaderFontSize == 18, "dot-matrix progress header font size did not persist");
@@ -708,159 +703,105 @@ if (OperatingSystem.IsWindows())
 }
 
 // ---- Claude usage --------------------------------------------------------
-// The screen reads Claude Code's transcripts and nothing else. Both remote
-// paths were removed rather than patched again: a cookie bound to the browser
-// that solved the Cloudflare challenge, and a status line whose numbers are not
-// persisted anywhere on disk. These tests pin the arithmetic that replaced them.
+// The screen asks claude.ai for the account's own windows, authenticated with
+// the OAuth token Claude Code already holds. The endpoint was never the problem
+// - the very first design called this same URL - so these tests pin the two
+// things that were: finding the credential, and reading the payload.
 
-Assert(ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Session == 2_000_000
-    && ClaudeUsageSettings.PresetFor(ClaudePlanKind.Max20).Week == 500_000_000,
-    "plan presets must stay put");
+// Credentials: the file's shape is not a documented contract, so the token is
+// found by walking the JSON rather than by one assumed path.
+var credFlat = ClaudeCodeCredentials.Parse("""{"accessToken":"tok-flat"}""", "test");
+Assert(credFlat?.AccessToken == "tok-flat", "a token at the root must be found");
 
-var budgeted = new ClaudeUsageSettings { Plan = ClaudePlanKind.Pro };
-Assert(budgeted.EffectiveSessionBudget == 2_000_000, "an unset budget must follow the plan preset");
-budgeted.SessionTokenBudget = 500_000;
-Assert(budgeted.EffectiveSessionBudget == 500_000, "an explicit budget must win over the preset");
-budgeted.SessionTokenBudget = -5;
-Assert(budgeted.EffectiveSessionBudget == 2_000_000, "a nonsense budget must fall back to the preset");
-Assert(budgeted.IsConfigured, "the local source needs no configuration to be usable");
+var credNested = ClaudeCodeCredentials.Parse(
+    """{"claudeAiOauth":{"accessToken":"tok-nested","refreshToken":"r","expiresAt":4102444800000}}""",
+    "test");
+Assert(credNested?.AccessToken == "tok-nested", "a nested token must be found");
+Assert(credNested?.ExpiresAt?.Year == 2100, "a millisecond epoch expiry must be read");
+Assert(!credNested!.IsExpired, "an expiry far in the future is not expired");
 
-// No directory at all means Claude Code has never run on this machine.
-using (var absentSource = new ClaudeUsageSnapshotSource(
-    new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), $"kss-absent-{Guid.NewGuid():N}"))))
+Assert(ClaudeCodeCredentials.Parse("""{"a":{"b":{"access_token":"tok-snake"}}}""", "t")?.AccessToken == "tok-snake",
+    "the snake_case spelling must be accepted too");
+Assert(ClaudeCodeCredentials.Parse("""{"expiresAt":1,"accessToken":"tok-old"}""", "t")!.IsExpired,
+    "a past expiry must read as expired");
+Assert(ClaudeCodeCredentials.Parse("""{"accessToken":""}""", "t") is null,
+    "an empty token is not a credential");
+Assert(ClaudeCodeCredentials.Parse("not json", "t") is null, "a torn file must not throw");
+Assert(ClaudeCodeCredentials.Read(Path.Combine(Path.GetTempPath(), $"kss-no-creds-{Guid.NewGuid():N}.json")) is null,
+    "a missing credentials file simply means Claude Code is not signed in");
+
+// No credential at all: the screen says so rather than inventing a number.
+using (var signedOut = new ClaudeUsageSnapshotSource(
+    new HttpClient(new ClaudeHandler(new Queue<string>())), () => null))
 {
-    var none = await absentSource.ReadAsync(new ClaudeUsageSettings());
-    Assert(!none.Available, "no transcript directory must read as unavailable");
-    var absentReport = await absentSource.CheckAsync(new ClaudeUsageSettings());
-    Assert(!absentReport.Success, "the check must fail when there is no directory");
+    var none = await signedOut.ReadAsync(new ClaudeUsageSettings());
+    Assert(!none.Available, "no Claude Code login must read as unavailable");
+    Assert((await signedOut.CheckAsync(new ClaudeUsageSettings())).Success == false,
+        "the check must fail when there is no login");
 }
 
-// The full arithmetic, against a fixed clock.
-var claudeRoot = Path.Combine(Path.GetTempPath(), $"kss-claude-src-{Guid.NewGuid():N}", "projects", "demo");
-Directory.CreateDirectory(claudeRoot);
-try
+using (var staleLogin = new ClaudeUsageSnapshotSource(
+    new HttpClient(new ClaudeHandler(new Queue<string>())),
+    () => new ClaudeCodeCredential("tok", DateTimeOffset.Now.AddMinutes(-1), "test")))
 {
-    // Concatenated rather than interpolated: the payload's own braces make a raw
-    // interpolated literal ambiguous.
-    static string Line(DateTimeOffset stamp, string model, long input, long output) =>
-        "{\"type\":\"assistant\",\"timestamp\":\"" + stamp.ToString("o")
-        + "\",\"message\":{\"model\":\"" + model
-        + "\",\"usage\":{\"input_tokens\":" + input + ",\"output_tokens\":" + output
-        + ",\"cache_read_input_tokens\":900000}}}";
-
-    var claudeNow = DateTimeOffset.Now;
-    var inSession = claudeNow.AddHours(-2);
-    var olderThisWeek = claudeNow.AddDays(-2);
-
-    await File.WriteAllLinesAsync(Path.Combine(claudeRoot, "a.jsonl"),
-    [
-        Line(inSession, "claude-opus-5", 400_000, 100_000),
-        Line(olderThisWeek, "claude-sonnet-5", 200_000, 50_000)
-    ]);
-
-    var localSettings = new ClaudeUsageSettings
-    {
-        Plan = ClaudePlanKind.Custom,
-        SessionTokenBudget = 1_000_000,
-        WeekTokenBudget = 1_000_000,
-        ModelScope = "opus"
-    };
-    using var localSource = new ClaudeUsageSnapshotSource(
-        new ClaudeCodeTokenReader(Path.Combine(claudeRoot, "..")));
-    var local = localSource.Read(localSettings, claudeNow);
-
-    Assert(local.Available, "transcripts on disk must produce a snapshot");
-    Assert(local.Windows.Count() == 3, "all three windows must be present");
-    // Cache reads are excluded on purpose: 900k of them must not move the figure.
-    Assert(local.Session?.TokensUsed == 500_000, $"session tokens wrong: {local.Session?.TokensUsed}");
-    Assert(local.Week?.TokensUsed == 750_000, $"week tokens wrong: {local.Week?.TokensUsed}");
-    Assert(local.ModelWeek?.TokensUsed == 500_000, "the model window must count Opus only");
-    Assert(Math.Abs((local.Session?.UtilizationPercent ?? 0) - 50d) < 0.001,
-        "the session meter must read tokens against the session budget");
-    Assert(Math.Abs((local.Week?.UtilizationPercent ?? 0) - 75d) < 0.001,
-        "the week meter must read tokens against the week budget");
-    Assert(local.ModelWeek?.ScopeName == "opus", "the model window must carry its scope name");
-
-    // A rolling window drains as its oldest entry ages out; there is no
-    // server-issued reset time to read, so this is what the countdown means.
-    Assert(local.Session?.ResetsAt is { } sessionReset
-        && Math.Abs((sessionReset - (inSession + ClaudeUsageSnapshotSource.SessionWindow)).TotalSeconds) < 1,
-        "the session reset must be the oldest counted record plus five hours");
-    Assert(local.Week?.ResetsAt is { } weekReset
-        && Math.Abs((weekReset - (olderThisWeek + ClaudeUsageSnapshotSource.WeekWindow)).TotalSeconds) < 1,
-        "the week reset must be the oldest counted record plus seven days");
-
-    var okReport = await localSource.CheckAsync(localSettings);
-    Assert(okReport.Success && okReport.TokensThisWeek == 750_000,
-        "the check must report the week's tokens");
-}
-finally
-{
-    try { Directory.Delete(Path.GetDirectoryName(claudeRoot)!, recursive: true); } catch (IOException) { }
+    Assert(!(await staleLogin.ReadAsync(new ClaudeUsageSettings())).Available,
+        "an expired login must read as unavailable");
 }
 
-// An existing directory with nothing in the window is a true zero, not a failure.
-var emptyRoot = Path.Combine(Path.GetTempPath(), $"kss-claude-empty-{Guid.NewGuid():N}", "projects");
-Directory.CreateDirectory(emptyRoot);
-try
+// The live path: organizations then usage, both on Authorization: Bearer.
+var claudeResponses = new Queue<string>(new[]
 {
-    using var emptySource = new ClaudeUsageSnapshotSource(new ClaudeCodeTokenReader(emptyRoot));
-    var empty = emptySource.Read(new ClaudeUsageSettings(), DateTimeOffset.Now);
-    Assert(empty.Available, "an existing directory with no usage is available data");
-    Assert(empty.Session?.TokensUsed == 0 && empty.Session?.EffectivePercent == 0,
-        "no usage must read as a true zero");
-    Assert(empty.Session?.ResetsAt is null, "nothing used means nothing to reset");
-}
-finally
+    """[{"uuid":"org-123","name":"Personal"}]""",
+    """{"five_hour":{"utilization":42,"resets_at":"2099-08-21T21:59:59Z"},"seven_day":{"utilization":"73%","resets_at":"2099-08-25T16:59:59Z"},"seven_day_opus":{"utilization":91.5,"resets_at":"2099-08-25T16:59:59Z"}}"""
+});
+var claudeHandler2 = new ClaudeHandler(claudeResponses);
+using (var claudeClient = new HttpClient(claudeHandler2))
+using (var live = new ClaudeUsageSnapshotSource(claudeClient,
+           () => new ClaudeCodeCredential("tok-live", null, "test"))
+       { BaseUrl = "https://claude.test/api" })
 {
-    try { Directory.Delete(Path.GetDirectoryName(emptyRoot)!, recursive: true); } catch (IOException) { }
-}
-Console.WriteLine("PASS Claude usage from local transcripts: windows, budgets, resets and diagnostics");
-
-// Local token counting: only records inside the window count, and the model
-// window only counts records from that model.
-var transcriptRoot = Path.Combine(Path.GetTempPath(), $"kss-claude-{Guid.NewGuid():N}", "projects", "demo");
-Directory.CreateDirectory(transcriptRoot);
-try
-{
-    var recent = DateTimeOffset.Now.AddMinutes(-30).ToString("o");
-    var midWeek = DateTimeOffset.Now.AddDays(-3).ToString("o");
-    var tooOld = DateTimeOffset.Now.AddDays(-30).ToString("o");
-    // Built by concatenation: the payload's own braces make an interpolated raw
-    // string literal ambiguous.
-    static string Record(string stamp, string model, string usage) =>
-        "{\"type\":\"assistant\",\"timestamp\":\"" + stamp + "\",\"message\":{\"model\":\"" + model
-        + "\",\"usage\":{" + usage + "}}}";
-
-    await File.WriteAllLinesAsync(Path.Combine(transcriptRoot, "session.jsonl"),
-    [
-        Record(recent, "claude-fable-5",
-            "\"input_tokens\":100,\"output_tokens\":50,\"cache_creation_input_tokens\":10,\"cache_read_input_tokens\":900000"),
-        Record(midWeek, "claude-opus-5",
-            "\"input_tokens\":200,\"output_tokens\":100,\"cache_creation_input_tokens\":0"),
-        Record(tooOld, "claude-fable-5", "\"input_tokens\":9999,\"output_tokens\":9999"),
-        """{"type":"user","message":{"content":"no usage block here"}}"""
-    ]);
-
-    var reader = new ClaudeCodeTokenReader(Path.Combine(transcriptRoot, ".."));
-    var totals = reader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), "fable");
-    Assert(totals.Available, "the reader should have found transcripts");
-    Assert(totals.Session == 160, $"the 5h window should count only the recent record, got {totals.Session}");
-    Assert(totals.Week == 460, $"the weekly window should skip the 30-day-old record, got {totals.Week}");
-    Assert(totals.ModelWeek == 160, $"the model window should count Fable only, got {totals.ModelWeek}");
-
-    var noScope = reader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), null);
-    Assert(noScope.ModelWeek == 0, "no model scope means no model total");
-}
-finally
-{
-    try { Directory.Delete(Path.GetDirectoryName(transcriptRoot)!, recursive: true); } catch (IOException) { }
+    var settings = new ClaudeUsageSettings { ModelScope = "opus" };
+    var snapshot = await live.ReadAsync(settings);
+    Assert(snapshot.Available, "a good token and payload must produce a snapshot");
+    Assert(settings.OrganizationId == "org-123", "the organization must be resolved and cached");
+    Assert(Math.Abs(snapshot.Session!.UtilizationPercent - 42) < 0.001, "the session percent is the account's own");
+    Assert(Math.Abs(snapshot.Week!.UtilizationPercent - 73) < 0.001, "a percent string must parse");
+    Assert(Math.Abs(snapshot.ModelWeek!.UtilizationPercent - 91.5) < 0.001, "the per-model window must be read");
+    Assert(snapshot.Session.ResetsAt?.Year == 2099, "the reset time must be carried through");
+    Assert(claudeHandler2.Requests.Count == 2, "one call for the organization, one for the usage");
+    Assert(claudeHandler2.AuthorizationHeaders.All(h => h == "Bearer tok-live"),
+        "every call must present the Claude Code token as a bearer, never a cookie");
+    Assert(claudeHandler2.CookieHeaders.Count == 0, "no cookie may be sent");
 }
 
-var missingReader = new ClaudeCodeTokenReader(Path.Combine(Path.GetTempPath(), $"kss-absent-{Guid.NewGuid():N}"));
-Assert(!missingReader.Read(DateTimeOffset.Now.AddHours(-5), DateTimeOffset.Now.AddDays(-7), "fable").Available,
-    "a missing transcripts directory must report nothing rather than throwing");
-Console.WriteLine("PASS Claude Code transcript reader: windows, model scope and a missing directory");
+// Both spellings of every field, because the two descriptions of this payload
+// in the wild disagree and guessing wrong costs a release to discover.
+using (var alt = JsonDocument.Parse(
+    """{"five_hour":{"utilization_pct":12,"reset_at":"2099-01-01T00:00:00Z"}}"""))
+{
+    var parsed = ClaudeUsageSnapshotSource.Parse(alt.RootElement, "opus", DateTimeOffset.Now);
+    Assert(parsed.Available && Math.Abs(parsed.Session!.UtilizationPercent - 12) < 0.001,
+        "utilization_pct must be accepted as well as utilization");
+    Assert(parsed.Session!.ResetsAt?.Year == 2099, "reset_at must be accepted as well as resets_at");
+}
+
+// Newer payloads null the per-model object and report it in a limits array.
+using (var limits = JsonDocument.Parse(
+    """{"five_hour":{"utilization":5},"limits":[{"kind":"weekly_scoped","percent":64,"scope":{"model":{"id":"claude-opus-5","display_name":"Opus"}}}]}"""))
+{
+    var parsed = ClaudeUsageSnapshotSource.Parse(limits.RootElement, "opus", DateTimeOffset.Now);
+    Assert(parsed.ModelWeek is { ScopeName: "Opus" } && Math.Abs(parsed.ModelWeek.UtilizationPercent - 64) < 0.001,
+        "a limits[] entry must win for the per-model window");
+}
+
+// A window whose reset has passed reads as empty, not as its last percentage.
+var expiredWindow = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
+Assert(expiredWindow.HasReset && expiredWindow.EffectivePercent == 0, "a window past its reset must read empty");
+
+Assert(ClaudeUsageSnapshotSource.FirstOrganizationId(
+    JsonDocument.Parse("""[{"name":"no uuid"},{"uuid":"org-2"}]""").RootElement) == "org-2",
+    "the first entry that actually carries a uuid wins");
+Console.WriteLine("PASS Claude usage: credential discovery, bearer auth, payload spellings, limits[]");
 
 // ---- Binance crypto source -----------------------------------------------
 Assert(BinanceStockSnapshotSource.NormalizeSymbol("btcusdt") == "BTCUSDT", "Binance pairs must upper-case");
@@ -1884,13 +1825,37 @@ Assert(!KnobControl.DevicePathMatches(@"\\?\HID#VID_046D&PID_C52B#7&1f6a&0&0000#
     "a different device must not match");
 Assert(!KnobControl.DevicePathMatches(null, 0x3151, 0x4015), "a missing path must not match");
 
-Assert(KnobControl.HotKeyToVirtualKey("F13") == 0x7C && KnobControl.HotKeyToVirtualKey("f24") == 0x87,
-    "F13-F24 must map onto their virtual keys");
-Assert(KnobControl.HotKeyToVirtualKey("F12") is null && KnobControl.HotKeyToVirtualKey("Q") is null
-    && KnobControl.HotKeyToVirtualKey(null) is null,
-    "keys outside F13-F24 must be rejected");
-Assert(KnobControl.HotKeyNames.Count == 12 && KnobControl.HotKeyNames[0] == "F13" && KnobControl.HotKeyNames[^1] == "F24",
-    "the hot-key list must span F13 through F24");
+// Any combination, not a fixed F13-F24 list: the Linx68 has no such keys, so
+// that mode only ever worked on a board you could remap in VIA/QMK.
+var chord = KnobShortcut.Parse("Ctrl+Alt+P");
+Assert(chord.VirtualKey == 'P' && chord.Modifiers == (KnobModifiers.Control | KnobModifiers.Alt),
+    "a chord must round-trip from its stored form");
+Assert(chord.ToStorageString() == "Ctrl+Alt+P", "storage form must be stable");
+Assert(chord.Describe() == "Ctrl + Alt + P", "the settings page spaces a chord out");
+Assert(chord.HasModifier && chord.IsSet, "a chord is set and carries a modifier");
+
+// Settings written before this existed hold a bare "F13"; they must keep working.
+var legacy = KnobShortcut.Parse("F13");
+Assert(legacy.VirtualKey == 0x7C && legacy.Modifiers == KnobModifiers.None,
+    "an old F13 binding must still parse");
+Assert(!legacy.HasModifier, "a bare key is what the warning is for");
+Assert(KnobShortcut.Parse("F24").VirtualKey == 0x87, "F24 must still map");
+Assert(KnobShortcut.Parse("").IsSet == false && KnobShortcut.Parse(null).IsSet == false,
+    "an empty binding is simply unset");
+Assert(KnobShortcut.Parse("Shift+Win+Num5").ToStorageString() == "Shift+Win+Num5",
+    "numpad keys and the Windows modifier must round-trip");
+Assert(KnobShortcut.Parse("VK173").VirtualKey == 0xAD && KnobShortcut.Parse("Mute").VirtualKey == 0xAD,
+    "a media key round-trips by name and by raw code");
+Assert(KnobShortcut.IsModifierKey(0x11) && !KnobShortcut.IsModifierKey('P'),
+    "modifier keys alone must not end a capture");
+
+var knobBindings = new KnobSettings { KeyForward = "Ctrl+Alt+Right", KeyBackward = "F14", KeyToggle = "" };
+Assert(KnobControl.ShortcutFor(knobBindings, KnobAction.NextTheme).Describe() == "Ctrl + Alt + Right",
+    "the forward binding must be read back");
+Assert(KnobControl.ShortcutFor(knobBindings, KnobAction.PreviousTheme).VirtualKey == 0x7D,
+    "a legacy binding beside a new one must still work");
+Assert(!KnobControl.ShortcutFor(knobBindings, KnobAction.ToggleCarousel).IsSet,
+    "an unset binding must not match anything");
 
 var knobDefaults = new KnobSettings();
 Assert(!knobDefaults.Enabled && knobDefaults.SuppressVolume && knobDefaults.Mode == KnobMode.VolumeKnob,
@@ -2041,7 +2006,51 @@ var composerRoundtrip = System.Text.Json.JsonSerializer.Deserialize<AppSettings>
     }));
 Assert(composerRoundtrip?.Composer.Widgets is [{ Kind: "clock" }, { Kind: "text", Text: "нотатка" }],
     "the composer layout must survive export/import untouched");
-Console.WriteLine("PASS screen builder: layout math, data needs, all widget renders, persistence");
+// Per-widget font and accent. The dot face is offered only where a number is
+// drawn: Doto has no Cyrillic, so a label in it would fall back to a system face.
+Assert(ComposerWidgets.Find("cpu")!.HasNumber && ComposerWidgets.Find("clock")!.HasNumber,
+    "numeric widgets must offer the dot font");
+Assert(!ComposerWidgets.Find("text")!.HasNumber && !ComposerWidgets.Find("music")!.HasNumber
+    && !ComposerWidgets.Find("spacer")!.HasNumber && !ComposerWidgets.Find("weather")!.HasNumber,
+    "widgets whose value is prose must not offer it");
+
+var styledWidgets = new List<ComposerWidgetSettings>
+{
+    new() { Kind = "clock", DotFont = true, Accent = "#22C55E" },
+    new() { Kind = "cpu", DotFont = true },
+    new() { Kind = "text", Text = "hello", DotFont = true, Accent = "#FF0000" }
+};
+var styledTheme = new ComposerTheme(new PomodoroTimer()) { Widgets = styledWidgets };
+Assert(renderer.Render(styledTheme, SystemSnapshot.DesignSample).JpegBytes is [0xFF, 0xD8, ..],
+    "a styled layout must render");
+
+// A bad or empty colour falls back to the theme accent rather than throwing.
+foreach (string accent in new[] { "", "not-a-colour", "#GGGGGG", "#12345" })
+{
+    var oddTheme = new ComposerTheme(new PomodoroTimer())
+    {
+        Widgets = [new ComposerWidgetSettings { Kind = "cpu", Accent = accent }]
+    };
+    Assert(renderer.Render(oddTheme, SystemSnapshot.DesignSample).JpegBytes.Length > 0,
+        $"accent '{accent}' must fall back instead of failing");
+}
+
+// The two styles must survive a settings round-trip.
+var composerStore = Path.Combine(Path.GetTempPath(), $"kss-composer-{Guid.NewGuid():N}.json");
+try
+{
+    var composerSettings = new AppSettings { Composer = new ComposerSettings { Widgets = styledWidgets } };
+    await new JsonSettingsStore(composerStore).SaveAsync(composerSettings);
+    var reloaded = await new JsonSettingsStore(composerStore).LoadAsync();
+    var first = reloaded.Composer!.Widgets[0];
+    Assert(first.DotFont && first.Accent == "#22C55E", "per-widget font and accent must persist");
+    Assert(!reloaded.Composer.Widgets[1].DotFont == false, "the second widget keeps its own font flag");
+}
+finally
+{
+    try { File.Delete(composerStore); } catch (IOException) { }
+}
+Console.WriteLine("PASS screen builder: layout math, data needs, all widget renders, per-widget font and accent, persistence");
 
 // ---- crash-safe settings store --------------------------------------------
 string storeDirectory = Path.Combine(Path.GetTempPath(), "kss-smoke-" + Guid.NewGuid().ToString("N"));
@@ -2240,6 +2249,12 @@ sealed class ClaudeHandler : HttpMessageHandler
     public List<string> UserAgents { get; } = [];
     public List<Version> Versions { get; } = [];
 
+    /// <summary>What each request presented on Authorization, so bearer auth can be asserted.</summary>
+    public List<string> AuthorizationHeaders { get; } = [];
+
+    /// <summary>Only the requests that carried a Cookie header at all.</summary>
+    public List<string> CookieHeaders { get; } = [];
+
     /// <summary>Sent as Set-Cookie on every response when set, like Cloudflare's __cf_bm.</summary>
     public string? SetCookie { get; init; }
 
@@ -2252,6 +2267,12 @@ sealed class ClaudeHandler : HttpMessageHandler
     {
         Requests.Add(request.RequestUri?.ToString() ?? string.Empty);
         Cookies.Add(request.Headers.TryGetValues("Cookie", out var values) ? string.Join("; ", values) : string.Empty);
+        if (request.Headers.TryGetValues("Cookie", out var sent))
+        {
+            CookieHeaders.Add(string.Join("; ", sent));
+        }
+
+        AuthorizationHeaders.Add(request.Headers.Authorization?.ToString() ?? string.Empty);
         ClientHints.Add(request.Headers.TryGetValues("sec-ch-ua", out var hints) ? string.Join("; ", hints) : string.Empty);
         UserAgents.Add(request.Headers.TryGetValues("User-Agent", out var agents) ? string.Join(" ", agents) : string.Empty);
         Versions.Add(request.Version);

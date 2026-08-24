@@ -282,13 +282,34 @@
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <StackPanel Spacing="4" Margin="0,0,0,6">
-                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
-                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
-                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
-                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
-                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+                                  <ToggleButton Classes="composer-expand" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                Content="⌄" ToolTip.Tip="{infra:Localize ComposerRowOptions}" />
+                                  <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Name}" />
+                                  <Button Grid.Column="2" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
+                                  <Button Grid.Column="3" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
+                                  <Button Grid.Column="4" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
                                 </Grid>
                                 <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" PlaceholderText="{infra:Localize ComposerTextPlaceholder}" />
+                                <Border IsVisible="{Binding IsExpanded}" Classes="composer-options" Padding="12,10" Margin="0,2,0,4">
+                                  <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding SupportsDotFont}">
+                                      <StackPanel Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerDotFontLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerDotFontHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding DotFont, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                      <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerAccentLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerAccentHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <Button Grid.Column="1" Click="ComposerAccentPick_OnClick" Content="{infra:Localize ThemeAccentPick}" />
+                                      <Button Grid.Column="2" IsVisible="{Binding HasAccent}" Click="ComposerAccentReset_OnClick" Content="{infra:Localize ThemeAccentReset}" />
+                                    </Grid>
+                                  </StackPanel>
+                                </Border>
                               </StackPanel>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
@@ -529,26 +550,6 @@
                                      Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
                         </Grid>
                         <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
-                        <StackPanel Spacing="6">
-                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeBudgetHeading}" />
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeBudgetHint}" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudePlanLabel}" />
-                          <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
-                                    ItemsSource="{Binding ClaudePlanOptions}"
-                                    SelectedItem="{Binding ClaudePlanPreference, Mode=TwoWay}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSessionBudgetLabel}" />
-                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeSessionBudgetInput, Mode=TwoWay}" />
-                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeWeekBudgetLabel}" />
-                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeWeekBudgetInput, Mode=TwoWay}" />
-                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
-                        </Grid>
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
                           <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
@@ -1215,20 +1216,29 @@
                             </Border>
                           </StackPanel>
                           <StackPanel Spacing="12" IsVisible="{Binding IsKnobHotKeyMode}">
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobCaptureHint}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyForwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyForward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyForwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureForward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyBackwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyBackward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyBackwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureBackward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyToggleLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyToggle, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyToggleText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureToggle_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
+                            <TextBlock IsVisible="{Binding IsCapturingKnobKey}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource KssControlFocusBrush}"
+                                       Text="{infra:Localize KnobCaptureWaiting}" TextWrapping="Wrap" />
+                            <TextBlock IsVisible="{Binding KnobBareKeyWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Classes="secondary" FontSize="11" Foreground="#B43B33"
+                                       Text="{Binding KnobBareKeyWarning}" TextWrapping="Wrap" />
                           </StackPanel>
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobViaHint}" TextWrapping="Wrap" />
                         </StackPanel>
                       </StackPanel>
                     </Expander>

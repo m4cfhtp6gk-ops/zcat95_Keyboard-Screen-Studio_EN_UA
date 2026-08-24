@@ -29,9 +29,13 @@ public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action cha
 }
 
 /// <summary>One row of the screen-builder editor: a placed widget.</summary>
-public sealed class ComposerRowViewModel(string kind, string text, Action changed) : ObservableObject
+public sealed class ComposerRowViewModel(
+    string kind, string text, bool dotFont, string accent, Action changed) : ObservableObject
 {
     private string _text = text;
+    private bool _dotFont = dotFont;
+    private string _accent = accent;
+    private bool _isExpanded;
 
     public string Kind { get; } = kind;
 
@@ -39,11 +43,50 @@ public sealed class ComposerRowViewModel(string kind, string text, Action change
 
     public bool IsText => Kind == "text";
 
+    /// <summary>
+    /// The font switch only appears where the widget draws a number. Doto has no
+    /// Cyrillic, so offering it on a prose widget would promise a look it cannot
+    /// deliver.
+    /// </summary>
+    public bool SupportsDotFont => ComposerWidgets.Find(Kind)?.HasNumber == true;
+
+    /// <summary>Font and colour live behind a click, so the list stays a list.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
+
     public string Text
     {
         get => _text;
         set { if (SetProperty(ref _text, value)) changed(); }
     }
+
+    public bool DotFont
+    {
+        get => _dotFont;
+        set { if (SetProperty(ref _dotFont, value)) changed(); }
+    }
+
+    /// <summary>#RRGGBB, or empty to follow the theme's accent.</summary>
+    public string Accent
+    {
+        get => _accent;
+        set
+        {
+            string cleaned = (value ?? string.Empty).Trim();
+            if (SetProperty(ref _accent, cleaned))
+            {
+                OnPropertyChanged(nameof(HasAccent));
+                changed();
+            }
+        }
+    }
+
+    public bool HasAccent => _accent.Length > 0;
+
+    public void ClearAccent() => Accent = string.Empty;
 }
 
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
@@ -159,9 +202,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _updateStatusText = string.Empty;
     private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
     private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
-    private ClaudePlanKind _claudePlan = ClaudePlanKind.Pro;
-    private long _claudeSessionBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Session;
-    private long _claudeWeekBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Week;
     private ClaudeUsageSnapshot? _claudeUsage;
     private string _currencyBase = "USD";
     private CurrencySourceKind _currencySourceKind = CurrencySourceKind.CurrencyApi;
@@ -1408,109 +1448,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
     }
 
-    public IReadOnlyList<string> ClaudePlanOptions =>
-        [Loc.T("ClaudePlanPro"), Loc.T("ClaudePlanMax5"), Loc.T("ClaudePlanMax20"), Loc.T("ClaudePlanCustom")];
-
-    public string ClaudePlanPreference
-    {
-        get => ClaudePlanOptions[(int)_claudePlan];
-        set
-        {
-            IReadOnlyList<string> options = ClaudePlanOptions;
-            int index = Math.Max(0, options.ToList().IndexOf(value));
-            var plan = (ClaudePlanKind)index;
-            if (_claudePlan == plan)
-            {
-                return;
-            }
-
-            _claudePlan = plan;
-            // Switching preset must move the visible numbers with it, otherwise
-            // the boxes keep showing the old plan's budget and read as broken.
-            if (plan != ClaudePlanKind.Custom)
-            {
-                (long session, long week) = ClaudeUsageSettings.PresetFor(plan);
-                _claudeSessionBudget = session;
-                _claudeWeekBudget = week;
-                OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
-                OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
-            }
-
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>Budgets are typed in millions: nobody wants to count zeroes.</summary>
-    public string ClaudeSessionBudgetInput
-    {
-        get => FormatMillions(_claudeSessionBudget);
-        set
-        {
-            if (!TryParseMillions(value, out long tokens) || tokens == _claudeSessionBudget)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            _claudeSessionBudget = tokens;
-            SwitchToCustomPlan();
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    public string ClaudeWeekBudgetInput
-    {
-        get => FormatMillions(_claudeWeekBudget);
-        set
-        {
-            if (!TryParseMillions(value, out long tokens) || tokens == _claudeWeekBudget)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            _claudeWeekBudget = tokens;
-            SwitchToCustomPlan();
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>Editing a budget by hand is what "custom" means; say so in the picker.</summary>
-    private void SwitchToCustomPlan()
-    {
-        if (_claudePlan == ClaudePlanKind.Custom)
-        {
-            return;
-        }
-
-        _claudePlan = ClaudePlanKind.Custom;
-        OnPropertyChanged(nameof(ClaudePlanPreference));
-    }
-
-    private static string FormatMillions(long tokens) =>
-        (tokens / 1_000_000d).ToString("0.##", Loc.Culture);
-
-    private static bool TryParseMillions(string? text, out long tokens)
-    {
-        tokens = 0;
-        if (!double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, Loc.Culture, out double millions)
-            && !double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out millions))
-        {
-            return false;
-        }
-
-        if (millions is <= 0 or > 100_000)
-        {
-            return false;
-        }
-
-        tokens = (long)Math.Round(millions * 1_000_000d);
-        return tokens > 0;
-    }
-
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
 
     public bool IsComposerTheme => SelectedTheme?.Id == "composer";
@@ -1778,24 +1715,110 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsKnobVolumeMode => _knobMode == KnobMode.VolumeKnob;
     public bool IsKnobHotKeyMode => _knobMode == KnobMode.HotKeys;
 
-    public IReadOnlyList<string> KnobKeyOptions => KnobControl.HotKeyNames;
-
     public string KnobKeyForward
     {
         get => _knobKeyForward;
-        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyBackward
     {
         get => _knobKeyBackward;
-        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyToggle
     {
         get => _knobKeyToggle;
-        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
+    }
+
+    private KnobAction? _knobCapture;
+
+    /// <summary>The combination each action is bound to, spaced out to read as a chord.</summary>
+    public string KnobKeyForwardText => Describe(KnobAction.NextTheme);
+    public string KnobKeyBackwardText => Describe(KnobAction.PreviousTheme);
+    public string KnobKeyToggleText => Describe(KnobAction.ToggleCarousel);
+
+    public bool IsCapturingKnobKey => _knobCapture is not null;
+
+    /// <summary>
+    /// Names any binding that has no modifier. The listener swallows what it
+    /// binds, so a bare key stops working everywhere else while KSS runs - which
+    /// is fine for F13 and ruinous for M. Allowed, but never silently.
+    /// </summary>
+    public string KnobBareKeyWarning
+    {
+        get
+        {
+            string[] bare = new[] { KnobAction.NextTheme, KnobAction.PreviousTheme, KnobAction.ToggleCarousel }
+                .Select(action => KnobControl.ShortcutFor(BuildKnobSettings(), action))
+                .Where(shortcut => shortcut.IsSet && !shortcut.HasModifier)
+                .Select(shortcut => shortcut.Describe())
+                .ToArray();
+            return bare.Length == 0 ? string.Empty : Loc.T("KnobBareKeyWarning", string.Join(", ", bare));
+        }
+    }
+
+    /// <summary>Arms the capture; the window hands back the next real key press.</summary>
+    public void BeginKnobCapture(KnobAction action)
+    {
+        _knobCapture = action;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    public void CancelKnobCapture()
+    {
+        if (_knobCapture is null)
+        {
+            return;
+        }
+
+        _knobCapture = null;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    /// <summary>
+    /// Stores what was pressed. Modifier keys alone are ignored so holding Ctrl
+    /// on the way to Ctrl+Alt+P does not end the capture early.
+    /// </summary>
+    public void ApplyKnobCapture(int virtualKey, KnobModifiers modifiers)
+    {
+        if (_knobCapture is not { } action || virtualKey == 0 || KnobShortcut.IsModifierKey(virtualKey))
+        {
+            return;
+        }
+
+        string stored = new KnobShortcut(virtualKey, modifiers).ToStorageString();
+        switch (action)
+        {
+            case KnobAction.NextTheme: KnobKeyForward = stored; break;
+            case KnobAction.PreviousTheme: KnobKeyBackward = stored; break;
+            default: KnobKeyToggle = stored; break;
+        }
+
+        CancelKnobCapture();
+    }
+
+    private string Describe(KnobAction action)
+    {
+        KnobShortcut shortcut = KnobControl.ShortcutFor(BuildKnobSettings(), action);
+        return shortcut.IsSet ? shortcut.Describe() : Loc.T("KnobKeyUnset");
+    }
+
+    private KnobSettings BuildKnobSettings() => new()
+    {
+        KeyForward = _knobKeyForward,
+        KeyBackward = _knobKeyBackward,
+        KeyToggle = _knobKeyToggle
+    };
+
+    private void RaiseKnobKeyText()
+    {
+        OnPropertyChanged(nameof(KnobKeyForwardText));
+        OnPropertyChanged(nameof(KnobKeyBackwardText));
+        OnPropertyChanged(nameof(KnobKeyToggleText));
+        OnPropertyChanged(nameof(KnobBareKeyWarning));
     }
 
     /// <summary>The selected theme's own accent (#RRGGBB), or empty for the global one.</summary>
@@ -2805,14 +2828,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
         StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _claudePlan = _settings.ClaudeUsage.Plan;
-        // Read the effective values, so the boxes show the preset the plan
-        // implies rather than the zero that means "follow the preset".
-        _claudeSessionBudget = _settings.ClaudeUsage.EffectiveSessionBudget;
-        _claudeWeekBudget = _settings.ClaudeUsage.EffectiveWeekBudget;
-        OnPropertyChanged(nameof(ClaudePlanPreference));
-        OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
-        OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : _settings.ClaudeUsage.ModelScope;
@@ -2991,7 +3006,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             if (ComposerWidgets.Find(widget.Kind) is not null)
             {
-                ComposerRows.Add(new ComposerRowViewModel(widget.Kind, widget.Text, OnComposerChanged));
+                ComposerRows.Add(new ComposerRowViewModel(
+                    widget.Kind, widget.Text, widget.DotFont, widget.Accent, OnComposerChanged));
             }
         }
         if (_composerTheme is { } composerTheme)
@@ -3221,9 +3237,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
         var settings = new ClaudeUsageSettings
         {
-            Plan = _claudePlan,
-            SessionTokenBudget = _claudeSessionBudget,
-            WeekTokenBudget = _claudeWeekBudget,
             ModelScope = ClaudeModelScope
         };
 
@@ -3269,7 +3282,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             .Select(row => new ComposerWidgetSettings
             {
                 Kind = row.Kind,
-                Text = row.IsText ? row.Text : string.Empty
+                Text = row.IsText ? row.Text : string.Empty,
+                DotFont = row.SupportsDotFont && row.DotFont,
+                Accent = row.Accent
             })
             .ToList();
 
@@ -3277,7 +3292,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         int index = Math.Clamp(SelectedComposerChoiceIndex, 0, ComposerWidgets.Catalog.Count - 1);
         ComposerRows.Add(new ComposerRowViewModel(
-            ComposerWidgets.Catalog[index].Kind, string.Empty, OnComposerChanged));
+            ComposerWidgets.Catalog[index].Kind, string.Empty, false, string.Empty, OnComposerChanged));
         OnComposerChanged();
     }
 
@@ -3475,9 +3490,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _settings.ClaudeUsage.Plan = _claudePlan;
-        _settings.ClaudeUsage.SessionTokenBudget = _claudeSessionBudget;
-        _settings.ClaudeUsage.WeekTokenBudget = _claudeWeekBudget;
         _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : ClaudeModelScope.Trim();

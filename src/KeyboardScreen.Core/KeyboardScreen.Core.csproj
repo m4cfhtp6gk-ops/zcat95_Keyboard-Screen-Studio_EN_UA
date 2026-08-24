@@ -17,6 +17,12 @@
     <EmbeddedResource Include="Localization/Strings.zh-Hans.json" LogicalName="KeyboardScreen.Core.Localization.Strings.zh-Hans.json" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The smoke tests exercise the parsing helpers directly; they stay
+         internal so they are not part of the app's supported surface. -->
+    <InternalsVisibleTo Include="KeyboardScreen.SmokeTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\Fonts\Doto.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="Assets\Fonts\Doto-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Fonts\MiSans-Medium.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />

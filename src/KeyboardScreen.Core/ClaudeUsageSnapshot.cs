@@ -14,21 +14,17 @@ public enum ClaudeUsageWindowKind
 }
 
 /// <summary>
-/// One Claude usage window.
+/// One Claude usage window, exactly as the account reports it.
 ///
-/// <see cref="TokensUsed"/> is summed from the local Claude Code transcripts and
-/// only covers this machine — a floor on real usage, never the account total.
-/// <see cref="UtilizationPercent"/> is that figure measured against the budget
-/// the user set, not a quota reported by any server: no local file records the
-/// account's real limits, and every remote path that claimed to has since
-/// stopped working. A percentage of your own target is honest; a percentage of
-/// a guessed quota would not be.
+/// <see cref="UtilizationPercent"/> is the account's own figure, not arithmetic
+/// done here. There is deliberately no token count: the usage payload carries
+/// none, and the previous design's local tally measured one machine against a
+/// budget the user invented, which looked like data and was not.
 /// </summary>
 public sealed record ClaudeUsageWindow(
     ClaudeUsageWindowKind Kind,
     double UtilizationPercent,
     DateTimeOffset? ResetsAt = null,
-    long? TokensUsed = null,
     string? ScopeName = null)
 {
     public double ClampedPercent => Math.Clamp(UtilizationPercent, 0d, 100d);
@@ -39,20 +35,15 @@ public sealed record ClaudeUsageWindow(
     public double EffectivePercent => HasReset ? 0d : ClampedPercent;
 }
 
-/// <summary>The three limit windows drawn by <see cref="ClaudeUsageTheme"/>.</summary>
 /// <summary>
-/// What one diagnostic pass found on this machine. There is no server in this
-/// path any more, so the useful facts are local: whether Claude Code's
-/// transcript directory is where we expect it, and how much it actually yielded.
+/// What one diagnostic pass found: whether a Claude Code credential exists on
+/// this machine and what claude.ai said when it was used. Never the token.
 /// </summary>
-/// <param name="Detail">The directory checked, or the reason it produced nothing.</param>
-public sealed record ClaudeConnectionReport(
-    bool Success,
-    string Detail,
-    long TokensThisWeek = 0)
+/// <param name="Detail">Where the credential came from, or why the call failed.</param>
+public sealed record ClaudeConnectionReport(bool Success, string Detail)
 {
     public string ToDisplayString() => Success
-        ? Loc.T("ClaudeCheckLineOk", ClaudeUsageTheme.FormatTokens(TokensThisWeek), Detail)
+        ? Loc.T("ClaudeCheckLineOk", Detail)
         : Loc.T("ClaudeCheckLineFailed", Detail);
 }
 

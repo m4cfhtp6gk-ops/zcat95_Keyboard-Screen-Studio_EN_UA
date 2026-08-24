@@ -287,8 +287,115 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
+    private async void ComposerAccentPick_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ComposerRowViewModel row)
+        {
+            return;
+        }
+
+        var dialog = new AccentColorWindow(row.HasAccent ? row.Accent : _viewModel.AccentColor);
+        string? selected = await dialog.ShowDialog<string?>(this);
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            row.Accent = selected;
+        }
+    }
+
+    private void ComposerAccentReset_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ComposerRowViewModel row)
+        {
+            row.ClearAccent();
+        }
+    }
+
     private async void ClaudeCheckButton_OnClick(object? sender, RoutedEventArgs e) =>
         await _viewModel.CheckClaudeConnectionAsync();
+
+    private void KnobCaptureForward_OnClick(object? sender, RoutedEventArgs e) =>
+        BeginKnobCapture(KnobAction.NextTheme);
+
+    private void KnobCaptureBackward_OnClick(object? sender, RoutedEventArgs e) =>
+        BeginKnobCapture(KnobAction.PreviousTheme);
+
+    private void KnobCaptureToggle_OnClick(object? sender, RoutedEventArgs e) =>
+        BeginKnobCapture(KnobAction.ToggleCarousel);
+
+    private void BeginKnobCapture(KnobAction action)
+    {
+        _viewModel.BeginKnobCapture(action);
+        // Tunnelling: the combination must reach us before a focused control
+        // treats it as its own shortcut.
+        AddHandler(KeyDownEvent, KnobCaptureKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    private void KnobCaptureKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!_viewModel.IsCapturingKnobKey)
+        {
+            RemoveHandler(KeyDownEvent, KnobCaptureKeyDown);
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            _viewModel.CancelKnobCapture();
+            RemoveHandler(KeyDownEvent, KnobCaptureKeyDown);
+            e.Handled = true;
+            return;
+        }
+
+        int virtualKey = ToVirtualKey(e.Key);
+        if (virtualKey == 0 || KnobShortcut.IsModifierKey(virtualKey))
+        {
+            // Still waiting for the real key; swallow so nothing else reacts.
+            e.Handled = true;
+            return;
+        }
+
+        var modifiers = KnobModifiers.None;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control)) modifiers |= KnobModifiers.Control;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt)) modifiers |= KnobModifiers.Alt;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) modifiers |= KnobModifiers.Shift;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Meta)) modifiers |= KnobModifiers.Windows;
+
+        _viewModel.ApplyKnobCapture(virtualKey, modifiers);
+        RemoveHandler(KeyDownEvent, KnobCaptureKeyDown);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Avalonia keys to Windows virtual-key codes, covering exactly what
+    /// KnobShortcut.KeyName can name back - anything else is refused rather than
+    /// stored as a number nobody can read.
+    /// </summary>
+    private static int ToVirtualKey(Key key) => key switch
+    {
+        >= Key.A and <= Key.Z => 0x41 + (key - Key.A),
+        >= Key.D0 and <= Key.D9 => 0x30 + (key - Key.D0),
+        >= Key.NumPad0 and <= Key.NumPad9 => 0x60 + (key - Key.NumPad0),
+        >= Key.F1 and <= Key.F24 => 0x70 + (key - Key.F1),
+        Key.Space => 0x20,
+        Key.Enter => 0x0D,
+        Key.Tab => 0x09,
+        Key.PageUp => 0x21,
+        Key.PageDown => 0x22,
+        Key.End => 0x23,
+        Key.Home => 0x24,
+        Key.Left => 0x25,
+        Key.Up => 0x26,
+        Key.Right => 0x27,
+        Key.Down => 0x28,
+        Key.Insert => 0x2D,
+        Key.Delete => 0x2E,
+        Key.LeftShift or Key.RightShift => 0x10,
+        Key.LeftCtrl or Key.RightCtrl => 0x11,
+        Key.LeftAlt or Key.RightAlt => 0x12,
+        Key.LWin => 0x5B,
+        Key.RWin => 0x5C,
+        _ => 0
+    };
 
     private void ComposerAddButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.AddComposerWidget();

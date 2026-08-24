@@ -40,7 +40,8 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - Theme switching from the keyboard itself: the Linx68 volume knob turns to
   the next/previous theme and its press pauses the carousel — bindable to the
   keyboard alone by VID:PID, with an optional volume-key mute, or driven by
-  VIA/QMK-remapped F13–F24 keys so volume is never touched. Off by default.
+  a key combination you record yourself, so volume is never touched — useful
+  whether or not the board can be remapped in VIA/QMK. Off by default.
 - A per-theme refresh interval and per-theme accent colour, a 12/24-hour
   clock and °C/°F units, sunrise/sunset and air quality on the weather
   screen, a stock portfolio row fed by per-symbol quantities, extra
@@ -55,10 +56,11 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - A first-run guide that asks only for the keyboard's IP address.
 - AI usage (in development) reads from a Tokscale installation you set up
   yourself; KSS never stores platform credentials.
-- A Claude usage theme showing the rolling 5-hour window, the last 7 days and
-  one model's share of that week as three horizontal meters. It reads Claude
-  Code's own transcripts on this PC — no login, no key, no network request —
-  and fills against a token budget you set. See [PRIVACY.md](PRIVACY.md).
+- A Claude usage theme showing the rolling 5-hour window, the week across every
+  model and one model's week as three horizontal meters, with the time until
+  each resets. These are your account's own figures: the screen borrows the
+  login Claude Code already holds on the PC, so there is nothing to paste and
+  nothing to sign in to. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 

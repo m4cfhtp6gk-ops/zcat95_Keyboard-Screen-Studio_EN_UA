@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Claude limits are the account's real figures now.** The screen asks
+  claude.ai for your subscription's own windows, authenticated with the
+  OAuth token Claude Code already stores when you sign in. Nothing to
+  paste, nothing to configure. The token budgets and plan presets are
+  gone with the local token tally they were a denominator for: when the
+  login is missing or expired, the screen says so instead of drawing a
+  substitute number. Each meter now shows the time until it resets, in
+  the space the local token count used to take.
+- The knob's hot-key mode takes a combination you record yourself instead
+  of a fixed F13-F24 list. The Linx68 has no such keys, so that list only
+  ever worked on a board you could remap in VIA/QMK. A modifier is
+  recommended and a binding without one is called out in red, because the
+  listener swallows whatever it binds. Existing F13-F24 settings keep
+  working untouched.
+- Screen builder blocks can each use the dot-matrix face for their
+  numbers and carry their own accent colour, revealed by a chevron on the
+  row. Labels stay in the normal face - the dot font has no Cyrillic - and
+  the switch appears only on blocks that actually draw a number.
+
+### Fixed
+
+- The weekday no longer gets cut to "понеді…" beside the date on the
+  dot-matrix analog clock. The line was split 42/58 with the longer
+  string given the smaller half; it is now divided by what the two
+  strings measure.
+- The dot-matrix clock drops its "Hours / Minutes / Seconds" captions -
+  three numbers stacked largest to smallest say which is which - and
+  centres the column in the freed space.
+
 ## v1.9.0 - 2026-08-24
 
 ### Changed
