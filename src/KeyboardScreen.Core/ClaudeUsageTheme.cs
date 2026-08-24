@@ -72,16 +72,16 @@ public sealed class ClaudeUsageTheme : IScreenTheme
         double contentWidth = card.Width - inset * 2;
 
         canvas.AlignedText(Label(window), 11, Secondary,
-            new Rect(card.Left + inset, card.Top + 9, contentWidth * 0.6, 15),
+            new Rect(card.Left + inset, card.Top + 9, contentWidth, 15),
             FontWeights.SemiBold, TextAlignment.Left);
-        canvas.AlignedText(Countdown(window), 9, Muted,
-            new Rect(card.Left + inset + contentWidth * 0.4, card.Top + 10, contentWidth * 0.6, 14),
-            FontWeights.Medium, TextAlignment.Right);
 
         canvas.AlignedText(percent.ToString("0", Loc.Culture) + "%", 30, Colors.White,
             new Rect(card.Left + inset, card.Top + 26, contentWidth * 0.62, 34),
             FontWeights.SemiBold, TextAlignment.Left);
-        canvas.AlignedText(Tokens(window), 11, Secondary,
+        // The countdown takes the slot the local token tally used to fill, at
+        // the size that tally had. "resets in 2h 51m" is the figure a person
+        // acts on, and it was previously crammed in at 9 px in the corner.
+        canvas.AlignedText(Countdown(window), 11, Secondary,
             new Rect(card.Left + inset + contentWidth * 0.38, card.Top + 35, contentWidth * 0.62, 18),
             FontWeights.Medium, TextAlignment.Right);
 
@@ -126,28 +126,5 @@ public sealed class ClaudeUsageTheme : IScreenTheme
         return left.TotalHours >= 1
             ? Loc.T("ScreenClaudeHoursMinutes", (int)left.TotalHours, left.Minutes)
             : Loc.T("ScreenClaudeMinutes", Math.Max(1, left.Minutes));
-    }
-
-    /// <summary>Tokens counted locally for this window; blank when none were read.</summary>
-    private static string Tokens(ClaudeUsageWindow window) =>
-        window.TokensUsed is { } tokens ? FormatTokens(tokens) : string.Empty;
-
-    /// <summary>Compact token count: 1.2M, 940K, 512.</summary>
-    public static string FormatTokens(long tokens)
-    {
-        CultureInfo culture = Loc.Culture;
-        if (tokens >= 1_000_000_000)
-        {
-            return (tokens / 1_000_000_000d).ToString("0.0", culture) + "B";
-        }
-
-        if (tokens >= 1_000_000)
-        {
-            return (tokens / 1_000_000d).ToString("0.0", culture) + "M";
-        }
-
-        return tokens >= 1_000
-            ? (tokens / 1_000d).ToString("0.0", culture) + "K"
-            : tokens.ToString("0", culture);
     }
 }

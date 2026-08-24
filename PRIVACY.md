@@ -16,16 +16,22 @@ Optional online features contact third-party services directly:
   through its local JSON commands. For that integration KSS does not sign in to
   any platform, does not read API keys, and does not upload usage data or
   credentials.
-- The Claude limits theme handles no credential at all. It reads the Claude Code
-  transcripts under `~/.claude/projects` on this computer, sums the tokens in
-  each usage block, and makes no network request of any kind - there is no
-  session cookie, no API key and no account to sign in to. Nothing read there
-  leaves the machine.
-- Because those transcripts only cover Claude Code on this computer, the totals
-  are a floor on account usage rather than the account total. Anthropic
-  publishes no quota that software can read, so the meters fill against a token
-  budget you set yourself; the percentage is measured against your target, not
-  against an official limit.
+- The Claude limits theme asks claude.ai for your subscription's own usage
+  windows. It does not ask you to paste anything: it reads the OAuth token that
+  Claude Code already stores when you sign in - `%USERPROFILE%\.claude\.credentials.json`
+  on Windows, or the directory `CLAUDE_CONFIG_DIR` points at - and presents it
+  as a bearer token to `claude.ai`.
+- That token is read fresh each time it is needed and is sent to `claude.ai` and
+  to no other host. KSS never copies it into its own settings file, never
+  includes it in an exported backup, and never writes it to a log or to the
+  screen; the theme's diagnostic line reports only where the token was found and
+  what the server answered. KSS does not refresh or modify the token, so it
+  cannot affect your Claude Code sign-in. Clearing it is done by signing out of
+  Claude Code.
+- The percentages and reset times shown are the account's own figures. The
+  endpoint they come from is not a documented public API and may change or stop
+  working without notice; when it does, the screen says it is not connected
+  rather than showing a substitute number.
 
 Images sent to the keyboard are posted directly from the computer to the
 configured device address over unencrypted HTTP. Use this feature only on a

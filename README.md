@@ -55,10 +55,11 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - A first-run guide that asks only for the keyboard's IP address.
 - AI usage (in development) reads from a Tokscale installation you set up
   yourself; KSS never stores platform credentials.
-- A Claude usage theme showing the rolling 5-hour window, the last 7 days and
-  one model's share of that week as three horizontal meters. It reads Claude
-  Code's own transcripts on this PC — no login, no key, no network request —
-  and fills against a token budget you set. See [PRIVACY.md](PRIVACY.md).
+- A Claude usage theme showing the rolling 5-hour window, the week across every
+  model and one model's week as three horizontal meters, with the time until
+  each resets. These are your account's own figures: the screen borrows the
+  login Claude Code already holds on the PC, so there is nothing to paste and
+  nothing to sign in to. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 

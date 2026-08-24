@@ -159,9 +159,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _updateStatusText = string.Empty;
     private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
     private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
-    private ClaudePlanKind _claudePlan = ClaudePlanKind.Pro;
-    private long _claudeSessionBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Session;
-    private long _claudeWeekBudget = ClaudeUsageSettings.PresetFor(ClaudePlanKind.Pro).Week;
     private ClaudeUsageSnapshot? _claudeUsage;
     private string _currencyBase = "USD";
     private CurrencySourceKind _currencySourceKind = CurrencySourceKind.CurrencyApi;
@@ -1406,109 +1403,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         get => _claudeModelScope;
         set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
-    }
-
-    public IReadOnlyList<string> ClaudePlanOptions =>
-        [Loc.T("ClaudePlanPro"), Loc.T("ClaudePlanMax5"), Loc.T("ClaudePlanMax20"), Loc.T("ClaudePlanCustom")];
-
-    public string ClaudePlanPreference
-    {
-        get => ClaudePlanOptions[(int)_claudePlan];
-        set
-        {
-            IReadOnlyList<string> options = ClaudePlanOptions;
-            int index = Math.Max(0, options.ToList().IndexOf(value));
-            var plan = (ClaudePlanKind)index;
-            if (_claudePlan == plan)
-            {
-                return;
-            }
-
-            _claudePlan = plan;
-            // Switching preset must move the visible numbers with it, otherwise
-            // the boxes keep showing the old plan's budget and read as broken.
-            if (plan != ClaudePlanKind.Custom)
-            {
-                (long session, long week) = ClaudeUsageSettings.PresetFor(plan);
-                _claudeSessionBudget = session;
-                _claudeWeekBudget = week;
-                OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
-                OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
-            }
-
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>Budgets are typed in millions: nobody wants to count zeroes.</summary>
-    public string ClaudeSessionBudgetInput
-    {
-        get => FormatMillions(_claudeSessionBudget);
-        set
-        {
-            if (!TryParseMillions(value, out long tokens) || tokens == _claudeSessionBudget)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            _claudeSessionBudget = tokens;
-            SwitchToCustomPlan();
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    public string ClaudeWeekBudgetInput
-    {
-        get => FormatMillions(_claudeWeekBudget);
-        set
-        {
-            if (!TryParseMillions(value, out long tokens) || tokens == _claudeWeekBudget)
-            {
-                OnPropertyChanged();
-                return;
-            }
-
-            _claudeWeekBudget = tokens;
-            SwitchToCustomPlan();
-            OnPropertyChanged();
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>Editing a budget by hand is what "custom" means; say so in the picker.</summary>
-    private void SwitchToCustomPlan()
-    {
-        if (_claudePlan == ClaudePlanKind.Custom)
-        {
-            return;
-        }
-
-        _claudePlan = ClaudePlanKind.Custom;
-        OnPropertyChanged(nameof(ClaudePlanPreference));
-    }
-
-    private static string FormatMillions(long tokens) =>
-        (tokens / 1_000_000d).ToString("0.##", Loc.Culture);
-
-    private static bool TryParseMillions(string? text, out long tokens)
-    {
-        tokens = 0;
-        if (!double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, Loc.Culture, out double millions)
-            && !double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out millions))
-        {
-            return false;
-        }
-
-        if (millions is <= 0 or > 100_000)
-        {
-            return false;
-        }
-
-        tokens = (long)Math.Round(millions * 1_000_000d);
-        return tokens > 0;
     }
 
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
@@ -2805,14 +2699,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
         StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _claudePlan = _settings.ClaudeUsage.Plan;
-        // Read the effective values, so the boxes show the preset the plan
-        // implies rather than the zero that means "follow the preset".
-        _claudeSessionBudget = _settings.ClaudeUsage.EffectiveSessionBudget;
-        _claudeWeekBudget = _settings.ClaudeUsage.EffectiveWeekBudget;
-        OnPropertyChanged(nameof(ClaudePlanPreference));
-        OnPropertyChanged(nameof(ClaudeSessionBudgetInput));
-        OnPropertyChanged(nameof(ClaudeWeekBudgetInput));
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : _settings.ClaudeUsage.ModelScope;
@@ -3221,9 +3107,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
         var settings = new ClaudeUsageSettings
         {
-            Plan = _claudePlan,
-            SessionTokenBudget = _claudeSessionBudget,
-            WeekTokenBudget = _claudeWeekBudget,
             ModelScope = ClaudeModelScope
         };
 
@@ -3475,9 +3358,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _settings.ClaudeUsage.Plan = _claudePlan;
-        _settings.ClaudeUsage.SessionTokenBudget = _claudeSessionBudget;
-        _settings.ClaudeUsage.WeekTokenBudget = _claudeWeekBudget;
         _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : ClaudeModelScope.Trim();

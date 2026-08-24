@@ -529,26 +529,6 @@
                                      Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
                         </Grid>
                         <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
-                        <StackPanel Spacing="6">
-                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeBudgetHeading}" />
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeBudgetHint}" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudePlanLabel}" />
-                          <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
-                                    ItemsSource="{Binding ClaudePlanOptions}"
-                                    SelectedItem="{Binding ClaudePlanPreference, Mode=TwoWay}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSessionBudgetLabel}" />
-                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeSessionBudgetInput, Mode=TwoWay}" />
-                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="100,*,Auto" ColumnSpacing="12">
-                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeWeekBudgetLabel}" />
-                          <TextBox Grid.Column="1" MaxLength="8" Text="{Binding ClaudeWeekBudgetInput, Mode=TwoWay}" />
-                          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeMillionTokens}" />
-                        </Grid>
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
                           <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
