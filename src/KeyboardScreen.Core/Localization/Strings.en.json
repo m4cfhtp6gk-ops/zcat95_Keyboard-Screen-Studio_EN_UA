@@ -779,6 +779,7 @@
   "ClaudeCheckButton": "Test connection",
   "ClaudeCheckRunning": "Checking...",
   "ClaudeCheckNoToken": "Read {0}, but there is no access token anywhere in it",
+  "ClaudeCheckAlsoLooked": "Also looked in: {0}",
   "ClaudeCheckUnparseable": "{0} is there but its contents are not valid JSON - try again in a moment",
   "ClaudeCheckUnreadable": "{0} is there but could not be opened ({1})",
   "ClaudeCheckNoFile": "No login file at {0}. That folder holds: {1}",

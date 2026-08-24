@@ -43,6 +43,12 @@ public sealed record ClaudeCredentialLookup(
     string Path,
     string Detail)
 {
+    /// <summary>
+    /// Every path that was tried. A user whose login is somewhere this does not
+    /// look can only tell us so if we say where we looked.
+    /// </summary>
+    public IReadOnlyList<string> Searched { get; init; } = [];
+
     public static ClaudeCredentialLookup From(ClaudeCodeCredential credential) =>
         new(credential, ClaudeCredentialProblem.None, credential.Source, string.Empty);
 }
@@ -77,16 +83,148 @@ public static class ClaudeCodeCredentials
     private static readonly string[] TokenNames = ["accesstoken", "access_token"];
     private static readonly string[] ExpiryNames = ["expiresat", "expires_at", "expiry"];
 
+    private const string ConfigDirectoryVariable = "CLAUDE_CONFIG_DIR";
+    private const string CredentialsFileName = ".credentials.json";
+
     public static string ConfigDirectory()
     {
-        string? configured = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
+        string? configured = ReadEnvironment(ConfigDirectoryVariable);
         return string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude")
             : configured;
     }
 
     public static string DefaultCredentialsPath() =>
-        Path.Combine(ConfigDirectory(), ".credentials.json");
+        Path.Combine(ConfigDirectory(), CredentialsFileName);
+
+    /// <summary>
+    /// An environment variable as this process sees it, and - on Windows - as the
+    /// user and machine have it set.
+    ///
+    /// A process inherits its environment when it starts. Someone who sets
+    /// CLAUDE_CODE_OAUTH_TOKEN or CLAUDE_CONFIG_DIR in System Properties, or in a
+    /// terminal, and then looks at an app that was already running (or was
+    /// started from an Explorer session older than the change) will not see it
+    /// there. Reading the stored value as well means the setting takes effect
+    /// when it is made rather than after the next sign-out.
+    /// </summary>
+    private static string? ReadEnvironment(string name)
+    {
+        string? value = Environment.GetEnvironmentVariable(name);
+        if (!string.IsNullOrWhiteSpace(value) || !OperatingSystem.IsWindows())
+        {
+            return value;
+        }
+
+        foreach (EnvironmentVariableTarget target in
+                 new[] { EnvironmentVariableTarget.User, EnvironmentVariableTarget.Machine })
+        {
+            try
+            {
+                value = Environment.GetEnvironmentVariable(name, target);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or IOException)
+            {
+                // A locked-down machine may refuse the registry read; the process
+                // block was already checked, so there is simply nothing more here.
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Every place this machine might be keeping a Claude Code login, best first.
+    ///
+    /// The previous version knew exactly one path and, when the file was not
+    /// there, could only repeat that path back at the user. That is fine when the
+    /// guess is right and useless when it is not - and the documented path is
+    /// only right for a login made by the Windows CLI under this account. A
+    /// developer whose Claude Code lives in WSL, or who moved CLAUDE_CONFIG_DIR,
+    /// or who signed in with `ant auth login`, has the file somewhere this never
+    /// looked.
+    /// </summary>
+    public static IReadOnlyList<string> SearchPaths(bool includeSlowPaths = true)
+    {
+        var paths = new List<string>();
+        void Add(string? directory)
+        {
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                paths.Add(Path.Combine(directory, CredentialsFileName));
+            }
+        }
+
+        Add(ReadEnvironment(ConfigDirectoryVariable));
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (home.Length > 0)
+        {
+            Add(Path.Combine(home, ".claude"));
+            Add(Path.Combine(home, ".config", "claude"));
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            Add(Environment.GetEnvironmentVariable("LOCALAPPDATA") is { Length: > 0 } local
+                ? Path.Combine(local, ".claude") : null);
+            Add(Environment.GetEnvironmentVariable("APPDATA") is { Length: > 0 } roaming
+                ? Path.Combine(roaming, ".claude") : null);
+
+            if (includeSlowPaths)
+            {
+                paths.AddRange(WslCredentialPaths());
+            }
+        }
+
+        return paths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>
+    /// Claude Code installed under WSL keeps its login in the Linux home, which
+    /// Windows reaches over a UNC share. Worth looking at, and worth looking at
+    /// last: resolving these paths goes through the WSL service, which is slow
+    /// when it is starting and slower when it is not installed at all.
+    /// </summary>
+    private static IEnumerable<string> WslCredentialPaths()
+    {
+        foreach (string root in new[] { @"\\wsl.localhost\", @"\\wsl$\" })
+        {
+            string[] distributions;
+            try
+            {
+                distributions = Directory.GetDirectories(root);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                continue;
+            }
+
+            foreach (string distribution in distributions)
+            {
+                yield return Path.Combine(distribution, "root", ".claude", CredentialsFileName);
+
+                string[] users;
+                try
+                {
+                    users = Directory.GetDirectories(Path.Combine(distribution, "home"));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    continue;
+                }
+
+                foreach (string user in users)
+                {
+                    yield return Path.Combine(user, ".claude", CredentialsFileName);
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// The environment variable wins, exactly as it does for Claude Code itself.
@@ -108,14 +246,58 @@ public static class ClaudeCodeCredentials
     /// </summary>
     public static ClaudeCredentialLookup Locate(string? credentialsPath = null)
     {
-        string? fromEnvironment = Environment.GetEnvironmentVariable(TokenEnvironmentVariable);
+        string? fromEnvironment = ReadEnvironment(TokenEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
         {
             return ClaudeCredentialLookup.From(
                 new ClaudeCodeCredential(fromEnvironment.Trim(), null, TokenEnvironmentVariable));
         }
 
-        string path = credentialsPath ?? DefaultCredentialsPath();
+        if (credentialsPath is not null)
+        {
+            return Inspect(credentialsPath);
+        }
+
+        // Every candidate is tried before giving up, and the failure reported is
+        // the most informative one seen - a file that exists and cannot be read
+        // says far more than four folders that do not exist.
+        ClaudeCredentialLookup? best = null;
+        var searched = new List<string>();
+        foreach (string candidate in SearchPaths())
+        {
+            searched.Add(candidate);
+            ClaudeCredentialLookup attempt = Inspect(candidate);
+            if (attempt.Credential is not null)
+            {
+                return attempt;
+            }
+
+            if (best is null || Rank(attempt.Problem) > Rank(best.Problem))
+            {
+                best = attempt;
+            }
+        }
+
+        best ??= new ClaudeCredentialLookup(
+            null, ClaudeCredentialProblem.NoDirectory, DefaultCredentialsPath(), string.Empty);
+        return best with { Searched = searched };
+    }
+
+    /// <summary>
+    /// How much a failure tells the user. A file that is there but unreadable is
+    /// worth reporting over a folder that never existed.
+    /// </summary>
+    private static int Rank(ClaudeCredentialProblem problem) => problem switch
+    {
+        ClaudeCredentialProblem.Unreadable => 5,
+        ClaudeCredentialProblem.NoTokenInside => 4,
+        ClaudeCredentialProblem.Unparseable => 3,
+        ClaudeCredentialProblem.NoFile => 2,
+        _ => 1
+    };
+
+    private static ClaudeCredentialLookup Inspect(string path)
+    {
         string directory = Path.GetDirectoryName(path) ?? string.Empty;
         string json;
         try

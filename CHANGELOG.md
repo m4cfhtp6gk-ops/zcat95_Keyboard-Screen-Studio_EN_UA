@@ -4,6 +4,19 @@
 
 ### Fixed
 
+- **The Claude login is now looked for wherever it might be, not in one
+  guessed place.** The old code knew exactly one path - the documented
+  `%USERPROFILE%\.claude\.credentials.json` - and when the file was not there
+  it could only repeat that path back at you. That is fine when the guess is
+  right and useless when it is not: a login made from WSL, or moved with
+  `CLAUDE_CONFIG_DIR`, or kept under AppData, was simply invisible. The search
+  now covers all of those, in order, and the connection test names every place
+  it tried, so a machine that keeps its login somewhere else can be reported
+  rather than guessed at.
+- **Environment variables set after the app started are picked up.** A process
+  inherits its environment when it launches, so setting `CLAUDE_CODE_OAUTH_TOKEN`
+  or `CLAUDE_CONFIG_DIR` in System Properties did nothing until the next sign-out.
+  On Windows the stored user and machine values are now read as well.
 - **The Claude connection test blamed the wrong thing.** It reported "no
   Claude Code login found at <path>" for six different situations: the folder
   missing, the file missing, the file there but not openable, the file held

@@ -774,6 +774,62 @@ finally
     Directory.Delete(credDir, recursive: true);
 }
 
+// The search must cover more than the one documented path. Knowing exactly one
+// place is what made the previous version useless to anyone whose Claude Code
+// lives somewhere else - and it could only repeat that one path back at them.
+var searchPaths = ClaudeCodeCredentials.SearchPaths(includeSlowPaths: false);
+Assert(searchPaths.Count >= 2, "more than one location must be searched");
+Assert(searchPaths.All(path => Path.GetFileName(path) == ".credentials.json"),
+    "every candidate is a credentials file, dot included");
+Assert(searchPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == searchPaths.Count,
+    "a duplicate candidate would report the same miss twice");
+Assert(searchPaths.Any(path => path.Contains(".claude", StringComparison.Ordinal)),
+    "the documented location stays in the list");
+
+// CLAUDE_CONFIG_DIR still wins, and a login there is found by the full search
+// rather than only by an explicitly supplied path.
+string movedDir = Path.Combine(Path.GetTempPath(), $"kss-moved-{Guid.NewGuid():N}");
+Directory.CreateDirectory(movedDir);
+string? previousConfigDir = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
+try
+{
+    File.WriteAllText(Path.Combine(movedDir, ".credentials.json"),
+        """{"claudeAiOauth":{"accessToken":"tok-moved"}}""");
+    Environment.SetEnvironmentVariable("CLAUDE_CONFIG_DIR", movedDir);
+    Assert(ClaudeCodeCredentials.SearchPaths(includeSlowPaths: false)[0].StartsWith(movedDir, StringComparison.Ordinal),
+        "a moved config directory is searched first");
+    Assert(ClaudeCodeCredentials.Locate().Credential?.AccessToken == "tok-moved",
+        "and the login inside it is what the full search returns");
+}
+finally
+{
+    Environment.SetEnvironmentVariable("CLAUDE_CONFIG_DIR", previousConfigDir);
+    Directory.Delete(movedDir, recursive: true);
+}
+
+// The env var outranks every file, exactly as it does for Claude Code itself.
+string? previousToken = Environment.GetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable);
+try
+{
+    Environment.SetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable, "tok-env");
+    var viaEnvironment = ClaudeCodeCredentials.Locate();
+    Assert(viaEnvironment.Credential?.AccessToken == "tok-env", "the environment variable wins");
+    Assert(viaEnvironment.Credential?.Source == ClaudeCodeCredentials.TokenEnvironmentVariable,
+        "and it is reported by name, never by value");
+}
+finally
+{
+    Environment.SetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable, previousToken);
+}
+
+// A failed search has to name where it went, or the user cannot tell us it
+// missed their install.
+var missedEverywhere = ClaudeCodeCredentials.Locate();
+if (missedEverywhere.Credential is null)
+{
+    Assert(missedEverywhere.Searched.Count >= 2, "a failed search reports every place it tried");
+}
+
 // No credential at all: the screen says so rather than inventing a number.
 using (var signedOut = new ClaudeUsageSnapshotSource(
     new HttpClient(new ClaudeHandler(new Queue<string>())),

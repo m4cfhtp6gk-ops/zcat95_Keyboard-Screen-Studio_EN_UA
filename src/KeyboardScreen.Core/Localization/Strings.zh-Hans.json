@@ -779,6 +779,7 @@
   "ClaudeCheckButton": "测试连接",
   "ClaudeCheckRunning": "正在检查……",
   "ClaudeCheckNoToken": "已读取 {0}，但其中没有任何访问令牌",
+  "ClaudeCheckAlsoLooked": "还查找了：{0}",
   "ClaudeCheckUnparseable": "{0} 存在，但内容不是有效的 JSON — 请稍后重试",
   "ClaudeCheckUnreadable": "{0} 存在，但无法打开（{1}）",
   "ClaudeCheckNoFile": "{0} 处没有登录文件。该目录中有：{1}",

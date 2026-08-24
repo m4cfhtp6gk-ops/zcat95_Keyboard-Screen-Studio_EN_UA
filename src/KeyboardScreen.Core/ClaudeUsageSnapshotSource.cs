@@ -333,15 +333,27 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     /// version reported "no login at &lt;path&gt;" for all of them, including the
     /// cases where the file was sitting right there.
     /// </summary>
-    private static string DescribeLookupFailure(ClaudeCredentialLookup lookup) => lookup.Problem switch
+    private static string DescribeLookupFailure(ClaudeCredentialLookup lookup)
     {
-        ClaudeCredentialProblem.NoDirectory => Loc.T("ClaudeCheckNoDirectory", lookup.Detail),
-        ClaudeCredentialProblem.NoFile => Loc.T("ClaudeCheckNoFile", lookup.Path,
-            lookup.Detail.Length > 0 ? lookup.Detail : "-"),
-        ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
-        ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
-        _ => Loc.T("ClaudeCheckNoToken", lookup.Path)
-    };
+        string reason = lookup.Problem switch
+        {
+            ClaudeCredentialProblem.NoDirectory => Loc.T("ClaudeCheckNoDirectory", lookup.Detail),
+            ClaudeCredentialProblem.NoFile => Loc.T("ClaudeCheckNoFile", lookup.Path,
+                lookup.Detail.Length > 0 ? lookup.Detail : "-"),
+            ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
+            ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
+            _ => Loc.T("ClaudeCheckNoToken", lookup.Path)
+        };
+
+        // Naming the other places turns "it is not where I expected" into
+        // something the user can act on - they can see at a glance whether their
+        // own install is somewhere this never looked.
+        string[] others = lookup.Searched.Where(path =>
+            !string.Equals(path, lookup.Path, StringComparison.OrdinalIgnoreCase)).ToArray();
+        return others.Length == 0
+            ? reason
+            : reason + " " + Loc.T("ClaudeCheckAlsoLooked", string.Join("; ", others));
+    }
 
     public void Dispose()
     {

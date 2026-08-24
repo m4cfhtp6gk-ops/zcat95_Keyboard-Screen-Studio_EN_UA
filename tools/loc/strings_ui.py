@@ -821,6 +821,7 @@ UI = [
      "Read {0}, but there is no access token anywhere in it",
      "Прочитано {0}, але токена доступу в ньому немає",
      "已读取 {0}，但其中没有任何访问令牌"),
+    ("ClaudeCheckAlsoLooked", "Also looked in: {0}", "Також шукав тут: {0}", "还查找了：{0}"),
     ("ClaudeCheckUnparseable",
      "{0} is there but its contents are not valid JSON - try again in a moment",
      "{0} існує, але його вміст не є коректним JSON - спробуйте за мить",
