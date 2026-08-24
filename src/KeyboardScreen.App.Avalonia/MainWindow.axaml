@@ -178,13 +178,21 @@
 
           <Grid Grid.Row="1" Margin="0,24,0,0" RowDefinitions="Auto,*">
             <TextBlock FontSize="13" FontWeight="SemiBold" Text="{infra:Localize SidebarThemesHeading}" />
+            <!--
+              The scrollbar is a 10 px overlay drawn on top of the content, so
+              the content has to stop short of it or it eats the clicks. The
+              margin/padding pair that used to do that here did not: the
+              negative margin widened the viewer and ScrollViewer.Padding never
+              reached the viewport, which left the rightmost 16 px of every
+              theme row swallowing clicks instead of selecting a theme. The
+              reservation belongs on the content, where it is actually applied.
+            -->
             <ScrollViewer
                 Classes="edge-fade"
                 Grid.Row="1"
-                Margin="0,12,-6,0"
-                Padding="0,0,6,0"
+                Margin="0,12,0,0"
                 VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding ThemeGroups}" x:CompileBindings="False">
+              <ItemsControl Margin="0,0,14,0" ItemsSource="{Binding ThemeGroups}" x:CompileBindings="False">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <StackPanel>

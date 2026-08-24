@@ -22,6 +22,17 @@
   next tick, which is what turns a minute of throttling into an hour of it.
   A 429 says so on screen rather than reading as a generic failure.
 
+- **The scrollbar was eating clicks along the right edge of every list.** It
+  is a 10 px overlay drawn on top of the scrolled content, and it is
+  hit-testable, so anything stretched to the full width lost its right edge to
+  it. In the theme sidebar that was the rightmost 16 px of every row - the
+  margin/padding pair meant to reserve that space did not work, because the
+  negative margin widened the viewer and `ScrollViewer.Padding` never reached
+  the viewport. On the settings pages there was no reservation at all: the
+  `page-content` class it should have come from had no style behind it, which
+  put the right edge of every toggle, dropdown and spinner in the Auto column
+  under the bar. The reservation now sits on the content, where it applies.
+
 ### Changed
 
 - The string generator under `tools/loc/` is back in step with the catalogues
