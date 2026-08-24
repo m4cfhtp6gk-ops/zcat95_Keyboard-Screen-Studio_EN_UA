@@ -1,69 +1,67 @@
-# v1.9.0
+# v1.10.0
 
-The Claude screen finally works, and so does the first five minutes with
-a new keyboard.
+The Claude screen finally shows your account's real numbers.
 
 ## Changed
 
-- **Claude limits are read from Claude Code's own transcripts on this
-  PC.** No login, no session key, no status-line setup, no request to
-  claude.ai - and nothing left for Cloudflare to block. Every previous
-  design asked a server for a number it would not hand a desktop app;
-  this one reads files that are already on your disk.
-- Because Anthropic publishes no quota that software can read, the three
-  meters fill against a **token budget you set**, with plan presets as a
-  starting point. Pick your plan, then adjust once you have seen a week
-  of your own use. The counts only cover Claude Code on this machine, so
-  they are a floor on real usage rather than an account total.
-- "Screen setup" and "Theme settings" were the wrong way round - the
-  first was a read-only status page, the second held the actual setup.
-  They are now "Overview" and "Screen setup".
-- The screen builder's editor moved out of Automation onto the theme
-  page, beside the other theme settings.
-- Telegram, notifications, the knob and diagnostics collapse in Other
-  settings, so the device address is not buried under a login form.
+- **Claude limits come from your account, not from an estimate.** The
+  screen asks claude.ai for your subscription's own windows, using the
+  login Claude Code already holds on this PC. Nothing to paste, nothing
+  to sign in to, no cookie for Cloudflare to block.
+
+  Two earlier designs failed here for the same reason, and it was never
+  the address. The first called the right endpoint with a browser session
+  cookie, which Cloudflare binds to the browser that solved its
+  challenge - a desktop app cannot present it. The second gave up on the
+  server and counted tokens in local transcripts, which is honest
+  arithmetic about the wrong question: a floor on one machine's usage,
+  shown as a percentage of a budget you had to invent yourself.
+
+  What both missed is that Claude Code stores an OAuth token for exactly
+  this kind of client. That token is what the cookie was standing in for.
+
+  The token budgets and plan presets are gone with the local tally they
+  were a denominator for. Each meter now shows the time until it resets,
+  in the space the token count used to take. When there is no login, or
+  it has expired, the screen says so rather than drawing a substitute.
+
+- **The knob takes a combination you record yourself.** The old mode
+  offered a list of F13-F24, which the Linx68 does not have - it only
+  ever worked if you could remap the encoder in VIA/QMK to emit one.
+  Press Record, then press whatever the knob sends. A modifier is
+  recommended and a binding without one is flagged in red, because the
+  app swallows what it binds. Existing F13-F24 settings keep working.
+
+- **Screen builder blocks can be styled one at a time.** A chevron on
+  each row reveals a dot-matrix switch for that block's numbers and its
+  own accent colour. Labels stay in the normal face - the dot font has
+  no Cyrillic - and the switch only appears on blocks that draw a number.
 
 ## Fixed
 
-- **The first-run IP field corrupted most home addresses.** Typing
-  `192.168.1.50` produced `192..168.150`, because the focus advanced
-  both when an octet filled and again on the dot you typed after it.
-  "Save and continue" then did nothing at all - silently - because the
-  red validation line was never filled in. Both fixed, and pasting a
-  whole address now works.
-- **The picture theme's clock was frozen.** The refresh loop skipped
-  that screen as "static", but it always draws a clock. Fixed on both
-  platforms, with the photo cached so the restored refresh does not
-  re-read it from disk every second.
-- A failed push was recorded as delivered, so a network blip on an
-  unchanged frame meant the keyboard never received that content again.
-- The device badge no longer reports "Disconnected" before anything has
-  been tried, or permanently when automatic push is off.
-- There is now a manual **Send now**, beside the preview and in the tray
-  menu. The command existed but had never been bound to anything.
-- A mistyped weather city reported "this theme uses only local time and
-  settings" instead of the real error.
-- Every scrollbar was invisible *and* unclickable, including the
-  33-theme sidebar where only about eight rows fit. They are back at the
-  10 px the design system always specified.
-- Secondary text in the light theme now meets WCAG AA; it measured
-  3.89:1.
-- The shipped default font id matched nothing, so the font list was
-  empty on every first launch.
-- An exception during startup no longer wedges every later settings
-  change into a silent no-op, and is written to the crash log instead of
-  a `Debug.WriteLine` that Release builds compile out.
+- The weekday is no longer cut to "понеді…" next to the date on the
+  dot-matrix analog clock. The line was split by a fixed ratio that gave
+  the longer string the smaller half; it is now divided by what the two
+  strings actually measure.
+- The dot-matrix clock drops its "Hours / Minutes / Seconds" captions.
+  Three numbers stacked largest to smallest, the last ticking in the
+  accent colour, already say which is which. The column is centred in the
+  space that frees.
 
 ## Notes
 
-- The Claude screen needs Claude Code to have run on this computer at
-  least once. Until then it says so plainly rather than showing an
-  error.
-- Upgrading is safe: the removed Claude settings (session key,
-  organization id, source choice) are simply ignored when your existing
-  settings file is read, and the new budget fields take their defaults.
-- The theme no longer stores any credential, so exported settings have
-  nothing to strip for it. See PRIVACY.md.
+- The Claude screen needs Claude Code signed in on this computer. If the
+  login expires, sign in again in Claude Code and the screen recovers on
+  its own.
+- Your Claude Code token is read fresh when needed, sent to claude.ai and
+  nowhere else, and never written into settings, an exported backup or a
+  log. KSS does not refresh or modify it, so it cannot affect your
+  Claude Code sign-in. See PRIVACY.md.
+- The endpoint behind the limits is not a documented public API and may
+  change without notice. If it does, the screen reports that it is not
+  connected instead of showing an invented figure.
+- Upgrading is safe: settings removed in this release are simply ignored
+  when your existing file is read.
 
 ## Platforms
 
