@@ -730,19 +730,122 @@ Assert(ClaudeCodeCredentials.Parse("not json", "t") is null, "a torn file must n
 Assert(ClaudeCodeCredentials.Read(Path.Combine(Path.GetTempPath(), $"kss-no-creds-{Guid.NewGuid():N}.json")) is null,
     "a missing credentials file simply means Claude Code is not signed in");
 
+// Every way this can fail has to be told apart. The first version collapsed all
+// of them into one null, and the settings page then said "no login at <path>"
+// even when the file was sitting right there - which sends the user off to
+// reinstall something that was never missing.
+string credDir = Path.Combine(Path.GetTempPath(), $"kss-creds-{Guid.NewGuid():N}");
+string credFile = Path.Combine(credDir, ".credentials.json");
+Assert(ClaudeCodeCredentials.Locate(credFile).Problem == ClaudeCredentialProblem.NoDirectory,
+    "a folder that does not exist means Claude Code has not run for this user");
+
+Directory.CreateDirectory(credDir);
+try
+{
+    File.WriteAllText(Path.Combine(credDir, "settings.json"), "{}");
+    var missing = ClaudeCodeCredentials.Locate(credFile);
+    Assert(missing.Problem == ClaudeCredentialProblem.NoFile, "an existing folder without the file is its own case");
+    Assert(missing.Detail.Contains("settings.json", StringComparison.Ordinal),
+        "the folder's contents distinguish 'never signed in' from 'wrong folder'");
+
+    File.WriteAllText(credFile, "{ this is not json");
+    Assert(ClaudeCodeCredentials.Locate(credFile).Problem == ClaudeCredentialProblem.Unparseable,
+        "a half-written file is a bad moment, not a missing login");
+
+    File.WriteAllText(credFile, """{"somethingElse":{"note":"no token here"}}""");
+    Assert(ClaudeCodeCredentials.Locate(credFile).Problem == ClaudeCredentialProblem.NoTokenInside,
+        "valid JSON with no token means this is not the file we want");
+
+    File.WriteAllText(credFile, """{"claudeAiOauth":{"accessToken":"tok-real"}}""");
+    var found = ClaudeCodeCredentials.Locate(credFile);
+    Assert(found.Problem == ClaudeCredentialProblem.None && found.Credential?.AccessToken == "tok-real",
+        "and the happy path still reads the token");
+
+    // Claude Code refreshes this file about hourly and may hold it open while it
+    // does. A read that cannot share was reported as "no login at <path>".
+    using (var held = new FileStream(credFile, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+    {
+        Assert(ClaudeCodeCredentials.Locate(credFile).Credential?.AccessToken == "tok-real",
+            "a refresh in flight must not read as a missing login");
+    }
+}
+finally
+{
+    Directory.Delete(credDir, recursive: true);
+}
+
+// The search must cover more than the one documented path. Knowing exactly one
+// place is what made the previous version useless to anyone whose Claude Code
+// lives somewhere else - and it could only repeat that one path back at them.
+var searchPaths = ClaudeCodeCredentials.SearchPaths(includeSlowPaths: false);
+Assert(searchPaths.Count >= 2, "more than one location must be searched");
+Assert(searchPaths.All(path => Path.GetFileName(path) == ".credentials.json"),
+    "every candidate is a credentials file, dot included");
+Assert(searchPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() == searchPaths.Count,
+    "a duplicate candidate would report the same miss twice");
+Assert(searchPaths.Any(path => path.Contains(".claude", StringComparison.Ordinal)),
+    "the documented location stays in the list");
+
+// CLAUDE_CONFIG_DIR still wins, and a login there is found by the full search
+// rather than only by an explicitly supplied path.
+string movedDir = Path.Combine(Path.GetTempPath(), $"kss-moved-{Guid.NewGuid():N}");
+Directory.CreateDirectory(movedDir);
+string? previousConfigDir = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
+try
+{
+    File.WriteAllText(Path.Combine(movedDir, ".credentials.json"),
+        """{"claudeAiOauth":{"accessToken":"tok-moved"}}""");
+    Environment.SetEnvironmentVariable("CLAUDE_CONFIG_DIR", movedDir);
+    Assert(ClaudeCodeCredentials.SearchPaths(includeSlowPaths: false)[0].StartsWith(movedDir, StringComparison.Ordinal),
+        "a moved config directory is searched first");
+    Assert(ClaudeCodeCredentials.Locate().Credential?.AccessToken == "tok-moved",
+        "and the login inside it is what the full search returns");
+}
+finally
+{
+    Environment.SetEnvironmentVariable("CLAUDE_CONFIG_DIR", previousConfigDir);
+    Directory.Delete(movedDir, recursive: true);
+}
+
+// The env var outranks every file, exactly as it does for Claude Code itself.
+string? previousToken = Environment.GetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable);
+try
+{
+    Environment.SetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable, "tok-env");
+    var viaEnvironment = ClaudeCodeCredentials.Locate();
+    Assert(viaEnvironment.Credential?.AccessToken == "tok-env", "the environment variable wins");
+    Assert(viaEnvironment.Credential?.Source == ClaudeCodeCredentials.TokenEnvironmentVariable,
+        "and it is reported by name, never by value");
+}
+finally
+{
+    Environment.SetEnvironmentVariable(ClaudeCodeCredentials.TokenEnvironmentVariable, previousToken);
+}
+
+// A failed search has to name where it went, or the user cannot tell us it
+// missed their install.
+var missedEverywhere = ClaudeCodeCredentials.Locate();
+if (missedEverywhere.Credential is null)
+{
+    Assert(missedEverywhere.Searched.Count >= 2, "a failed search reports every place it tried");
+}
+
 // No credential at all: the screen says so rather than inventing a number.
 using (var signedOut = new ClaudeUsageSnapshotSource(
-    new HttpClient(new ClaudeHandler(new Queue<string>())), () => null))
+    new HttpClient(new ClaudeHandler(new Queue<string>())),
+    () => new ClaudeCredentialLookup(null, ClaudeCredentialProblem.NoFile, "C:\\x\\.credentials.json", "settings.json")))
 {
     var none = await signedOut.ReadAsync(new ClaudeUsageSettings());
     Assert(!none.Available, "no Claude Code login must read as unavailable");
-    Assert((await signedOut.CheckAsync(new ClaudeUsageSettings())).Success == false,
-        "the check must fail when there is no login");
+    var report = await signedOut.CheckAsync(new ClaudeUsageSettings());
+    Assert(!report.Success, "the check must fail when there is no login");
+    Assert(report.Detail.Contains("settings.json", StringComparison.Ordinal),
+        "and it must report what it actually saw, not just repeat the path");
 }
 
 using (var staleLogin = new ClaudeUsageSnapshotSource(
     new HttpClient(new ClaudeHandler(new Queue<string>())),
-    () => new ClaudeCodeCredential("tok", DateTimeOffset.Now.AddMinutes(-1), "test")))
+    () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok", DateTimeOffset.Now.AddMinutes(-1), "test"))))
 {
     Assert(!(await staleLogin.ReadAsync(new ClaudeUsageSettings())).Available,
         "an expired login must read as unavailable");
@@ -760,7 +863,7 @@ var claudeResponses = new Queue<string>(new[]
 var claudeHandler2 = new ClaudeHandler(claudeResponses);
 using (var claudeClient = new HttpClient(claudeHandler2))
 using (var live = new ClaudeUsageSnapshotSource(claudeClient,
-           () => new ClaudeCodeCredential("tok-live", null, "test"))
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
        { BaseUrl = "https://anthropic.test" })
 {
     var settings = new ClaudeUsageSettings { ModelScope = "opus" };
@@ -788,7 +891,7 @@ using (var live = new ClaudeUsageSnapshotSource(claudeClient,
 var throttled = new ClaudeHandler(new Queue<string>()) { Status = HttpStatusCode.TooManyRequests };
 using (var throttledClient = new HttpClient(throttled))
 using (var limited = new ClaudeUsageSnapshotSource(throttledClient,
-           () => new ClaudeCodeCredential("tok-live", null, "test"))
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
        { BaseUrl = "https://anthropic.test" })
 {
     var first = await limited.ReadAsync(new ClaudeUsageSettings());

@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The Claude login is now looked for wherever it might be, not in one
+  guessed place.** The old code knew exactly one path - the documented
+  `%USERPROFILE%\.claude\.credentials.json` - and when the file was not there
+  it could only repeat that path back at you. That is fine when the guess is
+  right and useless when it is not: a login made from WSL, or moved with
+  `CLAUDE_CONFIG_DIR`, or kept under AppData, was simply invisible. The search
+  now covers all of those, in order, and the connection test names every place
+  it tried, so a machine that keeps its login somewhere else can be reported
+  rather than guessed at.
+- **Environment variables set after the app started are picked up.** A process
+  inherits its environment when it launches, so setting `CLAUDE_CODE_OAUTH_TOKEN`
+  or `CLAUDE_CONFIG_DIR` in System Properties did nothing until the next sign-out.
+  On Windows the stored user and machine values are now read as well.
+- **The Claude connection test blamed the wrong thing.** It reported "no
+  Claude Code login found at <path>" for six different situations: the folder
+  missing, the file missing, the file there but not openable, the file held
+  open by Claude Code mid-refresh, torn JSON, and a file with no token in it.
+  Being told the wrong reason is worse than being told nothing - it sends you
+  off to reinstall something that was never missing. Each case now says what
+  it actually is, and "no file" additionally lists what the folder does hold,
+  so "never signed in" can be told from "wrong folder entirely".
+- **A login being refreshed read as a login that was not there.** Claude Code
+  rewrites its credentials file about once an hour and can hold it open while
+  it does; the read did not share, so the failure was swallowed and reported
+  as a missing file. It shares now.
+
+### Changed
+
+- The Claude settings card mentions the documented fallback for machines where
+  the credentials file cannot be found: `claude setup-token` mints a
+  long-lived token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
+  which this app already reads first. Anthropic documents that token as being
+  for model requests, so it may not be accepted for limits - the card says so
+  rather than promising it.
+
 ## v1.10.1 - 2026-08-24
 
 ### Fixed
