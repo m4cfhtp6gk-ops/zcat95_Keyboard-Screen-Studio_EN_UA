@@ -1825,13 +1825,37 @@ Assert(!KnobControl.DevicePathMatches(@"\\?\HID#VID_046D&PID_C52B#7&1f6a&0&0000#
     "a different device must not match");
 Assert(!KnobControl.DevicePathMatches(null, 0x3151, 0x4015), "a missing path must not match");
 
-Assert(KnobControl.HotKeyToVirtualKey("F13") == 0x7C && KnobControl.HotKeyToVirtualKey("f24") == 0x87,
-    "F13-F24 must map onto their virtual keys");
-Assert(KnobControl.HotKeyToVirtualKey("F12") is null && KnobControl.HotKeyToVirtualKey("Q") is null
-    && KnobControl.HotKeyToVirtualKey(null) is null,
-    "keys outside F13-F24 must be rejected");
-Assert(KnobControl.HotKeyNames.Count == 12 && KnobControl.HotKeyNames[0] == "F13" && KnobControl.HotKeyNames[^1] == "F24",
-    "the hot-key list must span F13 through F24");
+// Any combination, not a fixed F13-F24 list: the Linx68 has no such keys, so
+// that mode only ever worked on a board you could remap in VIA/QMK.
+var chord = KnobShortcut.Parse("Ctrl+Alt+P");
+Assert(chord.VirtualKey == 'P' && chord.Modifiers == (KnobModifiers.Control | KnobModifiers.Alt),
+    "a chord must round-trip from its stored form");
+Assert(chord.ToStorageString() == "Ctrl+Alt+P", "storage form must be stable");
+Assert(chord.Describe() == "Ctrl + Alt + P", "the settings page spaces a chord out");
+Assert(chord.HasModifier && chord.IsSet, "a chord is set and carries a modifier");
+
+// Settings written before this existed hold a bare "F13"; they must keep working.
+var legacy = KnobShortcut.Parse("F13");
+Assert(legacy.VirtualKey == 0x7C && legacy.Modifiers == KnobModifiers.None,
+    "an old F13 binding must still parse");
+Assert(!legacy.HasModifier, "a bare key is what the warning is for");
+Assert(KnobShortcut.Parse("F24").VirtualKey == 0x87, "F24 must still map");
+Assert(KnobShortcut.Parse("").IsSet == false && KnobShortcut.Parse(null).IsSet == false,
+    "an empty binding is simply unset");
+Assert(KnobShortcut.Parse("Shift+Win+Num5").ToStorageString() == "Shift+Win+Num5",
+    "numpad keys and the Windows modifier must round-trip");
+Assert(KnobShortcut.Parse("VK173").VirtualKey == 0xAD && KnobShortcut.Parse("Mute").VirtualKey == 0xAD,
+    "a media key round-trips by name and by raw code");
+Assert(KnobShortcut.IsModifierKey(0x11) && !KnobShortcut.IsModifierKey('P'),
+    "modifier keys alone must not end a capture");
+
+var knobBindings = new KnobSettings { KeyForward = "Ctrl+Alt+Right", KeyBackward = "F14", KeyToggle = "" };
+Assert(KnobControl.ShortcutFor(knobBindings, KnobAction.NextTheme).Describe() == "Ctrl + Alt + Right",
+    "the forward binding must be read back");
+Assert(KnobControl.ShortcutFor(knobBindings, KnobAction.PreviousTheme).VirtualKey == 0x7D,
+    "a legacy binding beside a new one must still work");
+Assert(!KnobControl.ShortcutFor(knobBindings, KnobAction.ToggleCarousel).IsSet,
+    "an unset binding must not match anything");
 
 var knobDefaults = new KnobSettings();
 Assert(!knobDefaults.Enabled && knobDefaults.SuppressVolume && knobDefaults.Mode == KnobMode.VolumeKnob,

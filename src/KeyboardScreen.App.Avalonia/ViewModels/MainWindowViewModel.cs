@@ -1672,24 +1672,110 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsKnobVolumeMode => _knobMode == KnobMode.VolumeKnob;
     public bool IsKnobHotKeyMode => _knobMode == KnobMode.HotKeys;
 
-    public IReadOnlyList<string> KnobKeyOptions => KnobControl.HotKeyNames;
-
     public string KnobKeyForward
     {
         get => _knobKeyForward;
-        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyBackward
     {
         get => _knobKeyBackward;
-        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyToggle
     {
         get => _knobKeyToggle;
-        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
+    }
+
+    private KnobAction? _knobCapture;
+
+    /// <summary>The combination each action is bound to, spaced out to read as a chord.</summary>
+    public string KnobKeyForwardText => Describe(KnobAction.NextTheme);
+    public string KnobKeyBackwardText => Describe(KnobAction.PreviousTheme);
+    public string KnobKeyToggleText => Describe(KnobAction.ToggleCarousel);
+
+    public bool IsCapturingKnobKey => _knobCapture is not null;
+
+    /// <summary>
+    /// Names any binding that has no modifier. The listener swallows what it
+    /// binds, so a bare key stops working everywhere else while KSS runs - which
+    /// is fine for F13 and ruinous for M. Allowed, but never silently.
+    /// </summary>
+    public string KnobBareKeyWarning
+    {
+        get
+        {
+            string[] bare = new[] { KnobAction.NextTheme, KnobAction.PreviousTheme, KnobAction.ToggleCarousel }
+                .Select(action => KnobControl.ShortcutFor(BuildKnobSettings(), action))
+                .Where(shortcut => shortcut.IsSet && !shortcut.HasModifier)
+                .Select(shortcut => shortcut.Describe())
+                .ToArray();
+            return bare.Length == 0 ? string.Empty : Loc.T("KnobBareKeyWarning", string.Join(", ", bare));
+        }
+    }
+
+    /// <summary>Arms the capture; the window hands back the next real key press.</summary>
+    public void BeginKnobCapture(KnobAction action)
+    {
+        _knobCapture = action;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    public void CancelKnobCapture()
+    {
+        if (_knobCapture is null)
+        {
+            return;
+        }
+
+        _knobCapture = null;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    /// <summary>
+    /// Stores what was pressed. Modifier keys alone are ignored so holding Ctrl
+    /// on the way to Ctrl+Alt+P does not end the capture early.
+    /// </summary>
+    public void ApplyKnobCapture(int virtualKey, KnobModifiers modifiers)
+    {
+        if (_knobCapture is not { } action || virtualKey == 0 || KnobShortcut.IsModifierKey(virtualKey))
+        {
+            return;
+        }
+
+        string stored = new KnobShortcut(virtualKey, modifiers).ToStorageString();
+        switch (action)
+        {
+            case KnobAction.NextTheme: KnobKeyForward = stored; break;
+            case KnobAction.PreviousTheme: KnobKeyBackward = stored; break;
+            default: KnobKeyToggle = stored; break;
+        }
+
+        CancelKnobCapture();
+    }
+
+    private string Describe(KnobAction action)
+    {
+        KnobShortcut shortcut = KnobControl.ShortcutFor(BuildKnobSettings(), action);
+        return shortcut.IsSet ? shortcut.Describe() : Loc.T("KnobKeyUnset");
+    }
+
+    private KnobSettings BuildKnobSettings() => new()
+    {
+        KeyForward = _knobKeyForward,
+        KeyBackward = _knobKeyBackward,
+        KeyToggle = _knobKeyToggle
+    };
+
+    private void RaiseKnobKeyText()
+    {
+        OnPropertyChanged(nameof(KnobKeyForwardText));
+        OnPropertyChanged(nameof(KnobKeyBackwardText));
+        OnPropertyChanged(nameof(KnobKeyToggleText));
+        OnPropertyChanged(nameof(KnobBareKeyWarning));
     }
 
     /// <summary>The selected theme's own accent (#RRGGBB), or empty for the global one.</summary>

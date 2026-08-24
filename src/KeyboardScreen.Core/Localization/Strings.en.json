@@ -709,7 +709,7 @@
   "KnobHint": "Switch themes with the Linx68 volume knob: turn right for the next theme, left for the previous, press to pause or resume the carousel. Off by default.",
   "KnobModeLabel": "Input mode",
   "KnobModeVolume": "Volume knob",
-  "KnobModeHotKeys": "Dedicated keys (F13-F24)",
+  "KnobModeHotKeys": "Your own combination",
   "KnobSuppressLabel": "Mute the volume keys",
   "KnobSuppressHint": "On: the knob only switches themes and the system volume stays put. Off: it does both at once.",
   "KnobVidPidLabel": "Keyboard VID:PID",
@@ -717,7 +717,6 @@
   "KnobKeyForwardLabel": "Next theme key",
   "KnobKeyBackwardLabel": "Previous theme key",
   "KnobKeyToggleLabel": "Pause key",
-  "KnobViaHint": "Cleanest with VIA/QMK: remap the encoder to F13/F14 and its press to F15 in the keyboard's configurator, pick the dedicated-keys mode here, and volume is never touched at all.",
   "CurrencySourceLabel": "Data source",
   "CurrencySourceCdn": "Currency-API (international, daily)",
   "CurrencySourceErApi": "ExchangeRate-API (daily)",
@@ -807,5 +806,10 @@
   "ClaudeRequestFailed": "claude.ai returned {0}",
   "ClaudeTokenRejected": "claude.ai rejected the Claude Code login ({0})",
   "ClaudeCheckNoCredentials": "No Claude Code login found at {0}",
-  "ClaudeCheckFrom": "Read {0}, but the call failed: {1}"
+  "ClaudeCheckFrom": "Read {0}, but the call failed: {1}",
+  "KnobCaptureHint": "Press Record, then press the combination on your keyboard - turn the encoder, or press the key you remapped it to. A modifier is recommended: KSS swallows whatever it binds, so a bare key stops working everywhere else while the app runs. Esc cancels.",
+  "KnobCaptureButton": "Record",
+  "KnobCaptureWaiting": "Waiting for a key combination… press Esc to cancel.",
+  "KnobKeyUnset": "not set",
+  "KnobBareKeyWarning": "Bound without a modifier: {0}. That key will not reach any other program while KSS is running."
 }

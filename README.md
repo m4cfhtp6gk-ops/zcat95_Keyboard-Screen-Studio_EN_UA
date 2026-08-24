@@ -40,7 +40,8 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - Theme switching from the keyboard itself: the Linx68 volume knob turns to
   the next/previous theme and its press pauses the carousel — bindable to the
   keyboard alone by VID:PID, with an optional volume-key mute, or driven by
-  VIA/QMK-remapped F13–F24 keys so volume is never touched. Off by default.
+  a key combination you record yourself, so volume is never touched — useful
+  whether or not the board can be remapped in VIA/QMK. Off by default.
 - A per-theme refresh interval and per-theme accent colour, a 12/24-hour
   clock and °C/°F units, sunrise/sunset and air quality on the weather
   screen, a stock portfolio row fed by per-symbol quantities, extra

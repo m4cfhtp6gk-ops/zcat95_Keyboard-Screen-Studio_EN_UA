@@ -1195,20 +1195,29 @@
                             </Border>
                           </StackPanel>
                           <StackPanel Spacing="12" IsVisible="{Binding IsKnobHotKeyMode}">
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobCaptureHint}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyForwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyForward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyForwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureForward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyBackwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyBackward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyBackwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureBackward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyToggleLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyToggle, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyToggleText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureToggle_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
+                            <TextBlock IsVisible="{Binding IsCapturingKnobKey}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource KssControlFocusBrush}"
+                                       Text="{infra:Localize KnobCaptureWaiting}" TextWrapping="Wrap" />
+                            <TextBlock IsVisible="{Binding KnobBareKeyWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Classes="secondary" FontSize="11" Foreground="#B43B33"
+                                       Text="{Binding KnobBareKeyWarning}" TextWrapping="Wrap" />
                           </StackPanel>
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobViaHint}" TextWrapping="Wrap" />
                         </StackPanel>
                       </StackPanel>
                     </Expander>

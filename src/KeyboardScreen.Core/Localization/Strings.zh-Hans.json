@@ -709,7 +709,7 @@
   "KnobHint": "用 Linx68 音量旋钮切换主题：右旋下一主题，左旋上一主题，按下暂停/恢复轮播。默认关闭。",
   "KnobModeLabel": "输入模式",
   "KnobModeVolume": "音量旋钮",
-  "KnobModeHotKeys": "专用按键（F13-F24）",
+  "KnobModeHotKeys": "自定义组合键",
   "KnobSuppressLabel": "拦截音量键",
   "KnobSuppressHint": "开：旋钮只切换主题，系统音量不变。关：两者同时生效。",
   "KnobVidPidLabel": "键盘 VID:PID",
@@ -717,7 +717,6 @@
   "KnobKeyForwardLabel": "下一主题按键",
   "KnobKeyBackwardLabel": "上一主题按键",
   "KnobKeyToggleLabel": "暂停按键",
-  "KnobViaHint": "最干净的方式是 VIA/QMK：在键盘配置器中把编码器改映射为 F13/F14、按下为 F15，在此选择专用按键模式，完全不影响音量。",
   "CurrencySourceLabel": "数据源",
   "CurrencySourceCdn": "Currency-API（国际，每日）",
   "CurrencySourceErApi": "ExchangeRate-API（每日）",
@@ -807,5 +806,10 @@
   "ClaudeRequestFailed": "claude.ai 返回 {0}",
   "ClaudeTokenRejected": "claude.ai 拒绝了 Claude Code 登录（{0}）",
   "ClaudeCheckNoCredentials": "在 {0} 未找到 Claude Code 登录",
-  "ClaudeCheckFrom": "已读取 {0}，但请求失败：{1}"
+  "ClaudeCheckFrom": "已读取 {0}，但请求失败：{1}",
+  "KnobCaptureHint": "点击“录制”，然后在键盘上按下组合键——转动旋钮，或按下你为它重映射的按键。建议带修饰键：KSS 会拦截所绑定的按键，因此单独一个键在应用运行期间会在别处失效。按 Esc 取消。",
+  "KnobCaptureButton": "录制",
+  "KnobCaptureWaiting": "等待组合键…… 按 Esc 取消。",
+  "KnobKeyUnset": "未设置",
+  "KnobBareKeyWarning": "绑定未使用修饰键：{0}。KSS 运行期间该键不会传递给任何其他程序。"
 }

@@ -7,7 +7,7 @@ public enum KnobMode
     /// <summary>The volume knob itself: Volume Up/Down/Mute drive the themes.</summary>
     VolumeKnob = 0,
 
-    /// <summary>The encoder remapped in VIA/QMK to plain keys (F13-F24); volume is untouched.</summary>
+    /// <summary>A key combination you record yourself; the volume keys are untouched.</summary>
     HotKeys = 1
 }
 
@@ -45,6 +45,13 @@ public sealed class KnobSettings
     /// </summary>
     public List<int> Usages { get; set; } = [];
 
+    /// <summary>
+    /// The combinations the knob sends, in <see cref="KnobShortcut"/> storage
+    /// form. The F13-F15 defaults are what a VIA/QMK encoder remap typically
+    /// emits, and stay as a sensible starting point - but any combination can
+    /// be recorded now, which is the only option on a keyboard that cannot be
+    /// remapped at all.
+    /// </summary>
     public string KeyForward { get; set; } = "F13";
 
     public string KeyBackward { get; set; } = "F14";
@@ -256,18 +263,16 @@ public static class KnobControl
         _ => Loc.T("KnobUsageOther", "0x" + usage.ToString("X4", CultureInfo.InvariantCulture))
     };
 
-    /// <summary>The keys VIA/QMK encoder remaps typically use; F13 = 0x7C.</summary>
-    public static readonly IReadOnlyList<string> HotKeyNames =
-        Enumerable.Range(13, 12).Select(number => "F" + number).ToArray();
-
-    public static int? HotKeyToVirtualKey(string? name)
-    {
-        string trimmed = (name ?? string.Empty).Trim();
-        return trimmed.Length is 3 or 2
-            && trimmed[0] is 'F' or 'f'
-            && int.TryParse(trimmed[1..], out int number)
-            && number is >= 13 and <= 24
-            ? 0x7C + (number - 13)
-            : null;
-    }
+    /// <summary>
+    /// The stored combination for one action, or <see cref="KnobShortcut.None"/>
+    /// when it has never been recorded. Old settings holding a bare "F13" parse
+    /// unchanged, so upgrading does not silently unbind anyone's knob.
+    /// </summary>
+    public static KnobShortcut ShortcutFor(KnobSettings? settings, KnobAction action) =>
+        KnobShortcut.Parse(action switch
+        {
+            KnobAction.NextTheme => settings?.KeyForward,
+            KnobAction.PreviousTheme => settings?.KeyBackward,
+            _ => settings?.KeyToggle
+        });
 }
