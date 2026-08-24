@@ -14,7 +14,7 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 
 ## Status
 
-- **Windows:** v1.10.0, on Avalonia UI. This is the released platform.
+- **Windows:** v1.10.1, on Avalonia UI. This is the released platform.
 - **macOS:** the cross-platform project and packaging scripts are kept in the
   tree. Intel and Apple Silicon builds still need testing on real hardware and
   are not published as a stable release.
@@ -69,7 +69,7 @@ Simplified Chinese**; the language is switchable at runtime under *Other setting
 - "Image API" enabled in the keyboard menu, with the address it shows entered
   into KSS.
 
-Download `KeyboardScreenStudio-v1.10.0-win-x64.zip` from Releases, unpack it and
+Download `KeyboardScreenStudio-v1.10.1-win-x64.zip` from Releases, unpack it and
 run `KeyboardScreenStudio.exe`. The release is self-contained — no separate .NET
 installation is required.
 

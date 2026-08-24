@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish, for example v1.10.0"
+        description: "Release tag to publish, for example v1.10.1"
         required: true
         type: string
 
@@ -24,11 +24,11 @@ concurrency:
 
 jobs:
   release:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release v1.10.0]')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release v1.10.1]')
     name: Build Windows portable package
     runs-on: windows-latest
     env:
-      RELEASE_TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v1.10.0' }}
+      RELEASE_TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v1.10.1' }}
 
     steps:
       - name: Check out source
