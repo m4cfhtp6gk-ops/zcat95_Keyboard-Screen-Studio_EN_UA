@@ -6,6 +6,9 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
 {
     private static readonly FontFamily Doto = new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
 
+    /// <summary>Breathing room between the weekday and the date on the shared line.</summary>
+    private const double DateGap = 8;
+
     public string Id => "clock-dot-analog";
     public string DisplayName => Loc.T("ThemeClockDotAnalogName");
     public string Description => Loc.T("ThemeClockDotAnalogDescription");
@@ -32,10 +35,20 @@ public sealed class DotMatrixAnalogClockTheme : IScreenTheme
             primary);
 
         double dateTop = timeTop + 53;
-        canvas.AlignedText(Loc.DayName(snapshot.Timestamp), 11, canvas.AccentColor,
-            new Rect(safe.Left, dateTop, safe.Width * 0.42, 18), FontWeights.SemiBold, TextAlignment.Left);
-        canvas.AlignedText(Loc.ShortDate(snapshot.Timestamp), 11, primary,
-            new Rect(safe.Left + safe.Width * 0.42, dateTop, safe.Width * 0.58, 18), FontWeights.SemiBold, TextAlignment.Right);
+        // The date takes the width it needs; the weekday keeps the rest. The old
+        // fixed 42/58 split squeezed "понеділок" (58 px) into a 51 px box while
+        // the date sat in 71 px it never filled - the longer string had the
+        // smaller half. Capped so an unusually long date cannot starve the day.
+        string dayName = Loc.DayName(snapshot.Timestamp);
+        string shortDate = Loc.ShortDate(snapshot.Timestamp);
+        double dateWidth = Math.Min(
+            canvas.MeasureText(shortDate, 11, FontWeights.SemiBold),
+            safe.Width * 0.6);
+        double dayWidth = Math.Max(0, safe.Width - dateWidth - DateGap);
+        canvas.AlignedText(dayName, 11, canvas.AccentColor,
+            new Rect(safe.Left, dateTop, dayWidth, 18), FontWeights.SemiBold, TextAlignment.Left);
+        canvas.AlignedText(shortDate, 11, primary,
+            new Rect(safe.Right - dateWidth, dateTop, dateWidth, 18), FontWeights.SemiBold, TextAlignment.Right);
 
         DrawDottedRule(canvas, safe.Left, safe.Right, dateTop + 28, idleDot);
 
