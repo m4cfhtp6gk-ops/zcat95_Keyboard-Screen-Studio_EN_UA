@@ -1,61 +1,60 @@
-# v1.10.1
+# v1.10.2
 
-The Claude screen was still not working in v1.10.0. This fixes it.
+v1.10.1 sent the Claude request to the right place. This release finds the
+login it needs, and stops lying about it when it cannot.
 
 ## Fixed
 
-- **Claude limits: the right token, sent to the wrong host.** v1.10.0 found
-  the credential that is actually meant for a non-browser client - the OAuth
-  token Claude Code stores when you sign in - and then presented it to
-  `claude.ai`, which authenticates a browser session and has no use for a
-  bearer token.
+- **The login is looked for wherever it might be, not in one guessed place.**
+  `%USERPROFILE%\.claude\.credentials.json` is the documented path and it is
+  right for a login made by the Windows CLI under your account. It is wrong
+  for one made from WSL, where the file lives in the Linux home; wrong for one
+  moved with `CLAUDE_CONFIG_DIR`; wrong for an install under AppData. When the
+  one guess missed, the screen could only quote that same path back at you.
 
-  Each design so far had one half of this. The first had the right host for a
-  cookie a desktop app cannot present. The second gave up on the server and
-  counted tokens in local transcripts. The third found the right token and
-  posted it to the cookie's address.
+  All of those are searched now, in order. More usefully, the connection test
+  **names every path it tried**. If your login is somewhere this still does
+  not look, you can see that at a glance and say so - which was impossible
+  while the app only ever repeated its own assumption.
 
-  The limits now come from `api.anthropic.com/api/oauth/usage`, which is the
-  endpoint that takes that token. It is scoped by the token, so there is no
-  organization to look up and one request does the whole job. Two headers
-  turned out not to be optional: one selects the OAuth contract, and the
-  request has to identify as the Claude Code client whose login it borrows -
-  anything else is served by a bucket that throttles hard enough to look like
-  a broken feature.
+- **A login being refreshed read as a login that was not there.** Claude Code
+  rewrites its credentials file about once an hour and can hold it open while
+  it does. The read did not share write access, so a refresh in flight failed,
+  the error was swallowed, and the screen reported a missing file.
 
-  The screen is also far more patient now. It asks every three minutes rather
-  than every thirty seconds, and when it is refused it waits five minutes
-  instead of asking again on the next tick, which is what turns a minute of
-  throttling into an hour of it. Being throttled now says so, rather than
-  reading as a generic failure.
+- **The connection test blamed the wrong thing.** It said "no Claude Code
+  login found at <path>" for six different situations: no folder, no file, a
+  file it was not allowed to open, a file held open mid-refresh, half-written
+  JSON, and a file with no token in it. Being told the wrong reason is worse
+  than being told nothing - it sends you off to reinstall something that was
+  never missing. Each case now says what it actually is, and "no file" lists
+  what the folder does hold, which is what separates "never signed in" from
+  "this machine keeps its login somewhere else".
 
-- **The scrollbar was swallowing clicks along the right edge of every list.**
-  It is a 10 px strip drawn on top of the content, not beside it, so anything
-  stretched to the full width lost its right edge to it. In the theme list
-  that was the rightmost 16 px of every row. On the settings pages there was
-  no reservation at all, and those pages put every switch, dropdown and
-  spinner against the right edge - so the bar covered part of the controls
-  themselves.
+- **Environment variables set after the app started are picked up.** A program
+  inherits its environment when it launches, so setting
+  `CLAUDE_CODE_OAUTH_TOKEN` or `CLAUDE_CONFIG_DIR` in System Properties did
+  nothing until your next sign-out. On Windows the stored user and machine
+  values are read as well.
+
+## Changed
+
+- The Claude settings card mentions the documented fallback for a machine
+  where the file cannot be found: `claude setup-token` prints a long-lived
+  token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, which this app
+  reads ahead of any file. Anthropic documents that token as being for model
+  requests, so it may not be accepted for limits - the card says so rather
+  than promising it.
 
 ## Notes
 
-- The Claude screen needs Claude Code signed in on this computer. The access
-  token it borrows expires about once an hour and only Claude Code refreshes
-  it, so if the screen says the login expired, run Claude Code and it recovers
-  on its own.
 - Your Claude Code token is read fresh when needed, sent to api.anthropic.com
   and nowhere else, and never written into settings, an exported backup or a
-  log. KSS does not refresh or modify it, so it cannot affect your Claude Code
-  sign-in. See PRIVACY.md.
-- The endpoint behind the limits is not a documented public API and may change
-  without notice. If it does, the screen reports that it is not connected
-  instead of showing an invented figure.
-
-## For contributors
-
-- `tools/loc/` is back in step with the catalogues it generates. It had gone
-  stale across v1.9.0 and v1.10.0, so the regeneration its README documents
-  would have quietly dropped 20 strings and reverted 13 more.
+  log. The diagnostic line reports only where it looked and what it found -
+  folder and file names, never contents, never the token. See PRIVACY.md.
+- The access token expires about once an hour and only Claude Code refreshes
+  it. If the screen says the login expired, run Claude Code and it recovers on
+  its own.
 
 ## Platforms
 
