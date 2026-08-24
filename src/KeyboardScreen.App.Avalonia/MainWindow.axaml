@@ -288,7 +288,7 @@
                                   <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
                                   <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
                                 </Grid>
-                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" Watermark="{infra:Localize ComposerTextPlaceholder}" />
+                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" PlaceholderText="{infra:Localize ComposerTextPlaceholder}" />
                               </StackPanel>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
