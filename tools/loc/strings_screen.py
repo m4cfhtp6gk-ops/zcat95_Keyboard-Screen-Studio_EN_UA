@@ -35,7 +35,6 @@ SCREEN = [
     ("ScreenLabelHours",       "Hours",   "Години",  "小时"),
     ("ScreenLabelMinutes",     "Minutes", "Хвилини", "分钟"),
     ("ScreenLabelSeconds",     "Seconds", "Секунди", "秒钟"),
-    ("ScreenLabelSecondsShort","Sec",     "Сек",     "秒"),
 
     # ---- dot-matrix progress periods (right column is only ~39 px) -----------
     ("ScreenPeriodToday",   "Today", "День",   "今天"),
@@ -130,7 +129,7 @@ SCREEN = [
     ("ScreenClaudeSession",     "Session",       "Сесія",         "会话"),
     ("ScreenClaudeWeek",        "Week",          "Тиждень",       "本周"),
     ("ScreenClaudeNotConnected","Not connected", "Не підключено", "未连接"),
-    ("ScreenClaudeConnectHint", "Add a key in settings", "Додайте ключ", "请在设置中添加密钥"),
+    ("ScreenClaudeConnectHint", "Sign in to Claude Code", "Увійдіть у Claude Code", "请登录 Claude Code"),
     ("ScreenClaudeStale",       "Last known data", "Останні дані", "上次数据"),
     ("ScreenClaudeResetNow",    "resetting",     "скидання",      "重置中"),
     ("ScreenClaudeDaysHours",   "{0}d {1}h",     "{0}д {1}год",   "{0}天{1}小时"),
@@ -138,13 +137,25 @@ SCREEN = [
     ("ScreenClaudeMinutes",     "{0}m",          "{0}хв",         "{0}分"),
 
     # ---- Claude usage service messages ---------------------------------------
-    ("ClaudeNoOrganization", "No organization is visible to this session key", "Цьому ключу сесії не видно жодної організації", "此会话密钥看不到任何组织"),
-    ("ClaudeChallenged",     "Blocked by Cloudflare; pausing a few minutes before retrying - the key is fine", "Заблоковано Cloudflare; пауза кілька хвилин перед повтором - ключ у нормі", "被 Cloudflare 拦截，暂停几分钟后重试——密钥没有问题"),
-    ("ClaudeKeyRejected",    "The session key was rejected - it may have expired", "Ключ сесії відхилено - можливо, він застарів", "会话密钥被拒绝，可能已过期"),
-    ("ClaudeRateLimited",    "claude.ai is rate limiting requests", "claude.ai обмежує частоту запитів", "claude.ai 正在限制请求频率"),
-    ("ClaudeRequestFailed",  "claude.ai returned {0}", "claude.ai повернув {0}", "claude.ai 返回 {0}"),
+    ("ClaudeRateLimited",
+     "Anthropic is throttling requests - the screen will retry shortly",
+     "Anthropic обмежує частоту запитів - екран спробує ще раз незабаром",
+     "Anthropic 正在限制请求频率 - 屏幕稍后会重试"),
+    ("ClaudeRequestFailed", "Anthropic returned {0}", "Anthropic повернув {0}", "Anthropic 返回 {0}"),
     ("BinanceRequestFailed", "Binance returned {0}", "Binance повернув {0}", "币安返回 {0}"),
     ("ClaudeNoWindows",      "The account reported no limit windows", "Акаунт не повернув жодного вікна лімітів", "账户未返回任何额度窗口"),
+    ("ClaudeTokenRejected",
+     "Anthropic rejected the Claude Code login ({0})",
+     "Anthropic відхилив вхід Claude Code ({0})",
+     "Anthropic 拒绝了 Claude Code 登录（{0}）"),
+    ("ClaudeNoCredentials",
+     "Claude Code is not signed in on this PC",
+     "Claude Code не має входу на цьому ПК",
+     "本机 Claude Code 尚未登录"),
+    ("ClaudeCredentialExpired",
+     "The Claude Code login has expired - run Claude Code and sign in",
+     "Вхід Claude Code протух - запустіть Claude Code і увійдіть",
+     "Claude Code 登录已过期 — 请运行 Claude Code 重新登录"),
 
     # ---- currency rates theme (142 px wide: keep short) -----------------------
     ("ScreenTitleCurrency",   "Rates",     "Курси",      "汇率"),
@@ -266,10 +277,4 @@ SCREEN = [
     ("ComposerEmptyLine2", "Add widgets", "Додайте віджети", "请在主题设置中"),
     ("ComposerEmptyLine3", "in the theme settings", "в налаштуваннях теми", "添加小组件"),
     ("ScreenGitHubToday",  "Today", "Сьогодні", "今日"),
-    ("ClaudeStatuslineNotSetUp",   "Claude Code has not reported limits yet", "Claude Code ще не повідомив ліміти", "Claude Code 尚未报告用量"),
-    ("ClaudeStatuslineStale",      "Claude Code has not run for a while", "Claude Code давно не працював", "Claude Code 已有一段时间未运行"),
-    ("ClaudeStatuslineNoLimits",   "No limits in the Claude Code data", "У даних Claude Code немає лімітів", "Claude Code 数据中没有用量"),
-    ("ClaudeStatuslineUnreadable", "Could not read the Claude Code data", "Не вдалося прочитати дані Claude Code", "无法读取 Claude Code 数据"),
-    ("ScreenClaudeChallenged", "Cloudflare block", "Блок Cloudflare", "Cloudflare 拦截"),
-    ("ScreenClaudeRetryLater", "auto-retry soon", "повтор скоро", "稍后自动重试"),
 ]
