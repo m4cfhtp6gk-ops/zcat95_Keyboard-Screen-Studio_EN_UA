@@ -3,7 +3,21 @@ using System.Text.Json;
 namespace KeyboardScreen.Core;
 
 /// <summary>Tokens counted for each limit window, all from local transcripts.</summary>
-public sealed record ClaudeCodeTokenTotals(long Session, long Week, long ModelWeek, bool Available)
+/// <param name="SessionOldest">
+/// The oldest record still inside the five-hour window. A rolling window empties
+/// as its oldest entry ages out, so this is what a reset countdown is measured
+/// from - there is no server-issued reset time to read.
+/// </param>
+/// <param name="WeekOldest">The same, for the seven-day window.</param>
+/// <param name="LastActivity">The newest record seen in either window.</param>
+public sealed record ClaudeCodeTokenTotals(
+    long Session,
+    long Week,
+    long ModelWeek,
+    bool Available,
+    DateTimeOffset? SessionOldest = null,
+    DateTimeOffset? WeekOldest = null,
+    DateTimeOffset? LastActivity = null)
 {
     public static ClaudeCodeTokenTotals None { get; } = new(0, 0, 0, false);
 }
@@ -11,9 +25,12 @@ public sealed record ClaudeCodeTokenTotals(long Session, long Week, long ModelWe
 /// <summary>
 /// Sums tokens from the Claude Code transcripts under <c>~/.claude/projects</c>.
 ///
-/// No limit endpoint reports token counts, so this is the only place real
-/// numbers can come from — and it only ever sees Claude Code on this machine.
-/// Treat every total as a floor on account usage, never the account total.
+/// This is the whole data source for the Claude screen. Nothing on this machine
+/// records the account's limit windows, so nothing can be read from a server
+/// without a credential that expires or a challenge that blocks - the
+/// transcripts are the one place where real, current numbers sit in the clear.
+/// They only ever cover Claude Code on this machine: treat every total as a
+/// floor on account usage, never the account total.
 ///
 /// Cache reads are excluded. They are discounted heavily on the server and run
 /// one to two orders of magnitude above every other field, so including them
@@ -24,7 +41,22 @@ public sealed class ClaudeCodeTokenReader
     /// <summary>Stop after this many bytes so a large history cannot stall a refresh.</summary>
     private const long ScanBudgetBytes = 256L * 1024 * 1024;
 
+    /// <summary>
+    /// How long a scan is reused. The screen refreshes far more often than a
+    /// transcript changes, and re-walking every file each time would put a disk
+    /// sweep on a two-minute timer for no new information.
+    /// </summary>
+    private static readonly TimeSpan ScanCacheDuration = TimeSpan.FromSeconds(90);
+
+    /// <summary>One assistant record: enough to re-slice any window without rescanning.</summary>
+    private readonly record struct Entry(DateTimeOffset Timestamp, string Model, long Tokens);
+
     private readonly string _projectsDirectory;
+    private readonly object _gate = new();
+
+    private List<Entry>? _cached;
+    private DateTimeOffset _cachedAt;
+    private DateTimeOffset _cachedFrom;
 
     public ClaudeCodeTokenReader(string? projectsDirectory = null)
     {
@@ -40,6 +72,11 @@ public sealed class ClaudeCodeTokenReader
         return Path.Combine(root, "projects");
     }
 
+    /// <summary>True when Claude Code has ever written transcripts here.</summary>
+    public bool TranscriptsExist => Directory.Exists(_projectsDirectory);
+
+    public string ProjectsDirectory => _projectsDirectory;
+
     public ClaudeCodeTokenTotals Read(
         DateTimeOffset sessionSince,
         DateTimeOffset weekSince,
@@ -50,14 +87,98 @@ public sealed class ClaudeCodeTokenReader
             return ClaudeCodeTokenTotals.None;
         }
 
+        IReadOnlyList<Entry> entries = GetEntries(weekSince);
+        if (entries.Count == 0)
+        {
+            // The directory exists but held nothing in the window. That is a real
+            // answer - zero usage - not a failure to read, so report it as such.
+            return new ClaudeCodeTokenTotals(0, 0, 0, true);
+        }
+
         long session = 0;
         long week = 0;
         long modelWeek = 0;
-        long scanned = 0;
-        bool sawAny = false;
+        DateTimeOffset? sessionOldest = null;
+        DateTimeOffset? weekOldest = null;
+        DateTimeOffset? lastActivity = null;
         string scope = (modelScope ?? string.Empty).Trim().ToLowerInvariant();
 
-        foreach (string path in EnumerateTranscripts(weekSince))
+        foreach (Entry entry in entries)
+        {
+            if (entry.Timestamp < weekSince)
+            {
+                continue;
+            }
+
+            week += entry.Tokens;
+            if (weekOldest is null || entry.Timestamp < weekOldest)
+            {
+                weekOldest = entry.Timestamp;
+            }
+
+            if (lastActivity is null || entry.Timestamp > lastActivity)
+            {
+                lastActivity = entry.Timestamp;
+            }
+
+            if (entry.Timestamp >= sessionSince)
+            {
+                session += entry.Tokens;
+                if (sessionOldest is null || entry.Timestamp < sessionOldest)
+                {
+                    sessionOldest = entry.Timestamp;
+                }
+            }
+
+            if (scope.Length > 0 && entry.Model.Contains(scope, StringComparison.Ordinal))
+            {
+                modelWeek += entry.Tokens;
+            }
+        }
+
+        return new ClaudeCodeTokenTotals(
+            session,
+            week,
+            modelWeek,
+            true,
+            sessionOldest,
+            weekOldest,
+            lastActivity);
+    }
+
+    /// <summary>
+    /// The scanned records covering <paramref name="weekSince"/> onwards. A cached
+    /// scan is reused while it is young enough and still reaches far enough back;
+    /// a window that starts earlier than the cache covers forces a fresh sweep.
+    /// </summary>
+    private IReadOnlyList<Entry> GetEntries(DateTimeOffset weekSince)
+    {
+        lock (_gate)
+        {
+            if (_cached is not null
+                && _cachedFrom <= weekSince
+                && DateTimeOffset.Now - _cachedAt < ScanCacheDuration)
+            {
+                return _cached;
+            }
+        }
+
+        List<Entry> scanned = Scan(weekSince);
+        lock (_gate)
+        {
+            _cached = scanned;
+            _cachedAt = DateTimeOffset.Now;
+            _cachedFrom = weekSince;
+            return scanned;
+        }
+    }
+
+    private List<Entry> Scan(DateTimeOffset since)
+    {
+        var entries = new List<Entry>();
+        long scanned = 0;
+
+        foreach (string path in EnumerateTranscripts(since))
         {
             if (scanned >= ScanBudgetBytes)
             {
@@ -82,22 +203,12 @@ public sealed class ClaudeCodeTokenReader
                         continue;
                     }
 
-                    if (timestamp < weekSince)
+                    if (timestamp < since)
                     {
                         continue;
                     }
 
-                    sawAny = true;
-                    week += tokens;
-                    if (timestamp >= sessionSince)
-                    {
-                        session += tokens;
-                    }
-
-                    if (scope.Length > 0 && model.Contains(scope, StringComparison.Ordinal))
-                    {
-                        modelWeek += tokens;
-                    }
+                    entries.Add(new Entry(timestamp, model, tokens));
                 }
             }
             catch (IOException)
@@ -109,7 +220,7 @@ public sealed class ClaudeCodeTokenReader
             }
         }
 
-        return new ClaudeCodeTokenTotals(session, week, modelWeek, sawAny);
+        return entries;
     }
 
     private IEnumerable<string> EnumerateTranscripts(DateTimeOffset weekSince)
