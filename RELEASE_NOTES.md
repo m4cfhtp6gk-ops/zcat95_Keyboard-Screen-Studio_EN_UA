@@ -1,47 +1,69 @@
-# v1.8.0
+# v1.9.0
 
-Claude limits without a login, a cookie, or anything for Cloudflare to
-block.
+The Claude screen finally works, and so does the first five minutes with
+a new keyboard.
 
-## Added
+## Changed
 
-- **Claude limits straight from Claude Code.** Claude Code hands its
-  status line the same 5-hour and weekly numbers `/usage` shows; the app
-  now reads those, so the limits screen needs no session cookie, no
-  token, and makes no request to claude.ai at all. This is the new
-  default source, and "Set up Claude Code" in the Claude settings wires
-  it up in one click - your existing status line is never replaced
-  without asking, and every other Claude Code setting is left untouched.
-- The claude.ai cookie source is still selectable, and is still the only
-  one that reports the per-model weekly window.
+- **Claude limits are read from Claude Code's own transcripts on this
+  PC.** No login, no session key, no status-line setup, no request to
+  claude.ai - and nothing left for Cloudflare to block. Every previous
+  design asked a server for a number it would not hand a desktop app;
+  this one reads files that are already on your disk.
+- Because Anthropic publishes no quota that software can read, the three
+  meters fill against a **token budget you set**, with plan presets as a
+  starting point. Pick your plan, then adjust once you have seen a week
+  of your own use. The counts only cover Claude Code on this machine, so
+  they are a floor on real usage rather than an account total.
+- "Screen setup" and "Theme settings" were the wrong way round - the
+  first was a read-only status page, the second held the actual setup.
+  They are now "Overview" and "Screen setup".
+- The screen builder's editor moved out of Automation onto the theme
+  page, beside the other theme settings.
+- Telegram, notifications, the knob and diagnostics collapse in Other
+  settings, so the device address is not buried under a login form.
 
 ## Fixed
 
-- The limits screen no longer depends on getting past Cloudflare, which
-  is what kept breaking it. `cf_clearance` is bound to the browser that
-  solved the challenge - TLS fingerprint included - so no amount of
-  header work could have made a .NET client pass as that browser.
-- **The app no longer pretends to be Chrome.** Claiming a browser
-  user-agent and browser client hints while presenting a .NET connection
-  fingerprint is a contradiction that bot detection scores against; the
-  cookie source now identifies itself honestly.
-- A Cloudflare challenge is recognised by its `cf-mitigated` header
-  rather than only by an English phrase in the page body, so a challenge
-  is no longer misreported as a rejected session key - which had been
-  sending people off to regenerate a key that was never the problem.
-- Pressing "test connection" during a block no longer extends that
-  block, the reported status can no longer be a leftover from an earlier
-  call, and re-pasting a refreshed cookie is no longer ignored by a
-  cache keyed on the cookie's length.
+- **The first-run IP field corrupted most home addresses.** Typing
+  `192.168.1.50` produced `192..168.150`, because the focus advanced
+  both when an octet filled and again on the dot you typed after it.
+  "Save and continue" then did nothing at all - silently - because the
+  red validation line was never filled in. Both fixed, and pasting a
+  whole address now works.
+- **The picture theme's clock was frozen.** The refresh loop skipped
+  that screen as "static", but it always draws a clock. Fixed on both
+  platforms, with the photo cached so the restored refresh does not
+  re-read it from disk every second.
+- A failed push was recorded as delivered, so a network blip on an
+  unchanged frame meant the keyboard never received that content again.
+- The device badge no longer reports "Disconnected" before anything has
+  been tried, or permanently when automatic push is off.
+- There is now a manual **Send now**, beside the preview and in the tray
+  menu. The command existed but had never been bound to anything.
+- A mistyped weather city reported "this theme uses only local time and
+  settings" instead of the real error.
+- Every scrollbar was invisible *and* unclickable, including the
+  33-theme sidebar where only about eight rows fit. They are back at the
+  10 px the design system always specified.
+- Secondary text in the light theme now meets WCAG AA; it measured
+  3.89:1.
+- The shipped default font id matched nothing, so the font list was
+  empty on every first launch.
+- An exception during startup no longer wedges every later settings
+  change into a silent no-op, and is written to the crash log instead of
+  a `Debug.WriteLine` that Release builds compile out.
 
 ## Notes
 
-- Claude Code reports these limits only for Claude.ai subscribers, and
-  only once a session has had its first response, so the screen says it
-  is waiting until Claude Code has run at least once.
-- Each window can be absent on its own, and a known Claude Code bug can
-  put a timestamp where a percentage belongs; both are discarded rather
-  than drawn as a wrong number.
+- The Claude screen needs Claude Code to have run on this computer at
+  least once. Until then it says so plainly rather than showing an
+  error.
+- Upgrading is safe: the removed Claude settings (session key,
+  organization id, source choice) are simply ignored when your existing
+  settings file is read, and the new budget fields take their defaults.
+- The theme no longer stores any credential, so exported settings have
+  nothing to strip for it. See PRIVACY.md.
 
 ## Platforms
 
