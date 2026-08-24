@@ -811,5 +811,10 @@
   "KnobCaptureButton": "录制",
   "KnobCaptureWaiting": "等待组合键…… 按 Esc 取消。",
   "KnobKeyUnset": "未设置",
-  "KnobBareKeyWarning": "绑定未使用修饰键：{0}。KSS 运行期间该键不会传递给任何其他程序。"
+  "KnobBareKeyWarning": "绑定未使用修饰键：{0}。KSS 运行期间该键不会传递给任何其他程序。",
+  "ComposerRowOptions": "该模块的字体与颜色",
+  "ComposerDotFontLabel": "点阵数字",
+  "ComposerDotFontHint": "以点阵字体绘制该模块的数字。标签保持原样——点阵字体没有西里尔字母。",
+  "ComposerAccentLabel": "模块颜色",
+  "ComposerAccentHint": "仅为该模块覆盖主题强调色。"
 }

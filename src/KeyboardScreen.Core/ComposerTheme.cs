@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 
 namespace KeyboardScreen.Core;
 
@@ -8,6 +9,19 @@ public sealed class ComposerWidgetSettings
 
     /// <summary>Free text for the "text" widget; other kinds ignore it.</summary>
     public string Text { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Draw this widget's numbers in the dot-matrix face.
+    ///
+    /// Numbers only, never the labels: Doto carries 320 glyphs - Latin, digits
+    /// and punctuation - and no Cyrillic at all, so a label like "Пам'ять" would
+    /// silently fall back to a system face and look like neither. Kinds whose
+    /// value is text rather than a number do not offer this at all.
+    /// </summary>
+    public bool DotFont { get; set; }
+
+    /// <summary>This widget's own accent as #RRGGBB, or empty to follow the theme's.</summary>
+    public string Accent { get; set; } = string.Empty;
 }
 
 public sealed class ComposerSettings
@@ -27,7 +41,12 @@ public sealed class ComposerSettings
 /// <param name="Height">Row height on the 142-wide screen.</param>
 /// <param name="NameKey">Localization key of the name shown in the editor.</param>
 /// <param name="Source">Data source the widget needs beyond the always-on system counters, or null.</param>
-public sealed record ComposerWidgetInfo(string Kind, double Height, string NameKey, string? Source);
+/// <param name="HasNumber">
+/// Whether this kind draws a number the dot-matrix face could render. False for
+/// the ones whose value is prose - the editor hides the font switch there rather
+/// than offering a control that would quietly do the wrong thing.
+/// </param>
+public sealed record ComposerWidgetInfo(string Kind, double Height, string NameKey, string? Source, bool HasNumber = false);
 
 public sealed record ComposerPlacement(ComposerWidgetSettings Widget, ComposerWidgetInfo Info, Rect Bounds);
 
@@ -43,25 +62,25 @@ public static class ComposerWidgets
 
     public static readonly IReadOnlyList<ComposerWidgetInfo> Catalog =
     [
-        new("clock", 52, "ComposerWidgetClock", null),
+        new("clock", 52, "ComposerWidgetClock", null, true),
         new("date", 44, "ComposerWidgetDate", null),
-        new("cpu", 42, "ComposerWidgetCpu", null),
-        new("ram", 42, "ComposerWidgetRam", null),
-        new("gpu", 42, "ComposerWidgetGpu", null),
-        new("net", 46, "ComposerWidgetNet", null),
-        new("hardware", 64, "ComposerWidgetHardware", "hardware"),
+        new("cpu", 42, "ComposerWidgetCpu", null, true),
+        new("ram", 42, "ComposerWidgetRam", null, true),
+        new("gpu", 42, "ComposerWidgetGpu", null, true),
+        new("net", 46, "ComposerWidgetNet", null, true),
+        new("hardware", 64, "ComposerWidgetHardware", "hardware", true),
         new("weather", 60, "ComposerWidgetWeather", "weather"),
-        new("currency", 50, "ComposerWidgetCurrency", "currency"),
-        new("crypto", 46, "ComposerWidgetCrypto", "crypto"),
-        new("ping", 50, "ComposerWidgetPing", "ping"),
+        new("currency", 50, "ComposerWidgetCurrency", "currency", true),
+        new("crypto", 46, "ComposerWidgetCrypto", "crypto", true),
+        new("ping", 50, "ComposerWidgetPing", "ping", true),
         new("alerts", 38, "ComposerWidgetAlerts", "alerts"),
-        new("claude", 58, "ComposerWidgetClaude", "claude-usage"),
-        new("pomodoro", 52, "ComposerWidgetPomodoro", null),
+        new("claude", 58, "ComposerWidgetClaude", "claude-usage", true),
+        new("pomodoro", 52, "ComposerWidgetPomodoro", null, true),
         new("music", 54, "ComposerWidgetMusic", null),
         new("calendar-next", 48, "ComposerWidgetCalendarNext", "calendar"),
-        new("countdown-next", 46, "ComposerWidgetCountdownNext", null),
-        new("world-clock", 48, "ComposerWidgetWorldClock", null),
-        new("github", 44, "ComposerWidgetGitHub", "github"),
+        new("countdown-next", 46, "ComposerWidgetCountdownNext", null, true),
+        new("world-clock", 48, "ComposerWidgetWorldClock", null, true),
+        new("github", 44, "ComposerWidgetGitHub", "github", true),
         new("text", 40, "ComposerWidgetText", null),
         new("spacer", 14, "ComposerWidgetSpacer", null)
     ];
@@ -136,7 +155,19 @@ public static class ComposerWidgets
 /// </summary>
 public sealed class ComposerTheme : IScreenTheme
 {
+    private static readonly FontFamily Doto =
+        new("Doto", Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Doto.ttf"));
+
     private readonly PomodoroTimer _pomodoro;
+
+    /// <summary>
+    /// Set once per widget in <see cref="DrawWidget"/> and read by the drawing
+    /// helpers, so every widget's own font and accent apply without threading
+    /// two extra arguments through twenty call sites.
+    /// </summary>
+    private FontFamily? _valueFont;
+
+    private Color _accent;
 
     public ComposerTheme(PomodoroTimer pomodoro)
     {
@@ -190,14 +221,18 @@ public sealed class ComposerTheme : IScreenTheme
     private void DrawWidget(ScreenCanvas c, SystemSnapshot s, ComposerPlacement p)
     {
         Rect r = p.Bounds;
+        // Numbers only: Doto has no Cyrillic, so a label drawn in it would fall
+        // back to a system face. Kinds without a number never offer the switch.
+        _valueFont = p.Widget.DotFont && p.Info.HasNumber ? Doto : null;
+        _accent = ParseAccent(p.Widget.Accent) ?? c.AccentColor;
         switch (p.Info.Kind)
         {
             case "clock":
                 c.AlignedText(DisplayUnits.Time(s.Timestamp), 34, Colors.White, r,
-                    FontWeights.SemiBold, TextAlignment.Center);
+                    FontWeights.SemiBold, TextAlignment.Center, _valueFont);
                 break;
             case "date":
-                c.AlignedText(Loc.DayName(s.Timestamp), 12, c.AccentColor,
+                c.AlignedText(Loc.DayName(s.Timestamp), 12, _accent,
                     new Rect(r.Left, r.Top, r.Width, 20), FontWeights.SemiBold, TextAlignment.Center);
                 c.AlignedText(Loc.LongDate(s.Timestamp), 13, Colors.White,
                     new Rect(r.Left, r.Top + 22, r.Width, 20), FontWeights.Medium, TextAlignment.Center);
@@ -266,22 +301,36 @@ public sealed class ComposerTheme : IScreenTheme
 
     private static void Card(ScreenCanvas c, Rect r) => c.RoundedRect(r, 9, CardFill, CardBorder);
 
-    private static void MetricRow(ScreenCanvas c, Rect row, string label, string value, Color valueColor)
+    private void MetricRow(ScreenCanvas c, Rect row, string label, string value, Color valueColor)
     {
         c.AlignedText(label, 9, LabelGray,
             new Rect(row.Left + 9, row.Top, row.Width - 18, row.Height), FontWeights.SemiBold);
         c.AlignedText(value, 11, valueColor,
             new Rect(row.Left + 9, row.Top, row.Width - 18, row.Height),
-            FontWeights.SemiBold, TextAlignment.Right);
+            FontWeights.SemiBold, TextAlignment.Right, _valueFont);
     }
 
-    private static void PercentBar(ScreenCanvas c, Rect r, string label, double? percent)
+    /// <summary>A widget's own accent, or null to inherit the theme's.</summary>
+    private static Color? ParseAccent(string? value)
+    {
+        string text = (value ?? string.Empty).Trim();
+        if (text.Length != 7 || text[0] != '#')
+        {
+            return null;
+        }
+
+        return int.TryParse(text[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int rgb)
+            ? Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb)
+            : null;
+    }
+
+    private void PercentBar(ScreenCanvas c, Rect r, string label, double? percent)
     {
         Card(c, r);
         MetricRow(c, new Rect(r.Left, r.Top + 6, r.Width, 15),
             label, percent is { } value ? $"{value:0}%" : "—", Colors.White);
         c.ProgressBar(new Rect(r.Left + 9, r.Bottom - 12, r.Width - 18, 5),
-            percent ?? 0, TrackGray, c.AccentColor);
+            percent ?? 0, TrackGray, _accent);
     }
 
     private void DrawHardware(ScreenCanvas c, SystemSnapshot s, Rect r)
@@ -443,13 +492,13 @@ public sealed class ComposerTheme : IScreenTheme
             Loc.T("ScreenClaudeWeek"), usage.Week?.UtilizationPercent);
     }
 
-    private static void UsageBar(ScreenCanvas c, Rect row, string label, double? percent)
+    private void UsageBar(ScreenCanvas c, Rect row, string label, double? percent)
     {
         MetricRow(c, new Rect(row.Left, row.Top, row.Width, 13),
             label, percent is { } value ? $"{value:0}%" : "—", Colors.White);
         c.ProgressBar(new Rect(row.Left + 9, row.Bottom - 5, row.Width - 18, 4),
             percent ?? 0, TrackGray,
-            percent >= 90 ? LossRed : c.AccentColor);
+            percent >= 90 ? LossRed : _accent);
     }
 
     private void DrawPomodoro(ScreenCanvas c, SystemSnapshot s, Rect r)
@@ -466,9 +515,9 @@ public sealed class ComposerTheme : IScreenTheme
         string phase = Loc.T(pomodoro.Phase == PomodoroPhase.Focus ? "ScreenPomodoroFocus" : "ScreenPomodoroBreak");
         MetricRow(c, new Rect(r.Left, r.Top + 7, r.Width, 15),
             phase, $"{(int)pomodoro.Remaining.TotalMinutes}:{pomodoro.Remaining.Seconds:00}",
-            c.AccentColor);
+            _accent);
         c.ProgressBar(new Rect(r.Left + 9, r.Bottom - 13, r.Width - 18, 5),
-            pomodoro.ElapsedFraction * 100, TrackGray, c.AccentColor);
+            pomodoro.ElapsedFraction * 100, TrackGray, _accent);
     }
 
     private void DrawMusic(ScreenCanvas c, SystemSnapshot s, Rect r)
@@ -490,7 +539,7 @@ public sealed class ComposerTheme : IScreenTheme
             ? (music.IsPlaying ? 100 : 0)
             : music.Position.TotalSeconds / music.Duration.TotalSeconds * 100;
         c.ProgressBar(new Rect(r.Left + 9, r.Bottom - 11, r.Width - 18, 4),
-            percent, TrackGray, c.AccentColor);
+            percent, TrackGray, _accent);
     }
 
     private void DrawCalendarNext(ScreenCanvas c, SystemSnapshot s, Rect r)
@@ -512,7 +561,7 @@ public sealed class ComposerTheme : IScreenTheme
             : today
                 ? DisplayUnits.Time(next.Start)
                 : Loc.ShortDate(next.Start) + " " + DisplayUnits.Time(next.Start);
-        c.AlignedText(when, 10, c.AccentColor,
+        c.AlignedText(when, 10, _accent,
             new Rect(r.Left + 9, r.Top + 6, r.Width - 18, 15), FontWeights.SemiBold);
         c.AlignedText(next.Title, 10, Colors.White,
             new Rect(r.Left + 9, r.Top + 24, r.Width - 18, 16), FontWeights.Medium);

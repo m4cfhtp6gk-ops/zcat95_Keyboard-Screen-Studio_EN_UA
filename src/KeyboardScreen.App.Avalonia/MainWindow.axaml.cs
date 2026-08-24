@@ -287,6 +287,29 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
+    private async void ComposerAccentPick_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ComposerRowViewModel row)
+        {
+            return;
+        }
+
+        var dialog = new AccentColorWindow(row.HasAccent ? row.Accent : _viewModel.AccentColor);
+        string? selected = await dialog.ShowDialog<string?>(this);
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            row.Accent = selected;
+        }
+    }
+
+    private void ComposerAccentReset_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ComposerRowViewModel row)
+        {
+            row.ClearAccent();
+        }
+    }
+
     private async void ClaudeCheckButton_OnClick(object? sender, RoutedEventArgs e) =>
         await _viewModel.CheckClaudeConnectionAsync();
 

@@ -811,5 +811,10 @@
   "KnobCaptureButton": "Record",
   "KnobCaptureWaiting": "Waiting for a key combination… press Esc to cancel.",
   "KnobKeyUnset": "not set",
-  "KnobBareKeyWarning": "Bound without a modifier: {0}. That key will not reach any other program while KSS is running."
+  "KnobBareKeyWarning": "Bound without a modifier: {0}. That key will not reach any other program while KSS is running.",
+  "ComposerRowOptions": "Font and colour for this block",
+  "ComposerDotFontLabel": "Dot-matrix numbers",
+  "ComposerDotFontHint": "Draws this block's numbers in the dot face. Labels stay as they are - the dot font has no Cyrillic.",
+  "ComposerAccentLabel": "Block colour",
+  "ComposerAccentHint": "Overrides the theme's accent for this block only."
 }

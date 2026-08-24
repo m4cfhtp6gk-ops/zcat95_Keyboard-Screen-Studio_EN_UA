@@ -29,9 +29,13 @@ public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action cha
 }
 
 /// <summary>One row of the screen-builder editor: a placed widget.</summary>
-public sealed class ComposerRowViewModel(string kind, string text, Action changed) : ObservableObject
+public sealed class ComposerRowViewModel(
+    string kind, string text, bool dotFont, string accent, Action changed) : ObservableObject
 {
     private string _text = text;
+    private bool _dotFont = dotFont;
+    private string _accent = accent;
+    private bool _isExpanded;
 
     public string Kind { get; } = kind;
 
@@ -39,11 +43,50 @@ public sealed class ComposerRowViewModel(string kind, string text, Action change
 
     public bool IsText => Kind == "text";
 
+    /// <summary>
+    /// The font switch only appears where the widget draws a number. Doto has no
+    /// Cyrillic, so offering it on a prose widget would promise a look it cannot
+    /// deliver.
+    /// </summary>
+    public bool SupportsDotFont => ComposerWidgets.Find(Kind)?.HasNumber == true;
+
+    /// <summary>Font and colour live behind a click, so the list stays a list.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
+
     public string Text
     {
         get => _text;
         set { if (SetProperty(ref _text, value)) changed(); }
     }
+
+    public bool DotFont
+    {
+        get => _dotFont;
+        set { if (SetProperty(ref _dotFont, value)) changed(); }
+    }
+
+    /// <summary>#RRGGBB, or empty to follow the theme's accent.</summary>
+    public string Accent
+    {
+        get => _accent;
+        set
+        {
+            string cleaned = (value ?? string.Empty).Trim();
+            if (SetProperty(ref _accent, cleaned))
+            {
+                OnPropertyChanged(nameof(HasAccent));
+                changed();
+            }
+        }
+    }
+
+    public bool HasAccent => _accent.Length > 0;
+
+    public void ClearAccent() => Accent = string.Empty;
 }
 
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
@@ -2963,7 +3006,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             if (ComposerWidgets.Find(widget.Kind) is not null)
             {
-                ComposerRows.Add(new ComposerRowViewModel(widget.Kind, widget.Text, OnComposerChanged));
+                ComposerRows.Add(new ComposerRowViewModel(
+                    widget.Kind, widget.Text, widget.DotFont, widget.Accent, OnComposerChanged));
             }
         }
         if (_composerTheme is { } composerTheme)
@@ -3238,7 +3282,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             .Select(row => new ComposerWidgetSettings
             {
                 Kind = row.Kind,
-                Text = row.IsText ? row.Text : string.Empty
+                Text = row.IsText ? row.Text : string.Empty,
+                DotFont = row.SupportsDotFont && row.DotFont,
+                Accent = row.Accent
             })
             .ToList();
 
@@ -3246,7 +3292,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         int index = Math.Clamp(SelectedComposerChoiceIndex, 0, ComposerWidgets.Catalog.Count - 1);
         ComposerRows.Add(new ComposerRowViewModel(
-            ComposerWidgets.Catalog[index].Kind, string.Empty, OnComposerChanged));
+            ComposerWidgets.Catalog[index].Kind, string.Empty, false, string.Empty, OnComposerChanged));
         OnComposerChanged();
     }
 

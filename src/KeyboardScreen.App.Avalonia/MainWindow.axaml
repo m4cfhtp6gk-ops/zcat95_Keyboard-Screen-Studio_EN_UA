@@ -282,13 +282,34 @@
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <StackPanel Spacing="4" Margin="0,0,0,6">
-                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
-                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
-                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
-                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
-                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+                                  <ToggleButton Classes="composer-expand" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                Content="⌄" ToolTip.Tip="{infra:Localize ComposerRowOptions}" />
+                                  <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Name}" />
+                                  <Button Grid.Column="2" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
+                                  <Button Grid.Column="3" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
+                                  <Button Grid.Column="4" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
                                 </Grid>
                                 <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" PlaceholderText="{infra:Localize ComposerTextPlaceholder}" />
+                                <Border IsVisible="{Binding IsExpanded}" Classes="composer-options" Padding="12,10" Margin="0,2,0,4">
+                                  <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding SupportsDotFont}">
+                                      <StackPanel Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerDotFontLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerDotFontHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding DotFont, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                      <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerAccentLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerAccentHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <Button Grid.Column="1" Click="ComposerAccentPick_OnClick" Content="{infra:Localize ThemeAccentPick}" />
+                                      <Button Grid.Column="2" IsVisible="{Binding HasAccent}" Click="ComposerAccentReset_OnClick" Content="{infra:Localize ThemeAccentReset}" />
+                                    </Grid>
+                                  </StackPanel>
+                                </Border>
                               </StackPanel>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>

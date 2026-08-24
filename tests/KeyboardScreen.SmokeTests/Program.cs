@@ -2006,7 +2006,51 @@ var composerRoundtrip = System.Text.Json.JsonSerializer.Deserialize<AppSettings>
     }));
 Assert(composerRoundtrip?.Composer.Widgets is [{ Kind: "clock" }, { Kind: "text", Text: "нотатка" }],
     "the composer layout must survive export/import untouched");
-Console.WriteLine("PASS screen builder: layout math, data needs, all widget renders, persistence");
+// Per-widget font and accent. The dot face is offered only where a number is
+// drawn: Doto has no Cyrillic, so a label in it would fall back to a system face.
+Assert(ComposerWidgets.Find("cpu")!.HasNumber && ComposerWidgets.Find("clock")!.HasNumber,
+    "numeric widgets must offer the dot font");
+Assert(!ComposerWidgets.Find("text")!.HasNumber && !ComposerWidgets.Find("music")!.HasNumber
+    && !ComposerWidgets.Find("spacer")!.HasNumber && !ComposerWidgets.Find("weather")!.HasNumber,
+    "widgets whose value is prose must not offer it");
+
+var styledWidgets = new List<ComposerWidgetSettings>
+{
+    new() { Kind = "clock", DotFont = true, Accent = "#22C55E" },
+    new() { Kind = "cpu", DotFont = true },
+    new() { Kind = "text", Text = "hello", DotFont = true, Accent = "#FF0000" }
+};
+var styledTheme = new ComposerTheme(new PomodoroTimer()) { Widgets = styledWidgets };
+Assert(renderer.Render(styledTheme, SystemSnapshot.DesignSample).JpegBytes is [0xFF, 0xD8, ..],
+    "a styled layout must render");
+
+// A bad or empty colour falls back to the theme accent rather than throwing.
+foreach (string accent in new[] { "", "not-a-colour", "#GGGGGG", "#12345" })
+{
+    var oddTheme = new ComposerTheme(new PomodoroTimer())
+    {
+        Widgets = [new ComposerWidgetSettings { Kind = "cpu", Accent = accent }]
+    };
+    Assert(renderer.Render(oddTheme, SystemSnapshot.DesignSample).JpegBytes.Length > 0,
+        $"accent '{accent}' must fall back instead of failing");
+}
+
+// The two styles must survive a settings round-trip.
+var composerStore = Path.Combine(Path.GetTempPath(), $"kss-composer-{Guid.NewGuid():N}.json");
+try
+{
+    var composerSettings = new AppSettings { Composer = new ComposerSettings { Widgets = styledWidgets } };
+    await new JsonSettingsStore(composerStore).SaveAsync(composerSettings);
+    var reloaded = await new JsonSettingsStore(composerStore).LoadAsync();
+    var first = reloaded.Composer!.Widgets[0];
+    Assert(first.DotFont && first.Accent == "#22C55E", "per-widget font and accent must persist");
+    Assert(!reloaded.Composer.Widgets[1].DotFont == false, "the second widget keeps its own font flag");
+}
+finally
+{
+    try { File.Delete(composerStore); } catch (IOException) { }
+}
+Console.WriteLine("PASS screen builder: layout math, data needs, all widget renders, per-widget font and accent, persistence");
 
 // ---- crash-safe settings store --------------------------------------------
 string storeDirectory = Path.Combine(Path.GetTempPath(), "kss-smoke-" + Guid.NewGuid().ToString("N"));

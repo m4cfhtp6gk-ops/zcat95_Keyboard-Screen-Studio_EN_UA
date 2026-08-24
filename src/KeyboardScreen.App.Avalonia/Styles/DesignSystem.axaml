@@ -76,6 +76,27 @@
     <Setter Property="Padding" Value="24,0,24,20" />
   </Style>
 
+  <!-- The screen builder's per-widget options, kept behind a click. -->
+  <Style Selector="ToggleButton.composer-expand">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="ToggleButton.composer-expand:checked">
+    <Setter Property="Background" Value="{DynamicResource KssSelectedBrush}" />
+  </Style>
+  <Style Selector="Border.composer-options">
+    <Setter Property="Background" Value="{DynamicResource KssControlBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KssControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+
   <Style Selector="Border.elevated">
     <Setter Property="Background" Value="{DynamicResource KssPanelSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource KssCardBorderBrush}" />
