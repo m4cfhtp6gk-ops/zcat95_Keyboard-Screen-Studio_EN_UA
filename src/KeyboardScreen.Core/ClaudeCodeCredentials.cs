@@ -10,6 +10,43 @@ namespace KeyboardScreen.Core;
 /// variable name - never the token, which must not reach a log, the settings
 /// file, or an exported backup.
 /// </param>
+/// <summary>Why no credential came back, so the screen can say the true thing.</summary>
+public enum ClaudeCredentialProblem
+{
+    None,
+
+    /// <summary>Claude Code has never run for this user, or runs somewhere else entirely.</summary>
+    NoDirectory,
+
+    /// <summary>The folder is there but holds no credentials file - most often a login that never happened.</summary>
+    NoFile,
+
+    /// <summary>The file exists and could not be opened: permissions, or another process holding it.</summary>
+    Unreadable,
+
+    /// <summary>Opened, but the JSON is torn - usually a write caught halfway.</summary>
+    Unparseable,
+
+    /// <summary>Valid JSON with no access token anywhere in it: this is not the file we want.</summary>
+    NoTokenInside
+}
+
+/// <summary>The outcome of a credential search, including the near misses.</summary>
+/// <param name="Detail">
+/// Context for <see cref="Problem"/>: the folder for NoDirectory, the names it
+/// holds for NoFile, the exception type for Unreadable. Never file contents,
+/// and never the token.
+/// </param>
+public sealed record ClaudeCredentialLookup(
+    ClaudeCodeCredential? Credential,
+    ClaudeCredentialProblem Problem,
+    string Path,
+    string Detail)
+{
+    public static ClaudeCredentialLookup From(ClaudeCodeCredential credential) =>
+        new(credential, ClaudeCredentialProblem.None, credential.Source, string.Empty);
+}
+
 public sealed record ClaudeCodeCredential(string AccessToken, DateTimeOffset? ExpiresAt, string Source)
 {
     /// <summary>
@@ -53,33 +90,104 @@ public static class ClaudeCodeCredentials
 
     /// <summary>
     /// The environment variable wins, exactly as it does for Claude Code itself.
-    /// Returns null when the machine has no Claude Code login to borrow.
+    /// Returns null when the machine has no Claude Code login to borrow; use
+    /// <see cref="Locate"/> when you need to say why.
     /// </summary>
-    public static ClaudeCodeCredential? Read(string? credentialsPath = null)
+    public static ClaudeCodeCredential? Read(string? credentialsPath = null) =>
+        Locate(credentialsPath).Credential;
+
+    /// <summary>
+    /// The same search, but it reports what it saw.
+    ///
+    /// The first version of this collapsed a missing folder, a missing file, a
+    /// file it was not allowed to open, a file held open by Claude Code, torn
+    /// JSON and a file with no token in it into one null - and the settings page
+    /// then told the user, in all six cases, that there was no login "at" a path.
+    /// Being told the wrong reason is worse than being told nothing: it sends
+    /// you off to reinstall something that was never missing.
+    /// </summary>
+    public static ClaudeCredentialLookup Locate(string? credentialsPath = null)
     {
         string? fromEnvironment = Environment.GetEnvironmentVariable(TokenEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
         {
-            return new ClaudeCodeCredential(fromEnvironment.Trim(), null, TokenEnvironmentVariable);
+            return ClaudeCredentialLookup.From(
+                new ClaudeCodeCredential(fromEnvironment.Trim(), null, TokenEnvironmentVariable));
         }
 
         string path = credentialsPath ?? DefaultCredentialsPath();
+        string directory = Path.GetDirectoryName(path) ?? string.Empty;
         string json;
         try
         {
             if (!File.Exists(path))
             {
-                return null;
+                return directory.Length > 0 && !Directory.Exists(directory)
+                    ? new ClaudeCredentialLookup(null, ClaudeCredentialProblem.NoDirectory, path, directory)
+                    : new ClaudeCredentialLookup(
+                        null, ClaudeCredentialProblem.NoFile, path, DescribeDirectory(directory));
             }
 
-            json = File.ReadAllText(path);
+            // Claude Code refreshes this file roughly hourly and may hold it open
+            // while it does. Sharing the read means a refresh in flight looks like
+            // a moment's bad timing, not a missing login.
+            using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            json = reader.ReadToEnd();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return new ClaudeCredentialLookup(
+                null, ClaudeCredentialProblem.Unreadable, path, ex.GetType().Name);
+        }
+
+        if (Parse(json, path) is { } credential)
+        {
+            return ClaudeCredentialLookup.From(credential);
+        }
+
+        // Torn JSON and well-formed JSON without a token are different mistakes:
+        // the first is a bad moment, the second means this is not the file.
+        bool wellFormed;
+        try
+        {
+            using JsonDocument _ = JsonDocument.Parse(json);
+            wellFormed = true;
+        }
+        catch (JsonException)
+        {
+            wellFormed = false;
+        }
+
+        return new ClaudeCredentialLookup(
+            null,
+            wellFormed ? ClaudeCredentialProblem.NoTokenInside : ClaudeCredentialProblem.Unparseable,
+            path,
+            string.Empty);
+    }
+
+    /// <summary>
+    /// The names in the folder, so "no login file" can be told apart from "wrong
+    /// folder entirely". Names only - nothing in here is opened or reported.
+    /// </summary>
+    private static string DescribeDirectory(string directory)
+    {
+        try
+        {
+            string[] names = Directory
+                .EnumerateFileSystemEntries(directory)
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToArray()!;
+            return names.Length == 0 ? string.Empty : string.Join(", ", names);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return null;
+            return string.Empty;
         }
-
-        return Parse(json, path);
     }
 
     /// <summary>Split out so the shape handling is testable without touching the real file.</summary>

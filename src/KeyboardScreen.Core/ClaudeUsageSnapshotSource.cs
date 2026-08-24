@@ -60,7 +60,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
-    private readonly Func<ClaudeCodeCredential?> _credentialReader;
+    private readonly Func<ClaudeCredentialLookup> _credentialReader;
 
     private ClaudeUsageSnapshot? _cached;
     private string _cachedKey = string.Empty;
@@ -70,14 +70,14 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
     public ClaudeUsageSnapshotSource(
         HttpClient? client = null,
-        Func<ClaudeCodeCredential?>? credentialReader = null)
+        Func<ClaudeCredentialLookup>? credentialReader = null)
     {
         _ownsClient = client is null;
         _client = client ?? new HttpClient(new SocketsHttpHandler { UseCookies = false })
         {
             Timeout = TimeSpan.FromSeconds(15)
         };
-        _credentialReader = credentialReader ?? (() => ClaudeCodeCredentials.Read());
+        _credentialReader = credentialReader ?? (() => ClaudeCodeCredentials.Locate());
     }
 
     public string BaseUrl { get; init; } = "https://api.anthropic.com";
@@ -88,7 +88,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCodeCredential? credential = _credentialReader();
+        ClaudeCodeCredential? credential = _credentialReader().Credential;
         if (credential is null)
         {
             return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoCredentials"));
@@ -305,11 +305,11 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCodeCredential? credential = _credentialReader();
+        ClaudeCredentialLookup lookup = _credentialReader();
+        ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
-            return new ClaudeConnectionReport(false, Loc.T("ClaudeCheckNoCredentials",
-                ClaudeCodeCredentials.DefaultCredentialsPath()));
+            return new ClaudeConnectionReport(false, DescribeLookupFailure(lookup));
         }
 
         if (credential.IsExpired)
@@ -327,6 +327,21 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             : new ClaudeConnectionReport(false,
                 Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty));
     }
+
+    /// <summary>
+    /// Says which of the ways this can fail actually happened. The earlier
+    /// version reported "no login at &lt;path&gt;" for all of them, including the
+    /// cases where the file was sitting right there.
+    /// </summary>
+    private static string DescribeLookupFailure(ClaudeCredentialLookup lookup) => lookup.Problem switch
+    {
+        ClaudeCredentialProblem.NoDirectory => Loc.T("ClaudeCheckNoDirectory", lookup.Detail),
+        ClaudeCredentialProblem.NoFile => Loc.T("ClaudeCheckNoFile", lookup.Path,
+            lookup.Detail.Length > 0 ? lookup.Detail : "-"),
+        ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
+        ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
+        _ => Loc.T("ClaudeCheckNoToken", lookup.Path)
+    };
 
     public void Dispose()
     {

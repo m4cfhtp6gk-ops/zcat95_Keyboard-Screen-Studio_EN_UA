@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The Claude connection test blamed the wrong thing.** It reported "no
+  Claude Code login found at <path>" for six different situations: the folder
+  missing, the file missing, the file there but not openable, the file held
+  open by Claude Code mid-refresh, torn JSON, and a file with no token in it.
+  Being told the wrong reason is worse than being told nothing - it sends you
+  off to reinstall something that was never missing. Each case now says what
+  it actually is, and "no file" additionally lists what the folder does hold,
+  so "never signed in" can be told from "wrong folder entirely".
+- **A login being refreshed read as a login that was not there.** Claude Code
+  rewrites its credentials file about once an hour and can hold it open while
+  it does; the read did not share, so the failure was swallowed and reported
+  as a missing file. It shares now.
+
+### Changed
+
+- The Claude settings card mentions the documented fallback for machines where
+  the credentials file cannot be found: `claude setup-token` mints a
+  long-lived token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
+  which this app already reads first. Anthropic documents that token as being
+  for model requests, so it may not be accepted for limits - the card says so
+  rather than promising it.
+
 ## v1.10.1 - 2026-08-24
 
 ### Fixed
