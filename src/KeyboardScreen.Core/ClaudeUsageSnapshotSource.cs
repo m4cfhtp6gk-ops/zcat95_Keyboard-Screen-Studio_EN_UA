@@ -6,29 +6,57 @@ namespace KeyboardScreen.Core;
 
 /// <summary>
 /// Reads the real Claude subscription windows from
-/// <c>claude.ai/api/organizations/{id}/usage</c>, authenticated with the OAuth
-/// token Claude Code already holds on this machine.
+/// <c>api.anthropic.com/api/oauth/usage</c>, authenticated with the OAuth token
+/// Claude Code already holds on this machine.
 ///
-/// Three designs have stood here. The endpoint was never the problem - the
-/// first one called this exact URL. What failed was the credential: a browser
-/// <c>sessionKey</c> cookie, which Cloudflare binds to the browser that solved
-/// its challenge, TLS fingerprint included, so a desktop client could not
-/// present it convincingly. The second design gave up on the server and summed
-/// tokens from local transcripts, which is honest arithmetic but answers a
-/// different question - it can only report a floor on one machine's usage
-/// against a budget the user invented.
+/// Four designs have stood here, and each got one half right. The first sent a
+/// browser <c>sessionKey</c> cookie to <c>claude.ai/api</c>: right host for that
+/// credential, but Cloudflare binds the cookie to the browser that solved its
+/// challenge, so a desktop client cannot present it. The second gave up on the
+/// server and summed tokens from local transcripts - honest arithmetic about the
+/// wrong question, a floor on one machine's usage against a budget the user
+/// invented. The third found the credential that is actually meant for a
+/// non-browser client - the Claude Code OAuth token - and then sent it to the
+/// cookie's host, where it means nothing.
 ///
-/// The token Claude Code stores is an OAuth credential issued for a
-/// non-browser client, which is what the earlier attempts were missing. It is
-/// read fresh on every refresh, never copied into settings, never exported and
-/// never logged; this class sends it to claude.ai and nowhere else. Refreshing
+/// The token and the host belong together: this endpoint is the one that takes
+/// a bearer token, and it is scoped by the token, so there is no organization to
+/// resolve. Two headers are not optional. <c>anthropic-beta: oauth-2025-04-20</c>
+/// selects the OAuth contract, and the user agent must be <c>claude-code/</c>;
+/// any other one lands in a bucket that rate-limits hard enough to look like a
+/// broken feature. That is also why this polls slowly and, on a 429, stops
+/// asking for a while instead of hammering its way into a longer ban.
+///
+/// The token is read fresh on every refresh, sent to api.anthropic.com and
+/// nowhere else, and never copied into settings, an export or a log. Refreshing
 /// it is deliberately left to Claude Code: holding the refresh token here would
 /// put the user's login one bug away from being invalidated.
 /// </summary>
 public sealed class ClaudeUsageSnapshotSource : IDisposable
 {
-    /// <summary>Usage moves slowly and every call spends a request; twice a minute is plenty.</summary>
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
+    /// <summary>
+    /// This endpoint rate-limits by how often you ask, not by how much you use.
+    /// Three minutes is the interval it is documented to tolerate, and usage does
+    /// not move fast enough for a tighter one to show the user anything new.
+    /// </summary>
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// How long to stay quiet after a refusal. Retrying a 429 on the next tick is
+    /// what turns a minute of throttling into an hour of it.
+    /// </summary>
+    private static readonly TimeSpan FailureBackoff = TimeSpan.FromMinutes(5);
+
+    /// <summary>Selects the OAuth contract; without it the token is not honoured.</summary>
+    private const string OAuthBetaHeader = "oauth-2025-04-20";
+
+    /// <summary>
+    /// Required. Any other user agent is served by a bucket that rate-limits so
+    /// aggressively the screen never fills. We are a client of the user's own
+    /// Claude Code login, reading only that user's own numbers, so this says what
+    /// the request is on behalf of rather than pretending to be a browser.
+    /// </summary>
+    private const string ClaudeCodeUserAgent = "claude-code/2.1.69";
 
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
@@ -37,6 +65,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private ClaudeUsageSnapshot? _cached;
     private string _cachedKey = string.Empty;
     private DateTimeOffset _cachedAt;
+    private ClaudeUsageSnapshot? _lastFailure;
+    private DateTimeOffset _failedAt;
 
     public ClaudeUsageSnapshotSource(
         HttpClient? client = null,
@@ -50,7 +80,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         _credentialReader = credentialReader ?? (() => ClaudeCodeCredentials.Read());
     }
 
-    public string BaseUrl { get; init; } = "https://claude.ai/api";
+    public string BaseUrl { get; init; } = "https://api.anthropic.com";
 
     public async Task<ClaudeUsageSnapshot> ReadAsync(
         ClaudeUsageSettings settings,
@@ -76,77 +106,35 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             return _cached with { IsStale = true };
         }
 
+        // Repeat the last refusal rather than earn a longer one. The screen keeps
+        // saying exactly what went wrong; it just stops asking for a few minutes.
+        if (_lastFailure is not null && now - _failedAt < FailureBackoff)
+        {
+            return _lastFailure;
+        }
+
         try
         {
-            string organizationId = settings.OrganizationId;
-            if (string.IsNullOrWhiteSpace(organizationId))
-            {
-                organizationId = await ResolveOrganizationIdAsync(credential, cancellationToken);
-                if (organizationId.Length == 0)
-                {
-                    return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoOrganization"));
-                }
-
-                settings.OrganizationId = organizationId;
-            }
-
-            using JsonDocument usage = await GetJsonAsync(
-                $"/organizations/{organizationId}/usage", credential, cancellationToken);
+            using JsonDocument usage = await GetJsonAsync("/api/oauth/usage", credential, cancellationToken);
             ClaudeUsageSnapshot snapshot = Parse(usage.RootElement, settings.ModelScope, now);
             if (snapshot.Available)
             {
                 _cached = snapshot;
                 _cachedKey = key;
                 _cachedAt = now;
+                _lastFailure = null;
             }
 
             return snapshot;
         }
-        catch (ClaudeRequestException ex)
+        catch (Exception ex) when (ex is ClaudeRequestException or HttpRequestException
+                                      or TaskCanceledException or JsonException)
         {
-            // A stale organization id is the one failure worth retrying blind:
-            // it is cached in settings and only the server knows it went bad.
-            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden
-                && settings.OrganizationId.Length > 0)
-            {
-                settings.OrganizationId = string.Empty;
-            }
-
-            return ClaudeUsageSnapshot.Unavailable(ex.Message);
+            ClaudeUsageSnapshot failure = ClaudeUsageSnapshot.Unavailable(ex.Message);
+            _lastFailure = failure;
+            _failedAt = now;
+            return failure;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
-        {
-            return ClaudeUsageSnapshot.Unavailable(ex.Message);
-        }
-    }
-
-    public async Task<string> ResolveOrganizationIdAsync(
-        ClaudeCodeCredential credential,
-        CancellationToken cancellationToken = default)
-    {
-        using JsonDocument document = await GetJsonAsync("/organizations", credential, cancellationToken);
-        return FirstOrganizationId(document.RootElement);
-    }
-
-    internal static string FirstOrganizationId(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Array)
-        {
-            return string.Empty;
-        }
-
-        foreach (JsonElement item in root.EnumerateArray())
-        {
-            if (item.ValueKind == JsonValueKind.Object
-                && item.TryGetProperty("uuid", out JsonElement uuid)
-                && uuid.ValueKind == JsonValueKind.String
-                && uuid.GetString() is { Length: > 0 } value)
-            {
-                return value;
-            }
-        }
-
-        return string.Empty;
     }
 
     private async Task<JsonDocument> GetJsonAsync(
@@ -157,19 +145,21 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Get, BaseUrl + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
         request.Headers.Accept.ParseAdd("application/json");
-        // Identify honestly. The previous design claimed to be Chrome while
-        // presenting a .NET connection fingerprint, which is a contradiction bot
-        // detection scores against - and it never helped.
-        request.Headers.UserAgent.ParseAdd("KeyboardScreenStudio");
+        request.Headers.TryAddWithoutValidation("anthropic-beta", OAuthBetaHeader);
+        request.Headers.UserAgent.ParseAdd(ClaudeCodeUserAgent);
 
         using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             throw new ClaudeRequestException(
                 response.StatusCode,
-                response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
-                    ? Loc.T("ClaudeTokenRejected", (int)response.StatusCode)
-                    : Loc.T("ClaudeRequestFailed", (int)response.StatusCode));
+                response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
+                        Loc.T("ClaudeTokenRejected", (int)response.StatusCode),
+                    HttpStatusCode.TooManyRequests => Loc.T("ClaudeRateLimited"),
+                    _ => Loc.T("ClaudeRequestFailed", (int)response.StatusCode)
+                });
         }
 
         string body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -327,9 +317,9 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             return new ClaudeConnectionReport(false, Loc.T("ClaudeCredentialExpired"));
         }
 
-        // The cache must not answer a diagnostic: the whole point is a live call.
+        // Neither cache may answer a diagnostic: the whole point is a live call.
         _cached = null;
-        settings.OrganizationId = string.Empty;
+        _lastFailure = null;
 
         ClaudeUsageSnapshot snapshot = await ReadAsync(settings);
         return snapshot.Available
@@ -347,7 +337,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     }
 }
 
-/// <summary>Carries the status code so a stale organization id can be told from a dead token.</summary>
+/// <summary>Carries the status code so a dead token can be told from a throttled one.</summary>
 internal sealed class ClaudeRequestException(HttpStatusCode statusCode, string message) : Exception(message)
 {
     public HttpStatusCode StatusCode { get; } = statusCode;

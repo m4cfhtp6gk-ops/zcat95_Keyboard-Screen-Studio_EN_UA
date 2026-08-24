@@ -459,4 +459,16 @@
   <Style Selector="ScrollViewer.edge-fade">
     <Setter Property="behaviors:EdgeFadeBehavior.IsEnabled" Value="True" />
   </Style>
+
+  <!--
+    The 10 px scrollbar above is an overlay: it is drawn on top of the scrolled
+    content and it is hit-testable, so anything stretched to the full width has
+    its right edge swallowed. On these pages that edge is where the controls
+    are - every ToggleSwitch, ComboBox and NumericUpDown sits in the Auto column
+    on the right. The class was a marker with no style at all, which is why the
+    reservation was missing; 14 px clears the bar with a little room to spare.
+  -->
+  <Style Selector="StackPanel.page-content">
+    <Setter Property="Margin" Value="0,0,14,0" />
+  </Style>
 </Styles>

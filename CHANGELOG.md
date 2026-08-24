@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Claude limits: right token, wrong host.** v1.10.0 found the credential
+  that is actually meant for a non-browser client - the OAuth token Claude
+  Code stores - and then sent it to `claude.ai/api`, which authenticates a
+  browser session and has no idea what a bearer token is. The limits now come
+  from `api.anthropic.com/api/oauth/usage`, which is the endpoint that takes
+  that token.
+
+  Two headers turned out not to be optional. `anthropic-beta: oauth-2025-04-20`
+  selects the OAuth contract, and the user agent must be `claude-code/` - any
+  other one is served by a bucket that throttles hard enough to look like a
+  broken feature. The endpoint is scoped by the token, so the organization
+  lookup and its cached id are gone and one request now does the whole job.
+
+  It is also polled far more slowly - three minutes rather than thirty seconds -
+  and a refusal is now remembered for five minutes instead of retried on the
+  next tick, which is what turns a minute of throttling into an hour of it.
+  A 429 says so on screen rather than reading as a generic failure.
+
+- **The scrollbar was eating clicks along the right edge of every list.** It
+  is a 10 px overlay drawn on top of the scrolled content, and it is
+  hit-testable, so anything stretched to the full width lost its right edge to
+  it. In the theme sidebar that was the rightmost 16 px of every row - the
+  margin/padding pair meant to reserve that space did not work, because the
+  negative margin widened the viewer and `ScrollViewer.Padding` never reached
+  the viewport. On the settings pages there was no reservation at all: the
+  `page-content` class it should have come from had no style behind it, which
+  put the right edge of every toggle, dropdown and spinner in the Auto column
+  under the bar. The reservation now sits on the content, where it applies.
+
+### Changed
+
+- The string generator under `tools/loc/` is back in step with the catalogues
+  it generates. It had gone stale across v1.9.0 and v1.10.0: running
+  `python3 tools/loc/gen.py`, which its README gives as the way to regenerate,
+  would have dropped 20 strings added in those releases and reverted 13 more.
+
 ## v1.10.0 - 2026-08-24
 
 ### Changed

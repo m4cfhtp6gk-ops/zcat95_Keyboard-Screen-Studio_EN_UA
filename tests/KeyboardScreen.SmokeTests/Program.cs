@@ -19,7 +19,7 @@ Assert(defaults.Language.Length == 0, "first-run language must defer to the oper
 Assert(defaults.ClaudeUsage.ModelScope == "opus", "Claude usage must start on the Opus row");
 // Nothing to configure and no cached organization: the screen borrows the
 // Claude Code login, so a fresh machine reports "not signed in", never "no key".
-Assert(defaults.ClaudeUsage.IsConfigured && defaults.ClaudeUsage.OrganizationId.Length == 0,
+Assert(defaults.ClaudeUsage.IsConfigured && defaults.ClaudeUsage.ModelScope == "opus",
     "Claude usage must start with nothing to configure");
 // The shipped default used to be an id nothing could produce, so the font
 // drop-down was empty on every first launch while the screen rendered in MiSans.
@@ -508,7 +508,7 @@ var settingsPath = Path.Combine(Path.GetTempPath(), $"keyboard-screen-settings-{
 try
 {
     var settingsStore = new JsonSettingsStore(settingsPath);
-    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", ClaudeUsage = new ClaudeUsageSettings { ModelScope = "sonnet", OrganizationId = "org-persist" }, HasAcknowledgedClaudeNotice = true, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
+    var settings = new AppSettings { SelectedThemeId = "music", RefreshSeconds = 17, AccentColor = "#A23BFF", SelectedFontId = "file:test.ttf|test", SafeArea = new ScreenInsets(11, 53, 9, 13), AiQuota = new AiQuotaSettings { DataKind = AiUsageDataKind.ModelCost, SelectedItemKey = "model:test", DisplayName = "My AI", ProgressTarget = 25 }, Weather = new WeatherSettings { LocationQuery = "上海", UseAutomaticLocation = true }, Stocks = new StockSettings { SourceKind = StockSourceKind.Yahoo, RedForGain = false, Items = [new StockItemSettings { Symbol = "0700.HK", Alias = "腾讯", Enabled = false }] }, ImageTimePlacement = ImageTimePlacement.Top, ImageClockStyle = ImageClockStyle.Flip, ImageTimeBackground = false, ImageTextColor = ImageTextColor.Black, ImageTextAlignment = ImageTextAlignment.Right, ImageWeatherVisible = true, ImageTimeFontSize = 34, ImageDateFontSize = 15, ImageWeatherFontSize = 13, ImageDigitalOrder = ImageDigitalOrder.WeatherTimeDate, ImageLargeTimeFontSize = 42, ImageAnalogClockSize = 94, ImageAnalogOrder = ImageAnalogOrder.DateWeatherClock, ImageFlipTimeFontSize = 35, IgnoreBrowserMediaSessions = false, UiThemeMode = UiThemeMode.Dark, Language = "uk", ClaudeUsage = new ClaudeUsageSettings { ModelScope = "sonnet" }, HasAcknowledgedClaudeNotice = true, DotMatrixProgressPeriod = DotMatrixProgressPeriod.Quarter, DotMatrixProgressHeaderFontSize = 18, LaunchAtStartup = true, AutoMediaThemeSwitch = true, MediaPlayingThemeId = "music-poster", MediaIdleThemeId = "clock-neon" , HasCompletedOnboarding = true, HasAcknowledgedStockNotice = true, HasAcknowledgedAiUsageNotice = true };
     await settingsStore.SaveAsync(settings);
     var loadedSettings = await settingsStore.LoadAsync();
     Assert(loadedSettings.SelectedThemeId == "music", "settings theme did not persist");
@@ -535,7 +535,7 @@ try
     Assert(loadedSettings.UiThemeMode == UiThemeMode.Dark, "control UI theme mode did not persist");
     Assert(loadedSettings.Language == "uk" && AppLanguageInfo.Parse(loadedSettings.Language) == AppLanguage.Ukrainian, "language setting did not persist");
     Assert(loadedSettings.ClaudeUsage.ModelScope == "sonnet"
-        && loadedSettings.ClaudeUsage.OrganizationId == "org-persist", "Claude usage settings did not persist");
+        && loadedSettings.ClaudeUsage.ModelScope == "sonnet", "Claude usage settings did not persist");
     Assert(loadedSettings.HasAcknowledgedClaudeNotice, "the Claude notice acknowledgement did not persist");
     Assert(loadedSettings.DotMatrixProgressPeriod == DotMatrixProgressPeriod.Quarter, "dot-matrix progress period did not persist");
     Assert(loadedSettings.DotMatrixProgressHeaderFontSize == 18, "dot-matrix progress header font size did not persist");
@@ -748,30 +748,55 @@ using (var staleLogin = new ClaudeUsageSnapshotSource(
         "an expired login must read as unavailable");
 }
 
-// The live path: organizations then usage, both on Authorization: Bearer.
+// The live path. The token was never the problem after the cookie was dropped;
+// the host was. claude.ai/api authenticates a browser session, and the Claude
+// Code token is a bearer credential for api.anthropic.com - which is also
+// scoped by the token, so there is no organization to resolve and one call does
+// the whole job.
 var claudeResponses = new Queue<string>(new[]
 {
-    """[{"uuid":"org-123","name":"Personal"}]""",
     """{"five_hour":{"utilization":42,"resets_at":"2099-08-21T21:59:59Z"},"seven_day":{"utilization":"73%","resets_at":"2099-08-25T16:59:59Z"},"seven_day_opus":{"utilization":91.5,"resets_at":"2099-08-25T16:59:59Z"}}"""
 });
 var claudeHandler2 = new ClaudeHandler(claudeResponses);
 using (var claudeClient = new HttpClient(claudeHandler2))
 using (var live = new ClaudeUsageSnapshotSource(claudeClient,
            () => new ClaudeCodeCredential("tok-live", null, "test"))
-       { BaseUrl = "https://claude.test/api" })
+       { BaseUrl = "https://anthropic.test" })
 {
     var settings = new ClaudeUsageSettings { ModelScope = "opus" };
     var snapshot = await live.ReadAsync(settings);
     Assert(snapshot.Available, "a good token and payload must produce a snapshot");
-    Assert(settings.OrganizationId == "org-123", "the organization must be resolved and cached");
     Assert(Math.Abs(snapshot.Session!.UtilizationPercent - 42) < 0.001, "the session percent is the account's own");
     Assert(Math.Abs(snapshot.Week!.UtilizationPercent - 73) < 0.001, "a percent string must parse");
     Assert(Math.Abs(snapshot.ModelWeek!.UtilizationPercent - 91.5) < 0.001, "the per-model window must be read");
     Assert(snapshot.Session.ResetsAt?.Year == 2099, "the reset time must be carried through");
-    Assert(claudeHandler2.Requests.Count == 2, "one call for the organization, one for the usage");
+    Assert(claudeHandler2.Requests is [ "https://anthropic.test/api/oauth/usage" ],
+        "exactly one call, to the endpoint that takes a bearer token");
     Assert(claudeHandler2.AuthorizationHeaders.All(h => h == "Bearer tok-live"),
         "every call must present the Claude Code token as a bearer, never a cookie");
     Assert(claudeHandler2.CookieHeaders.Count == 0, "no cookie may be sent");
+    Assert(claudeHandler2.BetaHeaders.All(h => h == "oauth-2025-04-20"),
+        "the OAuth contract is opt-in through anthropic-beta");
+    // A different user agent is served by a bucket that throttles hard enough
+    // to look like a broken feature, so this one is load-bearing, not cosmetic.
+    Assert(claudeHandler2.UserAgents.All(h => h.StartsWith("claude-code/", StringComparison.Ordinal)),
+        "the request must identify as the Claude Code client it borrows its login from");
+}
+
+// A refusal must not become a habit: retrying 429 on the next refresh is how a
+// minute of throttling turns into an hour of it.
+var throttled = new ClaudeHandler(new Queue<string>()) { Status = HttpStatusCode.TooManyRequests };
+using (var throttledClient = new HttpClient(throttled))
+using (var limited = new ClaudeUsageSnapshotSource(throttledClient,
+           () => new ClaudeCodeCredential("tok-live", null, "test"))
+       { BaseUrl = "https://anthropic.test" })
+{
+    var first = await limited.ReadAsync(new ClaudeUsageSettings());
+    var second = await limited.ReadAsync(new ClaudeUsageSettings());
+    Assert(!first.Available && !second.Available, "a throttled call cannot produce a snapshot");
+    Assert(throttled.Requests.Count == 1, "the second read must be answered from the backoff, not the network");
+    Assert(first.ErrorMessage == second.ErrorMessage && (first.ErrorMessage ?? string.Empty).Length > 0,
+        "the screen keeps saying what went wrong while it waits");
 }
 
 // Both spellings of every field, because the two descriptions of this payload
@@ -798,10 +823,7 @@ using (var limits = JsonDocument.Parse(
 var expiredWindow = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
 Assert(expiredWindow.HasReset && expiredWindow.EffectivePercent == 0, "a window past its reset must read empty");
 
-Assert(ClaudeUsageSnapshotSource.FirstOrganizationId(
-    JsonDocument.Parse("""[{"name":"no uuid"},{"uuid":"org-2"}]""").RootElement) == "org-2",
-    "the first entry that actually carries a uuid wins");
-Console.WriteLine("PASS Claude usage: credential discovery, bearer auth, payload spellings, limits[]");
+Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[]");
 
 // ---- Binance crypto source -----------------------------------------------
 Assert(BinanceStockSnapshotSource.NormalizeSymbol("btcusdt") == "BTCUSDT", "Binance pairs must upper-case");
@@ -2255,6 +2277,12 @@ sealed class ClaudeHandler : HttpMessageHandler
     /// <summary>Only the requests that carried a Cookie header at all.</summary>
     public List<string> CookieHeaders { get; } = [];
 
+    /// <summary>What each request presented on anthropic-beta, which gates the OAuth contract.</summary>
+    public List<string> BetaHeaders { get; } = [];
+
+    /// <summary>Answer every request with this instead of 200, to exercise the refusal paths.</summary>
+    public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+
     /// <summary>Sent as Set-Cookie on every response when set, like Cloudflare's __cf_bm.</summary>
     public string? SetCookie { get; init; }
 
@@ -2273,9 +2301,15 @@ sealed class ClaudeHandler : HttpMessageHandler
         }
 
         AuthorizationHeaders.Add(request.Headers.Authorization?.ToString() ?? string.Empty);
+        BetaHeaders.Add(request.Headers.TryGetValues("anthropic-beta", out var beta) ? string.Join("; ", beta) : string.Empty);
         ClientHints.Add(request.Headers.TryGetValues("sec-ch-ua", out var hints) ? string.Join("; ", hints) : string.Empty);
         UserAgents.Add(request.Headers.TryGetValues("User-Agent", out var agents) ? string.Join(" ", agents) : string.Empty);
         Versions.Add(request.Version);
+        if (Status != HttpStatusCode.OK)
+        {
+            return Task.FromResult(new HttpResponseMessage(Status) { Content = new StringContent("{}") });
+        }
+
         if (_responses.Count == 0)
         {
             throw new InvalidOperationException("No mocked Claude response remains.");

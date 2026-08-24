@@ -4,9 +4,10 @@ namespace KeyboardScreen.Core;
 /// Settings for the Claude limits screen.
 ///
 /// There is nothing to sign in to and nothing to paste. The screen borrows the
-/// OAuth token Claude Code already keeps on this machine and asks claude.ai for
-/// the real windows, so what is left here is which model fills the third meter
-/// and one cached id.
+/// OAuth token Claude Code already keeps on this machine and asks Anthropic for
+/// the real windows. The endpoint is scoped by the token, so there is no
+/// organization to pick either: all that is left is which model fills the third
+/// meter.
 ///
 /// An earlier design asked the user for a token budget and drew a percentage
 /// against it. That number was arithmetic about a target the user invented, not
@@ -20,12 +21,6 @@ public sealed class ClaudeUsageSettings
 
     /// <summary>The model whose weekly window fills the third meter.</summary>
     public string ModelScope { get; set; } = DefaultModelScope;
-
-    /// <summary>
-    /// Resolved once from the token and kept so each refresh costs a single
-    /// request. Cleared automatically when the server stops recognising it.
-    /// </summary>
-    public string OrganizationId { get; set; } = string.Empty;
 
     /// <summary>
     /// Nothing to configure: the credential either exists on this machine or it
