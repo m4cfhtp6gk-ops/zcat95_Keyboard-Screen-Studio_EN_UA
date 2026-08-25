@@ -946,6 +946,69 @@ using (var live = new ClaudeUsageSnapshotSource(claudeClient,
         "the request must identify as the Claude Code client it borrows its login from");
 }
 
+// A throttle must not blank a screen that is working. This endpoint fails on
+// how often it is asked, which says nothing about whether the last answer was
+// true, so the figures stay up - marked stale - instead of being replaced by
+// "not connected".
+var flaky = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":42,"resets_at":"2099-08-21T21:59:59Z"}}"""
+}));
+using (var flakyClient = new HttpClient(flaky))
+using (var survives = new ClaudeUsageSnapshotSource(flakyClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test", CacheWindow = TimeSpan.Zero })
+{
+    var good = await survives.ReadAsync(new ClaudeUsageSettings());
+    Assert(good.Available && !good.IsStale, "the first call is live and current");
+
+    flaky.Status = HttpStatusCode.TooManyRequests;
+
+    var throttledRead = await survives.ReadAsync(new ClaudeUsageSettings());
+    Assert(throttledRead.Available, "a throttle keeps the last figures rather than blanking the screen");
+    Assert(throttledRead.IsStale, "and says plainly that they are no longer fresh");
+    Assert(Math.Abs(throttledRead.Session!.UtilizationPercent - 42) < 0.001, "they are the real ones");
+}
+
+// The diagnostic button used to clear both caches and call every time it was
+// pressed, so three impatient presses were three requests to an endpoint that
+// rate-limits on frequency - the button could earn the 429 it was explaining.
+var pressed = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":7,"resets_at":"2099-08-21T21:59:59Z"}}"""
+}));
+using (var pressClient = new HttpClient(pressed))
+using (var button = new ClaudeUsageSnapshotSource(pressClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test" })
+{
+    var first = await button.CheckAsync(new ClaudeUsageSettings());
+    var second = await button.CheckAsync(new ClaudeUsageSettings());
+    var third = await button.CheckAsync(new ClaudeUsageSettings());
+    Assert(first.Success, "the first press makes a live call");
+    Assert(pressed.Requests.Count == 1, "and the impatient ones do not");
+    Assert(second == first && third == first, "they repeat the answer that call produced");
+}
+
+// An empty model row falls back to the default, so the message has to name the
+// scope actually used - reporting no window for "" tells nobody what to type.
+var emptyScope = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":7},"seven_day_sonnet":{"utilization":3}}"""
+}));
+using (var emptyClient = new HttpClient(emptyScope))
+using (var source = new ClaudeUsageSnapshotSource(emptyClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test" })
+{
+    var report = await source.CheckAsync(new ClaudeUsageSettings { ModelScope = "  " });
+    Assert(report.Success && report.Detail.Contains("opus", StringComparison.OrdinalIgnoreCase),
+        "the scope named is the one the payload was read with");
+    Assert(!report.Detail.Contains("\"\"", StringComparison.Ordinal), "never an empty pair of quotes");
+    Assert(report.Detail.Contains("sonnet", StringComparison.OrdinalIgnoreCase),
+        "and the account's own scopes are offered");
+}
+
 // A refusal must not become a habit: retrying 429 on the next refresh is how a
 // minute of throttling turns into an hour of it.
 var throttled = new ClaudeHandler(new Queue<string>()) { Status = HttpStatusCode.TooManyRequests };
@@ -2469,7 +2532,7 @@ sealed class ClaudeHandler : HttpMessageHandler
     public List<string> BetaHeaders { get; } = [];
 
     /// <summary>Answer every request with this instead of 200, to exercise the refusal paths.</summary>
-    public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+    public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
     /// <summary>Sent as Set-Cookie on every response when set, like Cloudflare's __cf_bm.</summary>
     public string? SetCookie { get; init; }

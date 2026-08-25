@@ -47,6 +47,22 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     /// </summary>
     private static readonly TimeSpan FailureBackoff = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// How long a good answer keeps being shown once the calls start failing.
+    /// Long enough to ride out a throttle, short enough that nobody reads an
+    /// hour-old figure as current - and it is labelled stale throughout.
+    /// </summary>
+    private static readonly TimeSpan StaleTolerance = TimeSpan.FromMinutes(20);
+
+    /// <summary>
+    /// The shortest gap between two live calls the diagnostic button will make.
+    /// It used to clear both caches and call every time it was pressed, so three
+    /// impatient presses were three requests to an endpoint that rate-limits on
+    /// frequency - the button could earn the very failure it was there to
+    /// diagnose.
+    /// </summary>
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(60);
+
     /// <summary>Selects the OAuth contract; without it the token is not honoured.</summary>
     private const string OAuthBetaHeader = "oauth-2025-04-20";
 
@@ -67,6 +83,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private DateTimeOffset _cachedAt;
     private ClaudeUsageSnapshot? _lastFailure;
     private DateTimeOffset _failedAt;
+    private ClaudeConnectionReport? _lastReport;
+    private DateTimeOffset _checkedAt;
 
     public ClaudeUsageSnapshotSource(
         HttpClient? client = null,
@@ -81,6 +99,13 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     }
 
     public string BaseUrl { get; init; } = "https://api.anthropic.com";
+
+    /// <summary>
+    /// How long a good answer is reused before asking again. Overridable so a
+    /// test can reach the failure paths without waiting three minutes or
+    /// reaching into private state.
+    /// </summary>
+    internal TimeSpan CacheWindow { get; init; } = CacheDuration;
 
     public async Task<ClaudeUsageSnapshot> ReadAsync(
         ClaudeUsageSettings settings,
@@ -101,7 +126,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
         DateTimeOffset now = DateTimeOffset.Now;
         string key = credential.AccessToken.Length + "|" + settings.ModelScope;
-        if (_cached is not null && _cachedKey == key && now - _cachedAt < CacheDuration)
+        if (_cached is not null && _cachedKey == key && now - _cachedAt < CacheWindow)
         {
             return _cached with { IsStale = true };
         }
@@ -133,6 +158,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             ClaudeUsageSnapshot failure = ClaudeUsageSnapshot.Unavailable(ex.Message);
             _lastFailure = failure;
             _failedAt = now;
+
+            // A minute of throttling used to blank a screen that was working:
+            // the snapshot was thrown away and "not connected" drawn over real
+            // figures. Numbers that are twenty minutes old, marked stale, are
+            // worth more than no numbers at all - and this endpoint's whole
+            // failure mode is being asked too often, which says nothing about
+            // whether the last answer was true.
+            if (_cached is not null && _cachedKey == key && now - _cachedAt < StaleTolerance)
+            {
+                return _cached with { IsStale = true };
+            }
+
             return failure;
         }
     }
@@ -351,15 +388,26 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             return new ClaudeConnectionReport(false, Loc.T("ClaudeCredentialExpired"));
         }
 
-        // Neither cache may answer a diagnostic: the whole point is a live call.
+        // A diagnostic wants a live call - but not at any price. Clearing both
+        // caches on every press turned three impatient presses into three
+        // requests to an endpoint that rate-limits on frequency, so the button
+        // could produce the 429 it was pressed to explain. Within a minute of
+        // the last one, the last answer is the answer.
+        DateTimeOffset checkedAt = DateTimeOffset.Now;
+        if (_lastReport is not null && checkedAt - _checkedAt < CheckInterval)
+        {
+            return _lastReport;
+        }
+
+        _checkedAt = checkedAt;
         _cached = null;
         _lastFailure = null;
 
         ClaudeUsageSnapshot snapshot = await ReadAsync(settings);
         if (!snapshot.Available)
         {
-            return new ClaudeConnectionReport(false,
-                Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty));
+            return Remember(new ClaudeConnectionReport(false,
+                Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty)));
         }
 
         // Connected, but the model row asked for a model this account is not
@@ -369,11 +417,23 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         string detail = credential.Source;
         if (snapshot.ModelWeek is null && snapshot.AvailableModelScopes.Count > 0)
         {
+            // The scope the payload was actually read with, not the raw setting:
+            // an empty box falls back to the default, and reporting no window
+            // for "" told the user nothing about what to type instead.
+            string scope = string.IsNullOrWhiteSpace(settings.ModelScope)
+                ? ClaudeUsageSettings.DefaultModelScope
+                : settings.ModelScope.Trim();
             detail += " " + Loc.T("ClaudeCheckScopeMissing",
-                settings.ModelScope, string.Join(", ", snapshot.AvailableModelScopes));
+                scope, string.Join(", ", snapshot.AvailableModelScopes));
         }
 
-        return new ClaudeConnectionReport(true, detail);
+        return Remember(new ClaudeConnectionReport(true, detail));
+    }
+
+    private ClaudeConnectionReport Remember(ClaudeConnectionReport report)
+    {
+        _lastReport = report;
+        return report;
     }
 
     /// <summary>

@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **A moment's throttling blanked a screen that was working.** Anthropic's
+  usage endpoint refuses calls that come too often, and the screen treated that
+  refusal like any other: it threw away the figures it had and drew "not
+  connected" over them. But being asked too often says nothing about whether
+  the last answer was true. A good reading now stays up for twenty minutes
+  through failures, labelled stale, instead of being replaced by nothing.
+- **The connection test could cause the failure it was there to explain.** It
+  cleared its caches and made a live call on every press, so three impatient
+  presses were three requests to an endpoint that rate-limits on frequency.
+  Within a minute of the last one it now repeats that answer instead of asking
+  again.
+- **An empty model row reported having no window for `""`.** The blank box
+  falls back to the default scope, but the message quoted the raw setting, so
+  it named a scope nobody had asked for and told the user nothing about what to
+  type instead. It now names the scope the payload was actually read with.
+
 ## v1.10.5 - 2026-08-25
 
 ### Fixed
