@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Sign in to Claude from the app, no command-line tool required.** The screen
+  could only borrow the login the Claude Code command-line tool stores, which
+  left out anyone who uses only the Claude desktop or web app. There is now a
+  "Sign in with your Claude account" button in the Claude settings: it opens
+  your browser, you approve, you paste back a short code, and the app reads your
+  limits directly. It runs the same sign-in Claude Code itself uses.
+
+  The token this produces belongs to the app, so unlike the borrowed login it
+  is stored - in its own file, sealed with Windows DPAPI under your user
+  account, never in the settings file or an exported backup. It asks only for
+  permission to read your usage and profile, and "Sign out" deletes it. The
+  borrowed Claude Code login still works and is still tried; this is an
+  additional way in, not a replacement.
+
+
+- **Each meter says when it resets, not only how long is left.** "In 37
+  minutes" and "at 12:34" answer different questions, and the second is the one
+  you act on when deciding whether to start something now. Windows more than a
+  day out carry the weekday, since "at 19:29" is ambiguous four days ahead.
+- **A set-up guide in the Claude settings, collapsed until it is needed.** The
+  screen borrows the login the Claude Code command-line tool stores, and
+  nothing in the app ever said so - which is how a machine with the Claude
+  desktop app installed could look correctly set up while holding no login this
+  can use. The guide is the whole path from nothing to numbers, including the
+  part where the folder looks full and is not.
+
+### Fixed
+
+- **A moment's throttling blanked a screen that was working.** Anthropic's
+  usage endpoint refuses calls that come too often, and the screen treated that
+  refusal like any other: it threw away the figures it had and drew "not
+  connected" over them. But being asked too often says nothing about whether
+  the last answer was true. A good reading now stays up for twenty minutes
+  through failures, labelled stale, instead of being replaced by nothing.
+- **The connection test could cause the failure it was there to explain.** It
+  cleared its caches and made a live call on every press, so three impatient
+  presses were three requests to an endpoint that rate-limits on frequency.
+  Within a minute of the last one it now repeats that answer instead of asking
+  again.
+- **An empty model row reported having no window for `""`.** The blank box
+  falls back to the default scope, but the message quoted the raw setting, so
+  it named a scope nobody had asked for and told the user nothing about what to
+  type instead. It now names the scope the payload was actually read with.
+
 ## v1.10.5 - 2026-08-25
 
 ### Fixed

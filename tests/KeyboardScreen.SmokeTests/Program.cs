@@ -946,6 +946,69 @@ using (var live = new ClaudeUsageSnapshotSource(claudeClient,
         "the request must identify as the Claude Code client it borrows its login from");
 }
 
+// A throttle must not blank a screen that is working. This endpoint fails on
+// how often it is asked, which says nothing about whether the last answer was
+// true, so the figures stay up - marked stale - instead of being replaced by
+// "not connected".
+var flaky = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":42,"resets_at":"2099-08-21T21:59:59Z"}}"""
+}));
+using (var flakyClient = new HttpClient(flaky))
+using (var survives = new ClaudeUsageSnapshotSource(flakyClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test", CacheWindow = TimeSpan.Zero })
+{
+    var good = await survives.ReadAsync(new ClaudeUsageSettings());
+    Assert(good.Available && !good.IsStale, "the first call is live and current");
+
+    flaky.Status = HttpStatusCode.TooManyRequests;
+
+    var throttledRead = await survives.ReadAsync(new ClaudeUsageSettings());
+    Assert(throttledRead.Available, "a throttle keeps the last figures rather than blanking the screen");
+    Assert(throttledRead.IsStale, "and says plainly that they are no longer fresh");
+    Assert(Math.Abs(throttledRead.Session!.UtilizationPercent - 42) < 0.001, "they are the real ones");
+}
+
+// The diagnostic button used to clear both caches and call every time it was
+// pressed, so three impatient presses were three requests to an endpoint that
+// rate-limits on frequency - the button could earn the 429 it was explaining.
+var pressed = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":7,"resets_at":"2099-08-21T21:59:59Z"}}"""
+}));
+using (var pressClient = new HttpClient(pressed))
+using (var button = new ClaudeUsageSnapshotSource(pressClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test" })
+{
+    var first = await button.CheckAsync(new ClaudeUsageSettings());
+    var second = await button.CheckAsync(new ClaudeUsageSettings());
+    var third = await button.CheckAsync(new ClaudeUsageSettings());
+    Assert(first.Success, "the first press makes a live call");
+    Assert(pressed.Requests.Count == 1, "and the impatient ones do not");
+    Assert(second == first && third == first, "they repeat the answer that call produced");
+}
+
+// An empty model row falls back to the default, so the message has to name the
+// scope actually used - reporting no window for "" tells nobody what to type.
+var emptyScope = new ClaudeHandler(new Queue<string>(new[]
+{
+    """{"five_hour":{"utilization":7},"seven_day_sonnet":{"utilization":3}}"""
+}));
+using (var emptyClient = new HttpClient(emptyScope))
+using (var source = new ClaudeUsageSnapshotSource(emptyClient,
+           () => ClaudeCredentialLookup.From(new ClaudeCodeCredential("tok-live", null, "test")))
+       { BaseUrl = "https://anthropic.test" })
+{
+    var report = await source.CheckAsync(new ClaudeUsageSettings { ModelScope = "  " });
+    Assert(report.Success && report.Detail.Contains("opus", StringComparison.OrdinalIgnoreCase),
+        "the scope named is the one the payload was read with");
+    Assert(!report.Detail.Contains("\"\"", StringComparison.Ordinal), "never an empty pair of quotes");
+    Assert(report.Detail.Contains("sonnet", StringComparison.OrdinalIgnoreCase),
+        "and the account's own scopes are offered");
+}
+
 // A refusal must not become a habit: retrying 429 on the next refresh is how a
 // minute of throttling turns into an hour of it.
 var throttled = new ClaudeHandler(new Queue<string>()) { Status = HttpStatusCode.TooManyRequests };
@@ -1011,7 +1074,128 @@ using (var scopes = JsonDocument.Parse(
 var expiredWindow = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
 Assert(expiredWindow.HasReset && expiredWindow.EffectivePercent == 0, "a window past its reset must read empty");
 
-Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[]");
+// The OAuth sign-in flow, so the screen works without Claude Code installed.
+// It runs the same authorization-code-with-PKCE dance Claude Code uses.
+var flow = new ClaudeOAuth { AuthorizeEndpoint = "https://claude.test/oauth/authorize" };
+var challenge = flow.BeginSignIn();
+Assert(challenge.Url.StartsWith("https://claude.test/oauth/authorize?", StringComparison.Ordinal),
+    "the browser is sent to the authorize endpoint");
+Assert(challenge.Url.Contains("client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e", StringComparison.Ordinal),
+    "with Claude Code's public client id");
+Assert(challenge.Url.Contains("code_challenge_method=S256", StringComparison.Ordinal)
+    && challenge.Url.Contains("code_challenge=", StringComparison.Ordinal),
+    "and a PKCE S256 challenge");
+Assert(challenge.Url.Contains("scope=user%3Aprofile%20user%3Ainference", StringComparison.Ordinal),
+    "requesting only profile and inference, never org:create_api_key");
+Assert(!challenge.Url.Contains("create_api_key", StringComparison.Ordinal),
+    "a stored token must not be able to mint API keys");
+
+// The challenge is the SHA-256 of the verifier, base64url without padding -
+// the whole point of PKCE is that this holds.
+using (var sha = System.Security.Cryptography.SHA256.Create())
+{
+    string expected = Convert.ToBase64String(sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(challenge.Verifier)))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    Assert(challenge.Url.Contains("code_challenge=" + expected, StringComparison.Ordinal),
+        "the challenge is the hash of the verifier this flow kept");
+}
+
+// Two sign-ins never share a verifier or state.
+var other = flow.BeginSignIn();
+Assert(other.Verifier != challenge.Verifier && other.State != challenge.State,
+    "each attempt is freshly random");
+
+// The pasted value is CODE#STATE, and a state from a different flow is refused
+// before any network call.
+var mismatched = await flow.CompleteSignInAsync(challenge, "some-code#not-our-state");
+Assert(!mismatched.Success && mismatched.Error is { Length: > 0 },
+    "a code whose state does not match is rejected");
+
+// The token response is parsed into an access token, a refresh token and an
+// expiry computed from expires_in.
+var oauthParsed = ClaudeOAuth.ParseTokens(
+    """{"access_token":"acc","refresh_token":"ref","expires_in":3600}""", DateTimeOffset.UnixEpoch);
+Assert(oauthParsed?.AccessToken == "acc" && oauthParsed.RefreshToken == "ref", "both tokens are read");
+Assert(oauthParsed!.ExpiresAt == DateTimeOffset.UnixEpoch.AddSeconds(3600), "the expiry is now plus expires_in");
+Assert(ClaudeOAuth.ParseTokens("""{"access_token":"only"}""", DateTimeOffset.UnixEpoch, "kept-refresh")?.RefreshToken
+    == "kept-refresh", "a reply without a refresh token keeps the previous one");
+Assert(ClaudeOAuth.ParseTokens("""{"refresh_token":"no-access"}""", DateTimeOffset.Now) is null,
+    "a reply without an access token is not a sign-in");
+
+// The store round-trips a sign-in. On this Linux host the plaintext fallback is
+// exercised; on Windows the same path is sealed with DPAPI.
+string storePath = Path.Combine(Path.GetTempPath(), $"kss-oauth-{Guid.NewGuid():N}.bin");
+try
+{
+    var store = new ClaudeOAuthStore(storePath);
+    Assert(!store.HasTokens && store.Load() is null, "an empty store has no sign-in");
+    var saved = new ClaudeOAuthTokens("acc-1", "ref-1", DateTimeOffset.Now.AddHours(1));
+    store.Save(saved);
+    Assert(store.HasTokens, "a saved sign-in is present");
+    var loaded = store.Load();
+    Assert(loaded?.AccessToken == "acc-1" && loaded.RefreshToken == "ref-1", "and reads back intact");
+    Assert(!loaded!.NeedsRefresh, "a token good for an hour does not need refreshing yet");
+    Assert(new ClaudeOAuthTokens("a", "r", DateTimeOffset.Now).NeedsRefresh, "one at its expiry does");
+    Assert(!new ClaudeOAuthTokens("a", "", DateTimeOffset.Now).CanRefresh, "and without a refresh token cannot");
+    store.Clear();
+    Assert(!store.HasTokens && store.Load() is null, "sign-out removes it");
+}
+finally
+{
+    if (File.Exists(storePath)) File.Delete(storePath);
+}
+
+// A stored sign-in is preferred over the Claude Code file, and an expired one
+// with no refresh token reads as "sign in again" rather than falling through.
+string chainDir = Path.Combine(Path.GetTempPath(), $"kss-chain-{Guid.NewGuid():N}");
+Directory.CreateDirectory(chainDir);
+string chainStore = Path.Combine(chainDir, "oauth.bin");
+try
+{
+    var live = new ClaudeOAuthStore(chainStore);
+    live.Save(new ClaudeOAuthTokens("acc-live", "ref-live", DateTimeOffset.Now.AddHours(1)));
+    var chainHandler = new ClaudeHandler(new Queue<string>(new[]
+    {
+        """{"five_hour":{"utilization":11,"resets_at":"2099-01-01T00:00:00Z"}}"""
+    }));
+    using var httpClient = new HttpClient(chainHandler);
+    using var source = new ClaudeUsageSnapshotSource(httpClient, credentialReader: null, oauthStore: live)
+    { BaseUrl = "https://anthropic.test" };
+    var snap = await source.ReadAsync(new ClaudeUsageSettings());
+    Assert(snap.Available, "a stored sign-in is used with no Claude Code file present");
+    Assert(chainHandler.AuthorizationHeaders.Any(h => h == "Bearer acc-live"),
+        "and its access token is what is presented");
+}
+finally
+{
+    Directory.Delete(chainDir, recursive: true);
+}
+
+// An expired sign-in that cannot be renewed says so in the app's own words -
+// not "Claude Code is not signed in", which names the wrong tool.
+string staleDir = Path.Combine(Path.GetTempPath(), $"kss-stale-{Guid.NewGuid():N}");
+Directory.CreateDirectory(staleDir);
+try
+{
+    var staleStore = new ClaudeOAuthStore(Path.Combine(staleDir, "oauth.bin"));
+    staleStore.Save(new ClaudeOAuthTokens("acc-old", "", DateTimeOffset.Now.AddMinutes(-5)));
+    var staleHandler = new ClaudeHandler(new Queue<string>());
+    using var staleClient = new HttpClient(staleHandler);
+    using var staleSource = new ClaudeUsageSnapshotSource(staleClient, credentialReader: null, oauthStore: staleStore)
+    { BaseUrl = "https://anthropic.test" };
+    var staleSnap = await staleSource.ReadAsync(new ClaudeUsageSettings());
+    Assert(!staleSnap.Available, "an expired unrenewable sign-in is not a credential");
+    Assert(staleHandler.Requests.Count == 0, "and no call is made with a token known to be dead");
+    Assert((staleSnap.ErrorMessage ?? "").Contains("Claude", StringComparison.Ordinal)
+        && !(staleSnap.ErrorMessage ?? "").Contains("Claude Code", StringComparison.Ordinal),
+        "the message says the app's sign-in expired, not that Claude Code is missing");
+}
+finally
+{
+    Directory.Delete(staleDir, recursive: true);
+}
+
+Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[], OAuth sign-in");
 
 // ---- Binance crypto source -----------------------------------------------
 Assert(BinanceStockSnapshotSource.NormalizeSymbol("btcusdt") == "BTCUSDT", "Binance pairs must upper-case");
@@ -2469,7 +2653,7 @@ sealed class ClaudeHandler : HttpMessageHandler
     public List<string> BetaHeaders { get; } = [];
 
     /// <summary>Answer every request with this instead of 200, to exercise the refusal paths.</summary>
-    public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
+    public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
     /// <summary>Sent as Set-Cookie on every response when set, like Cloudflare's __cf_bm.</summary>
     public string? SetCookie { get; init; }

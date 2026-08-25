@@ -47,6 +47,22 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     /// </summary>
     private static readonly TimeSpan FailureBackoff = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// How long a good answer keeps being shown once the calls start failing.
+    /// Long enough to ride out a throttle, short enough that nobody reads an
+    /// hour-old figure as current - and it is labelled stale throughout.
+    /// </summary>
+    private static readonly TimeSpan StaleTolerance = TimeSpan.FromMinutes(20);
+
+    /// <summary>
+    /// The shortest gap between two live calls the diagnostic button will make.
+    /// It used to clear both caches and call every time it was pressed, so three
+    /// impatient presses were three requests to an endpoint that rate-limits on
+    /// frequency - the button could earn the very failure it was there to
+    /// diagnose.
+    /// </summary>
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(60);
+
     /// <summary>Selects the OAuth contract; without it the token is not honoured.</summary>
     private const string OAuthBetaHeader = "oauth-2025-04-20";
 
@@ -61,16 +77,21 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
     private readonly Func<ClaudeCredentialLookup> _credentialReader;
+    private readonly ClaudeOAuthStore? _oauthStore;
+    private readonly ClaudeOAuth? _oauth;
 
     private ClaudeUsageSnapshot? _cached;
     private string _cachedKey = string.Empty;
     private DateTimeOffset _cachedAt;
     private ClaudeUsageSnapshot? _lastFailure;
     private DateTimeOffset _failedAt;
+    private ClaudeConnectionReport? _lastReport;
+    private DateTimeOffset _checkedAt;
 
     public ClaudeUsageSnapshotSource(
         HttpClient? client = null,
-        Func<ClaudeCredentialLookup>? credentialReader = null)
+        Func<ClaudeCredentialLookup>? credentialReader = null,
+        ClaudeOAuthStore? oauthStore = null)
     {
         _ownsClient = client is null;
         _client = client ?? new HttpClient(new SocketsHttpHandler { UseCookies = false })
@@ -78,9 +99,34 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             Timeout = TimeSpan.FromSeconds(15)
         };
         _credentialReader = credentialReader ?? (() => ClaudeCodeCredentials.Locate());
+
+        // A store is used only when the caller does not inject its own reader,
+        // so the existing tests - which do - keep their exact behaviour. In the
+        // app it lets a token this app signed in for be tried ahead of a
+        // borrowed Claude Code file.
+        if (credentialReader is null)
+        {
+            _oauthStore = oauthStore ?? new ClaudeOAuthStore();
+            _oauth = new ClaudeOAuth(_client) { TokenEndpoint = OAuthTokenEndpoint };
+        }
+        else
+        {
+            _oauthStore = oauthStore;
+            _oauth = oauthStore is null ? null : new ClaudeOAuth(_client) { TokenEndpoint = OAuthTokenEndpoint };
+        }
     }
 
+    /// <summary>Overridable so a test can point token refresh at a stub.</summary>
+    public string OAuthTokenEndpoint { get; init; } = "https://console.anthropic.com/v1/oauth/token";
+
     public string BaseUrl { get; init; } = "https://api.anthropic.com";
+
+    /// <summary>
+    /// How long a good answer is reused before asking again. Overridable so a
+    /// test can reach the failure paths without waiting three minutes or
+    /// reaching into private state.
+    /// </summary>
+    internal TimeSpan CacheWindow { get; init; } = CacheDuration;
 
     public async Task<ClaudeUsageSnapshot> ReadAsync(
         ClaudeUsageSettings settings,
@@ -88,10 +134,13 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCodeCredential? credential = _credentialReader().Credential;
+        ClaudeCredentialLookup lookup = await ResolveCredentialAsync(cancellationToken);
+        ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
-            return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoCredentials"));
+            return ClaudeUsageSnapshot.Unavailable(lookup.Problem == ClaudeCredentialProblem.SignInExpired
+                ? Loc.T("ClaudeOAuthExpired")
+                : Loc.T("ClaudeNoCredentials"));
         }
 
         if (credential.IsExpired)
@@ -101,7 +150,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
         DateTimeOffset now = DateTimeOffset.Now;
         string key = credential.AccessToken.Length + "|" + settings.ModelScope;
-        if (_cached is not null && _cachedKey == key && now - _cachedAt < CacheDuration)
+        if (_cached is not null && _cachedKey == key && now - _cachedAt < CacheWindow)
         {
             return _cached with { IsStale = true };
         }
@@ -133,6 +182,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             ClaudeUsageSnapshot failure = ClaudeUsageSnapshot.Unavailable(ex.Message);
             _lastFailure = failure;
             _failedAt = now;
+
+            // A minute of throttling used to blank a screen that was working:
+            // the snapshot was thrown away and "not connected" drawn over real
+            // figures. Numbers that are twenty minutes old, marked stale, are
+            // worth more than no numbers at all - and this endpoint's whole
+            // failure mode is being asked too often, which says nothing about
+            // whether the last answer was true.
+            if (_cached is not null && _cachedKey == key && now - _cachedAt < StaleTolerance)
+            {
+                return _cached with { IsStale = true };
+            }
+
             return failure;
         }
     }
@@ -339,7 +400,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCredentialLookup lookup = _credentialReader();
+        ClaudeCredentialLookup lookup = await ResolveCredentialAsync(default);
         ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
@@ -351,15 +412,26 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             return new ClaudeConnectionReport(false, Loc.T("ClaudeCredentialExpired"));
         }
 
-        // Neither cache may answer a diagnostic: the whole point is a live call.
+        // A diagnostic wants a live call - but not at any price. Clearing both
+        // caches on every press turned three impatient presses into three
+        // requests to an endpoint that rate-limits on frequency, so the button
+        // could produce the 429 it was pressed to explain. Within a minute of
+        // the last one, the last answer is the answer.
+        DateTimeOffset checkedAt = DateTimeOffset.Now;
+        if (_lastReport is not null && checkedAt - _checkedAt < CheckInterval)
+        {
+            return _lastReport;
+        }
+
+        _checkedAt = checkedAt;
         _cached = null;
         _lastFailure = null;
 
         ClaudeUsageSnapshot snapshot = await ReadAsync(settings);
         if (!snapshot.Available)
         {
-            return new ClaudeConnectionReport(false,
-                Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty));
+            return Remember(new ClaudeConnectionReport(false,
+                Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty)));
         }
 
         // Connected, but the model row asked for a model this account is not
@@ -369,11 +441,78 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         string detail = credential.Source;
         if (snapshot.ModelWeek is null && snapshot.AvailableModelScopes.Count > 0)
         {
+            // The scope the payload was actually read with, not the raw setting:
+            // an empty box falls back to the default, and reporting no window
+            // for "" told the user nothing about what to type instead.
+            string scope = string.IsNullOrWhiteSpace(settings.ModelScope)
+                ? ClaudeUsageSettings.DefaultModelScope
+                : settings.ModelScope.Trim();
             detail += " " + Loc.T("ClaudeCheckScopeMissing",
-                settings.ModelScope, string.Join(", ", snapshot.AvailableModelScopes));
+                scope, string.Join(", ", snapshot.AvailableModelScopes));
         }
 
-        return new ClaudeConnectionReport(true, detail);
+        return Remember(new ClaudeConnectionReport(true, detail));
+    }
+
+    private ClaudeConnectionReport Remember(ClaudeConnectionReport report)
+    {
+        _lastReport = report;
+        return report;
+    }
+
+    /// <summary>
+    /// The credential to use, best source first: an explicit environment
+    /// override, then a token this app signed in for (refreshed if the hour is
+    /// up), then a login borrowed from Claude Code's own file. When no store is
+    /// configured - the tests - this is just the injected reader.
+    /// </summary>
+    private async Task<ClaudeCredentialLookup> ResolveCredentialAsync(CancellationToken cancellationToken)
+    {
+        if (_oauthStore is null)
+        {
+            return _credentialReader();
+        }
+
+        if (ClaudeCodeCredentials.FromEnvironment() is { } fromEnvironment)
+        {
+            return ClaudeCredentialLookup.From(fromEnvironment);
+        }
+
+        ClaudeOAuthTokens? tokens = _oauthStore.Load();
+        if (tokens is not null)
+        {
+            if (tokens.NeedsRefresh && tokens.CanRefresh && _oauth is not null)
+            {
+                ClaudeOAuthResult refreshed = await _oauth.RefreshAsync(tokens.RefreshToken, cancellationToken);
+                if (refreshed.Tokens is { } fresh)
+                {
+                    // A refresh reply may omit the refresh token, meaning "keep
+                    // the one you have" - losing it would strand the next hour.
+                    tokens = fresh.RefreshToken.Length > 0
+                        ? fresh
+                        : fresh with { RefreshToken = tokens.RefreshToken };
+                    _oauthStore.Save(tokens);
+                }
+            }
+
+            // Still stale after the attempt covers both cases that matter: no
+            // refresh token to begin with, and a refresh that did not return a
+            // fresh one (revoked, or offline). Either way the honest thing is
+            // "sign in again", said in the app's own terms - the earlier version
+            // returned an empty credential here, which the screen then reported
+            // as "Claude Code is not signed in", naming the wrong tool for a
+            // sign-in this app made.
+            if (tokens.NeedsRefresh)
+            {
+                return new ClaudeCredentialLookup(null, ClaudeCredentialProblem.SignInExpired,
+                    Loc.T("ClaudeOAuthSource"), string.Empty);
+            }
+
+            return ClaudeCredentialLookup.From(
+                new ClaudeCodeCredential(tokens.AccessToken, tokens.ExpiresAt, Loc.T("ClaudeOAuthSource")));
+        }
+
+        return ClaudeCodeCredentials.Locate();
     }
 
     /// <summary>
@@ -390,6 +529,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                 lookup.Detail.Length > 0 ? lookup.Detail : "-"),
             ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
             ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
+            ClaudeCredentialProblem.SignInExpired => Loc.T("ClaudeOAuthExpired"),
             _ => Loc.T("ClaudeCheckNoToken", lookup.Path,
                 lookup.Detail.Length > 0 ? lookup.Detail : "-")
         };
