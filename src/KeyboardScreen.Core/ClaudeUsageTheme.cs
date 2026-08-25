@@ -16,11 +16,12 @@ public sealed class ClaudeUsageTheme : IScreenTheme
     private static readonly Color Secondary = Color.FromRgb(150, 160, 172);
     private static readonly Color Muted = Color.FromRgb(102, 112, 124);
     private static readonly Color Track = Color.FromRgb(35, 42, 51);
-    private static readonly Color Warning = Color.FromRgb(232, 165, 71);
-    private static readonly Color Critical = Color.FromRgb(238, 78, 88);
 
-    private const double CardHeight = 92;
-    private const double CardGap = 14;
+    private const double CardHeight = 84;
+    private const double CardGap = 12;
+
+    /// <summary>Space between the percentage and the countdown that shares its line.</summary>
+    private const double ColumnGap = 8;
 
     public string Id => "claude-usage";
     public string DisplayName => Loc.T("ThemeClaudeUsageName");
@@ -62,30 +63,70 @@ public sealed class ClaudeUsageTheme : IScreenTheme
             new Rect(safe.Left, safe.Top + 182, safe.Width, 18), FontWeights.Normal, TextAlignment.Center);
     }
 
+    /// <summary>
+    /// One meter: label and countdown on one line, the percentage on its own,
+    /// then the bar.
+    ///
+    /// The percentage and the countdown used to share a line by fixed fractions
+    /// of it - 0.62 each, starting at 0 and 0.38, so they overlapped by a quarter
+    /// of the row and any figure past one digit was ellipsized into "6…". On a
+    /// screen whose whole job is that number, that is worse than useless.
+    ///
+    /// Measuring instead of guessing fixed the overlap but not the crowding: a
+    /// 30 px figure and a countdown cannot both live in 96 px. Moving the
+    /// countdown up beside the label - which is one short word - gives the digits
+    /// the full width and costs nothing, because that line was empty.
+    /// </summary>
     private static void DrawWindow(ScreenCanvas canvas, Rect card, ClaudeUsageWindow window)
     {
         canvas.RoundedRect(card, 11, Panel, Stroke);
 
         double percent = window.EffectivePercent;
-        Color fill = percent >= 90 ? Critical : percent >= 75 ? Warning : canvas.AccentColor;
         double inset = 11;
         double contentWidth = card.Width - inset * 2;
 
-        canvas.AlignedText(Label(window), 11, Secondary,
-            new Rect(card.Left + inset, card.Top + 9, contentWidth, 15),
-            FontWeights.SemiBold, TextAlignment.Left);
+        // The label is the row's identity - which window this is - so it is
+        // measured first and never trimmed to make room. The countdown is the
+        // secondary figure and takes what is left, shrinking a couple of points
+        // rather than losing its tail: "2год 3…" tells you nothing.
+        string label = Label(window);
+        string countdown = Countdown(window);
+        double labelWidth = Math.Min(
+            canvas.MeasureText(label, 11, FontWeights.SemiBold), contentWidth * 0.62);
+        double countdownRoom = countdown.Length == 0
+            ? 0
+            : Math.Max(0, contentWidth - labelWidth - ColumnGap);
 
-        canvas.AlignedText(percent.ToString("0", Loc.Culture) + "%", 30, Colors.White,
-            new Rect(card.Left + inset, card.Top + 26, contentWidth * 0.62, 34),
+        double countdownSize = 10;
+        while (countdownSize > 8
+               && canvas.MeasureText(countdown, countdownSize, FontWeights.Medium) > countdownRoom)
+        {
+            countdownSize -= 0.5;
+        }
+
+        canvas.AlignedText(label, 11, Secondary,
+            new Rect(card.Left + inset, card.Top + 9, labelWidth, 14),
             FontWeights.SemiBold, TextAlignment.Left);
-        // The countdown takes the slot the local token tally used to fill, at
-        // the size that tally had. "resets in 2h 51m" is the figure a person
-        // acts on, and it was previously crammed in at 9 px in the corner.
-        canvas.AlignedText(Countdown(window), 11, Secondary,
-            new Rect(card.Left + inset + contentWidth * 0.38, card.Top + 35, contentWidth * 0.62, 18),
+        canvas.AlignedText(countdown, countdownSize, Muted,
+            new Rect(card.Right - inset - countdownRoom, card.Top + 9, countdownRoom, 14),
             FontWeights.Medium, TextAlignment.Right);
 
-        canvas.ProgressBar(new Rect(card.Left + inset, card.Top + 68, contentWidth, 10), percent, Track, fill);
+        // Full width now, so "100%" never has to shrink; the loop is kept only
+        // for a font whose digits are wider than the one this was measured with.
+        string figure = percent.ToString("0", Loc.Culture) + "%";
+        double size = 32;
+        while (size > 17 && canvas.MeasureText(figure, size, FontWeights.SemiBold) > contentWidth)
+        {
+            size -= 1;
+        }
+
+        canvas.AlignedText(figure, size, Colors.White,
+            new Rect(card.Left + inset, card.Top + 26, contentWidth, 34),
+            FontWeights.SemiBold, TextAlignment.Left);
+
+        canvas.ProgressBar(
+            new Rect(card.Left + inset, card.Bottom - 19, contentWidth, 9),
+            percent, Track, ClaudeUsagePalette.ForPercent(percent));
     }
 
     private static void DrawFooter(ScreenCanvas canvas, Rect safe, ClaudeUsageSnapshot? usage)

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The Claude screen cut off its own numbers.** The percentage and the reset
+  countdown were each given a fixed fraction of the same line - 0.62 of it,
+  starting at 0 and at 0.38 - so they overlapped by a quarter of the row.
+  Anything past one digit was ellipsized: 63% drew as "6…" and 100% as "10…".
+  On a screen whose entire job is that number, that is worse than showing
+  nothing.
+
+  The countdown moves up beside the label, which is one short word and had the
+  line to itself, and the figure takes the full width. Both are measured rather
+  than apportioned, with the label given priority since it says which window
+  you are looking at.
+
+### Changed
+
+- **The bars run green to red instead of jumping.** The old rule drew the
+  accent colour below 75%, amber to 90%, then red - so a bar at 4% and a bar at
+  74% were the same colour and only the number carried the change. The fill now
+  moves continuously through amber, so the colour says what the length says.
+- **A model row for a model your account is not metered on now explains
+  itself.** Which models get their own weekly window is Anthropic's decision.
+  Asking for one that has none - "fable", say - used to leave the third row
+  silently missing. The connection test now names the scopes the account does
+  report.
+
 ## v1.10.4 - 2026-08-25
 
 ### Fixed

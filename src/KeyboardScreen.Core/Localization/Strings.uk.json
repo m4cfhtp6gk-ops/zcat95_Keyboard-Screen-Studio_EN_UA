@@ -779,6 +779,7 @@
   "ClaudeCheckButton": "Перевірити з'єднання",
   "ClaudeCheckRunning": "Перевіряю...",
   "ClaudeCheckNoToken": "Прочитано {0}, але токена доступу в ньому немає. У ньому є: {1}",
+  "ClaudeCheckScopeMissing": "Акаунт не має тижневого вікна для \"{0}\"; він повідомляє: {1}",
   "ClaudeCheckAlsoLooked": "Також шукав тут: {0}",
   "ClaudeCheckUnparseable": "{0} існує, але його вміст не є коректним JSON - спробуйте за мить",
   "ClaudeCheckUnreadable": "{0} існує, але відкрити не вдалося ({1})",
