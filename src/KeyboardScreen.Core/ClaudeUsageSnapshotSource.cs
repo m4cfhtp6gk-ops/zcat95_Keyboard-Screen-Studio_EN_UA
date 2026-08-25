@@ -188,6 +188,25 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         ClaudeUsageWindow? modelWeek = ReadWindow(
             root, "seven_day_" + scope.ToLowerInvariant(), ClaudeUsageWindowKind.ModelWeek, scope);
 
+        // Which models this account is actually metered on. Anthropic decides
+        // that, and a scope it does not meter used to yield a missing third row
+        // and no reason for it.
+        var availableScopes = new List<string>();
+        foreach (JsonProperty property in root.EnumerateObject())
+        {
+            const string prefix = "seven_day_";
+            if (property.Name.StartsWith(prefix, StringComparison.Ordinal)
+                && property.Value.ValueKind == JsonValueKind.Object
+                && property.Name.Length > prefix.Length)
+            {
+                availableScopes.Add(property.Name[prefix.Length..]);
+            }
+        }
+
+        // The loop no longer stops at the first match, because it is also what
+        // collects the scope names - so the first match has to be kept
+        // deliberately rather than by leaving the loop.
+        bool modelWeekFromLimits = false;
         if (root.TryGetProperty("limits", out JsonElement limits) && limits.ValueKind == JsonValueKind.Array)
         {
             foreach (JsonElement limit in limits.EnumerateArray())
@@ -207,8 +226,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                 string id = ReadString(model, "id").ToLowerInvariant();
                 string displayName = ReadString(model, "display_name");
                 string needle = scope.ToLowerInvariant();
-                if (!id.Contains(needle, StringComparison.Ordinal)
-                    && !displayName.Equals(scope, StringComparison.OrdinalIgnoreCase))
+                if (displayName.Length > 0)
+                {
+                    availableScopes.Add(displayName);
+                }
+                else if (id.Length > 0)
+                {
+                    availableScopes.Add(id);
+                }
+
+                if (modelWeekFromLimits
+                    || (!id.Contains(needle, StringComparison.Ordinal)
+                        && !displayName.Equals(scope, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }
@@ -218,13 +247,18 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                     ReadPercent(limit, "percent"),
                     ReadResetsAt(limit),
                     displayName.Length > 0 ? displayName : scope);
-                break;
+                modelWeekFromLimits = true;
             }
         }
 
         bool available = session is not null || week is not null || modelWeek is not null;
         return available
             ? new ClaudeUsageSnapshot(true, session, week, modelWeek, now)
+            {
+                AvailableModelScopes = availableScopes
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            }
             : ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoWindows"));
     }
 
@@ -322,10 +356,24 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         _lastFailure = null;
 
         ClaudeUsageSnapshot snapshot = await ReadAsync(settings);
-        return snapshot.Available
-            ? new ClaudeConnectionReport(true, credential.Source)
-            : new ClaudeConnectionReport(false,
+        if (!snapshot.Available)
+        {
+            return new ClaudeConnectionReport(false,
                 Loc.T("ClaudeCheckFrom", credential.Source, snapshot.ErrorMessage ?? string.Empty));
+        }
+
+        // Connected, but the model row asked for a model this account is not
+        // metered on separately. Which models get their own weekly window is
+        // Anthropic's decision, so naming the ones that came back is the only
+        // useful thing to say - previously the row just silently went missing.
+        string detail = credential.Source;
+        if (snapshot.ModelWeek is null && snapshot.AvailableModelScopes.Count > 0)
+        {
+            detail += " " + Loc.T("ClaudeCheckScopeMissing",
+                settings.ModelScope, string.Join(", ", snapshot.AvailableModelScopes));
+        }
+
+        return new ClaudeConnectionReport(true, detail);
     }
 
     /// <summary>

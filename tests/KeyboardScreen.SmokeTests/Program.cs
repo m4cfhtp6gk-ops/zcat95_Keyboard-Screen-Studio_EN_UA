@@ -982,6 +982,31 @@ using (var limits = JsonDocument.Parse(
         "a limits[] entry must win for the per-model window");
 }
 
+// The bar colour is a ramp, not three steps: at 4% and at 74% the old rule drew
+// exactly the same colour, so only the number carried the change.
+var low = ClaudeUsagePalette.ForPercent(0);
+var mid = ClaudeUsagePalette.ForPercent(55);
+var high = ClaudeUsagePalette.ForPercent(100);
+Assert(low.G > low.R && low.G > low.B, "empty reads green");
+Assert(high.R > high.G && high.R > high.B, "full reads red");
+Assert(mid.R > 180 && mid.G > 130 && mid.B < 120, "the middle is amber, not muddy olive");
+Assert(ClaudeUsagePalette.ForPercent(20).R < ClaudeUsagePalette.ForPercent(40).R,
+    "and it moves continuously rather than in steps");
+Assert(ClaudeUsagePalette.ForPercent(-10) == low && ClaudeUsagePalette.ForPercent(140) == high,
+    "out-of-range figures clamp to the ends");
+
+// Which models the account is metered on is Anthropic's decision. A scope it
+// does not report used to leave the third row missing with no explanation.
+using (var scopes = JsonDocument.Parse(
+    """{"five_hour":{"utilization":5},"seven_day_opus":{"utilization":10},"seven_day_sonnet":{"utilization":20}}"""))
+{
+    var parsed = ClaudeUsageSnapshotSource.Parse(scopes.RootElement, "fable", DateTimeOffset.Now);
+    Assert(parsed.Available, "the session and week still come through");
+    Assert(parsed.ModelWeek is null, "a model the account does not meter has no window");
+    Assert(parsed.AvailableModelScopes.OrderBy(x => x).SequenceEqual(new[] { "opus", "sonnet" }),
+        "and the ones it does meter are reported, so the screen can say which");
+}
+
 // A window whose reset has passed reads as empty, not as its last percentage.
 var expiredWindow = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
 Assert(expiredWindow.HasReset && expiredWindow.EffectivePercent == 0, "a window past its reset must read empty");

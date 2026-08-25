@@ -779,6 +779,7 @@
   "ClaudeCheckButton": "Test connection",
   "ClaudeCheckRunning": "Checking...",
   "ClaudeCheckNoToken": "Read {0}, but found no access token in it. It holds: {1}",
+  "ClaudeCheckScopeMissing": "The account reports no weekly window for \"{0}\"; it reports: {1}",
   "ClaudeCheckAlsoLooked": "Also looked in: {0}",
   "ClaudeCheckUnparseable": "{0} is there but its contents are not valid JSON - try again in a moment",
   "ClaudeCheckUnreadable": "{0} is there but could not be opened ({1})",

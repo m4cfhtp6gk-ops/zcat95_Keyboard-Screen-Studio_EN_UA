@@ -56,6 +56,18 @@ public sealed record ClaudeUsageSnapshot(
     bool IsStale = false,
     string? ErrorMessage = null)
 {
+    /// <summary>
+    /// Every per-model window the account reported, whether or not one of them
+    /// is the configured scope.
+    ///
+    /// The model row is chosen by a name the user types, and until this existed
+    /// a name the account does not meter - "fable", say - simply produced no
+    /// third row and no explanation. Anthropic decides which models get their
+    /// own weekly window; the only honest thing the app can do is show which
+    /// ones came back.
+    /// </summary>
+    public IReadOnlyList<string> AvailableModelScopes { get; init; } = [];
+
     public static ClaudeUsageSnapshot Unavailable(string? message = null) =>
         new(false, UpdatedAt: DateTimeOffset.MinValue, ErrorMessage: message);
 
