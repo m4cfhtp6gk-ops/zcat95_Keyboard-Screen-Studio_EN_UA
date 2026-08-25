@@ -138,7 +138,9 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
         ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
-            return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoCredentials"));
+            return ClaudeUsageSnapshot.Unavailable(lookup.Problem == ClaudeCredentialProblem.SignInExpired
+                ? Loc.T("ClaudeOAuthExpired")
+                : Loc.T("ClaudeNoCredentials"));
         }
 
         if (credential.IsExpired)
@@ -493,12 +495,16 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                 }
             }
 
-            if (tokens.NeedsRefresh && !tokens.CanRefresh)
+            // Still stale after the attempt covers both cases that matter: no
+            // refresh token to begin with, and a refresh that did not return a
+            // fresh one (revoked, or offline). Either way the honest thing is
+            // "sign in again", said in the app's own terms - the earlier version
+            // returned an empty credential here, which the screen then reported
+            // as "Claude Code is not signed in", naming the wrong tool for a
+            // sign-in this app made.
+            if (tokens.NeedsRefresh)
             {
-                // Signed in once, the access token has aged out and there is no
-                // refresh token to renew it - the same "sign in again" state a
-                // borrowed login reaches, said the same way.
-                return new ClaudeCredentialLookup(null, ClaudeCredentialProblem.None,
+                return new ClaudeCredentialLookup(null, ClaudeCredentialProblem.SignInExpired,
                     Loc.T("ClaudeOAuthSource"), string.Empty);
             }
 
@@ -523,6 +529,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                 lookup.Detail.Length > 0 ? lookup.Detail : "-"),
             ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
             ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
+            ClaudeCredentialProblem.SignInExpired => Loc.T("ClaudeOAuthExpired"),
             _ => Loc.T("ClaudeCheckNoToken", lookup.Path,
                 lookup.Detail.Length > 0 ? lookup.Detail : "-")
         };

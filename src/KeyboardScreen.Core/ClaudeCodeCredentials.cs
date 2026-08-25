@@ -28,7 +28,10 @@ public enum ClaudeCredentialProblem
     Unparseable,
 
     /// <summary>Valid JSON with no access token anywhere in it: this is not the file we want.</summary>
-    NoTokenInside
+    NoTokenInside,
+
+    /// <summary>A sign-in made in the app has expired and could not be renewed.</summary>
+    SignInExpired
 }
 
 /// <summary>The outcome of a credential search, including the near misses.</summary>

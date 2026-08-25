@@ -212,6 +212,7 @@
   "ClaudeOAuthStateMismatch": "Цей код з іншого входу - почніть заново",
   "ClaudeOAuthNoCode": "Вставте код, який показав браузер",
   "ClaudeOAuthSource": "ваш акаунт Claude (вхід тут)",
+  "ClaudeOAuthExpired": "Ваш вхід Claude протух - увійдіть знову",
   "ClaudeTokenRejected": "Anthropic відхилив вхід Claude Code ({0})",
   "ClaudeNoCredentials": "Claude Code не має входу на цьому ПК",
   "ClaudeCredentialExpired": "Вхід Claude Code протух - запустіть Claude Code і увійдіть",

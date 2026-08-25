@@ -212,6 +212,7 @@
   "ClaudeOAuthStateMismatch": "That code is from a different sign-in - start again",
   "ClaudeOAuthNoCode": "Paste the code the browser showed",
   "ClaudeOAuthSource": "your Claude account (signed in here)",
+  "ClaudeOAuthExpired": "Your Claude sign-in expired - sign in again",
   "ClaudeTokenRejected": "Anthropic rejected the Claude Code login ({0})",
   "ClaudeNoCredentials": "Claude Code is not signed in on this PC",
   "ClaudeCredentialExpired": "The Claude Code login has expired - run Claude Code and sign in",

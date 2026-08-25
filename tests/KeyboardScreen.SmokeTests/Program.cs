@@ -1171,6 +1171,30 @@ finally
     Directory.Delete(chainDir, recursive: true);
 }
 
+// An expired sign-in that cannot be renewed says so in the app's own words -
+// not "Claude Code is not signed in", which names the wrong tool.
+string staleDir = Path.Combine(Path.GetTempPath(), $"kss-stale-{Guid.NewGuid():N}");
+Directory.CreateDirectory(staleDir);
+try
+{
+    var staleStore = new ClaudeOAuthStore(Path.Combine(staleDir, "oauth.bin"));
+    staleStore.Save(new ClaudeOAuthTokens("acc-old", "", DateTimeOffset.Now.AddMinutes(-5)));
+    var staleHandler = new ClaudeHandler(new Queue<string>());
+    using var staleClient = new HttpClient(staleHandler);
+    using var staleSource = new ClaudeUsageSnapshotSource(staleClient, credentialReader: null, oauthStore: staleStore)
+    { BaseUrl = "https://anthropic.test" };
+    var staleSnap = await staleSource.ReadAsync(new ClaudeUsageSettings());
+    Assert(!staleSnap.Available, "an expired unrenewable sign-in is not a credential");
+    Assert(staleHandler.Requests.Count == 0, "and no call is made with a token known to be dead");
+    Assert((staleSnap.ErrorMessage ?? "").Contains("Claude", StringComparison.Ordinal)
+        && !(staleSnap.ErrorMessage ?? "").Contains("Claude Code", StringComparison.Ordinal),
+        "the message says the app's sign-in expired, not that Claude Code is missing");
+}
+finally
+{
+    Directory.Delete(staleDir, recursive: true);
+}
+
 Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[], OAuth sign-in");
 
 // ---- Binance crypto source -----------------------------------------------
