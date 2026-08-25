@@ -1,4 +1,5 @@
 using Avalonia;
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -26,6 +27,8 @@ public sealed partial class MainWindow : Window
         _viewModel = new MainWindowViewModel(new WindowsDesktopServices());
         _viewModel.PickImageAsync = PickImageAsync;
         _viewModel.PickExportPathAsync = PickExportPathAsync;
+        _viewModel.OpenUrl = OpenInBrowser;
+        _viewModel.RefreshClaudeSignInState();
         _viewModel.PickImportPathAsync = PickImportPathAsync;
         _viewModel.ShowTelegramNoticeAsync = async () =>
         {
@@ -312,6 +315,35 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
 
     private async void ClaudeCheckButton_OnClick(object? sender, RoutedEventArgs e) =>
         await _viewModel.CheckClaudeConnectionAsync();
+
+    private void ClaudeSignInButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.BeginClaudeSignIn();
+
+    private async void ClaudeCompleteSignInButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await _viewModel.CompleteClaudeSignInAsync();
+
+    private void ClaudeCancelSignInButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.CancelClaudeSignIn();
+
+    private void ClaudeSignOutButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.SignOutClaude();
+
+    /// <summary>
+    /// Opens a URL in the user's default browser. UseShellExecute is what makes
+    /// the OS pick the browser rather than trying to run the URL as a program.
+    /// </summary>
+    private static void OpenInBrowser(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // No browser to open is not worth crashing the settings page over;
+            // the sign-in URL is also shown on screen to copy by hand.
+        }
+    }
 
     private void KnobCaptureForward_OnClick(object? sender, RoutedEventArgs e) =>
         BeginKnobCapture(KnobAction.NextTheme);

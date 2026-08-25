@@ -557,6 +557,41 @@
                           <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
                                      Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
                         </Grid>
+
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+
+                        <!--
+                          The second way in, for a machine without the Claude Code
+                          command-line tool: the app runs the same OAuth sign-in
+                          itself. The token it gets is stored encrypted and tried
+                          ahead of any borrowed Claude Code file.
+                        -->
+                        <StackPanel Spacing="8">
+                          <TextBlock FontSize="13" FontWeight="SemiBold" Text="{infra:Localize ClaudeSignInHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSignInIntro}" TextWrapping="Wrap" />
+
+                          <Button IsVisible="{Binding ClaudeCanSignIn}"
+                                  HorizontalAlignment="Left"
+                                  Click="ClaudeSignInButton_OnClick"
+                                  Content="{infra:Localize ClaudeSignInButton}" />
+
+                          <StackPanel IsVisible="{Binding ClaudeAwaitingCode}" Spacing="6">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSignInCodeLabel}" TextWrapping="Wrap" />
+                            <TextBox Text="{Binding ClaudePastedCode, Mode=TwoWay}"
+                                     PlaceholderText="{infra:Localize ClaudeSignInCodePlaceholder}" />
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                              <Button Click="ClaudeCompleteSignInButton_OnClick" Content="{infra:Localize ClaudeSignInComplete}" />
+                              <Button Grid.Column="1" Click="ClaudeCancelSignInButton_OnClick" Content="{infra:Localize ClaudeSignInCancel}" />
+                            </Grid>
+                          </StackPanel>
+
+                          <Grid IsVisible="{Binding ClaudeSignedIn}" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                       Text="{infra:Localize ClaudeSignedInLabel}" TextWrapping="Wrap" />
+                            <Button Grid.Column="1" Click="ClaudeSignOutButton_OnClick" Content="{infra:Localize ClaudeSignOutButton}" />
+                          </Grid>
+                        </StackPanel>
+
                         <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />

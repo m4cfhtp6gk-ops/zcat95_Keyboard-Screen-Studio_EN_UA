@@ -3249,6 +3249,109 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             ClaudeCheckResult = ex.Message;
         }
+
+        RefreshClaudeSignInState();
+    }
+
+    private readonly ClaudeOAuthStore _claudeOAuthStore = new();
+    private readonly ClaudeOAuth _claudeOAuth = new();
+    private ClaudeOAuthChallenge? _claudeSignInChallenge;
+
+    private bool _claudeSignedIn;
+
+    /// <summary>Whether a sign-in this app made is stored, so the UI can offer sign-out instead.</summary>
+    public bool ClaudeSignedIn
+    {
+        get => _claudeSignedIn;
+        private set
+        {
+            if (SetProperty(ref _claudeSignedIn, value))
+            {
+                OnPropertyChanged(nameof(ClaudeCanSignIn));
+            }
+        }
+    }
+
+    private bool _claudeAwaitingCode;
+
+    /// <summary>True between opening the browser and pasting the code back: the paste box shows only then.</summary>
+    public bool ClaudeAwaitingCode
+    {
+        get => _claudeAwaitingCode;
+        private set
+        {
+            if (SetProperty(ref _claudeAwaitingCode, value))
+            {
+                OnPropertyChanged(nameof(ClaudeCanSignIn));
+            }
+        }
+    }
+
+    /// <summary>The sign-in button shows only when there is no sign-in and none in progress.</summary>
+    public bool ClaudeCanSignIn => !ClaudeSignedIn && !ClaudeAwaitingCode;
+
+    private string _claudePastedCode = string.Empty;
+
+    public string ClaudePastedCode
+    {
+        get => _claudePastedCode;
+        set => SetProperty(ref _claudePastedCode, value);
+    }
+
+    /// <summary>Set by the window so the view model can open the system browser.</summary>
+    public Action<string>? OpenUrl { get; set; }
+
+    public void RefreshClaudeSignInState() => ClaudeSignedIn = _claudeOAuthStore.HasTokens;
+
+    /// <summary>Start a browser sign-in: build the challenge, open the URL, reveal the paste box.</summary>
+    public void BeginClaudeSignIn()
+    {
+        _claudeSignInChallenge = _claudeOAuth.BeginSignIn();
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = true;
+        ClaudeCheckResult = Loc.T("ClaudeOAuthOpened");
+        OpenUrl?.Invoke(_claudeSignInChallenge.Url);
+    }
+
+    /// <summary>Finish the sign-in with the pasted code, store the token, and verify it live.</summary>
+    public async Task CompleteClaudeSignInAsync()
+    {
+        if (_claudeSignInChallenge is not { } challenge)
+        {
+            return;
+        }
+
+        ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
+        ClaudeOAuthResult result = await _claudeOAuth.CompleteSignInAsync(challenge, ClaudePastedCode);
+        if (result.Tokens is not { } tokens)
+        {
+            ClaudeCheckResult = Loc.T("ClaudeCheckLineFailed", result.Error ?? string.Empty);
+            return;
+        }
+
+        _claudeOAuthStore.Save(tokens);
+        _claudeSignInChallenge = null;
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = false;
+        RefreshClaudeSignInState();
+
+        // Prove the token works before declaring success, so a stored-but-dead
+        // sign-in never reads as connected.
+        await CheckClaudeConnectionAsync();
+    }
+
+    public void CancelClaudeSignIn()
+    {
+        _claudeSignInChallenge = null;
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = false;
+    }
+
+    public void SignOutClaude()
+    {
+        _claudeOAuthStore.Clear();
+        RefreshClaudeSignInState();
+        ClaudeCheckResult = Loc.T("ClaudeOAuthSignedOut");
     }
 
     private ComposerTheme? _composerTheme;

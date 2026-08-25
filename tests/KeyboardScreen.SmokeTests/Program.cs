@@ -1074,7 +1074,104 @@ using (var scopes = JsonDocument.Parse(
 var expiredWindow = new ClaudeUsageWindow(ClaudeUsageWindowKind.Session, 88, DateTimeOffset.Now.AddMinutes(-1));
 Assert(expiredWindow.HasReset && expiredWindow.EffectivePercent == 0, "a window past its reset must read empty");
 
-Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[]");
+// The OAuth sign-in flow, so the screen works without Claude Code installed.
+// It runs the same authorization-code-with-PKCE dance Claude Code uses.
+var flow = new ClaudeOAuth { AuthorizeEndpoint = "https://claude.test/oauth/authorize" };
+var challenge = flow.BeginSignIn();
+Assert(challenge.Url.StartsWith("https://claude.test/oauth/authorize?", StringComparison.Ordinal),
+    "the browser is sent to the authorize endpoint");
+Assert(challenge.Url.Contains("client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e", StringComparison.Ordinal),
+    "with Claude Code's public client id");
+Assert(challenge.Url.Contains("code_challenge_method=S256", StringComparison.Ordinal)
+    && challenge.Url.Contains("code_challenge=", StringComparison.Ordinal),
+    "and a PKCE S256 challenge");
+Assert(challenge.Url.Contains("scope=user%3Aprofile%20user%3Ainference", StringComparison.Ordinal),
+    "requesting only profile and inference, never org:create_api_key");
+Assert(!challenge.Url.Contains("create_api_key", StringComparison.Ordinal),
+    "a stored token must not be able to mint API keys");
+
+// The challenge is the SHA-256 of the verifier, base64url without padding -
+// the whole point of PKCE is that this holds.
+using (var sha = System.Security.Cryptography.SHA256.Create())
+{
+    string expected = Convert.ToBase64String(sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(challenge.Verifier)))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    Assert(challenge.Url.Contains("code_challenge=" + expected, StringComparison.Ordinal),
+        "the challenge is the hash of the verifier this flow kept");
+}
+
+// Two sign-ins never share a verifier or state.
+var other = flow.BeginSignIn();
+Assert(other.Verifier != challenge.Verifier && other.State != challenge.State,
+    "each attempt is freshly random");
+
+// The pasted value is CODE#STATE, and a state from a different flow is refused
+// before any network call.
+var mismatched = await flow.CompleteSignInAsync(challenge, "some-code#not-our-state");
+Assert(!mismatched.Success && mismatched.Error is { Length: > 0 },
+    "a code whose state does not match is rejected");
+
+// The token response is parsed into an access token, a refresh token and an
+// expiry computed from expires_in.
+var oauthParsed = ClaudeOAuth.ParseTokens(
+    """{"access_token":"acc","refresh_token":"ref","expires_in":3600}""", DateTimeOffset.UnixEpoch);
+Assert(oauthParsed?.AccessToken == "acc" && oauthParsed.RefreshToken == "ref", "both tokens are read");
+Assert(oauthParsed!.ExpiresAt == DateTimeOffset.UnixEpoch.AddSeconds(3600), "the expiry is now plus expires_in");
+Assert(ClaudeOAuth.ParseTokens("""{"access_token":"only"}""", DateTimeOffset.UnixEpoch, "kept-refresh")?.RefreshToken
+    == "kept-refresh", "a reply without a refresh token keeps the previous one");
+Assert(ClaudeOAuth.ParseTokens("""{"refresh_token":"no-access"}""", DateTimeOffset.Now) is null,
+    "a reply without an access token is not a sign-in");
+
+// The store round-trips a sign-in. On this Linux host the plaintext fallback is
+// exercised; on Windows the same path is sealed with DPAPI.
+string storePath = Path.Combine(Path.GetTempPath(), $"kss-oauth-{Guid.NewGuid():N}.bin");
+try
+{
+    var store = new ClaudeOAuthStore(storePath);
+    Assert(!store.HasTokens && store.Load() is null, "an empty store has no sign-in");
+    var saved = new ClaudeOAuthTokens("acc-1", "ref-1", DateTimeOffset.Now.AddHours(1));
+    store.Save(saved);
+    Assert(store.HasTokens, "a saved sign-in is present");
+    var loaded = store.Load();
+    Assert(loaded?.AccessToken == "acc-1" && loaded.RefreshToken == "ref-1", "and reads back intact");
+    Assert(!loaded!.NeedsRefresh, "a token good for an hour does not need refreshing yet");
+    Assert(new ClaudeOAuthTokens("a", "r", DateTimeOffset.Now).NeedsRefresh, "one at its expiry does");
+    Assert(!new ClaudeOAuthTokens("a", "", DateTimeOffset.Now).CanRefresh, "and without a refresh token cannot");
+    store.Clear();
+    Assert(!store.HasTokens && store.Load() is null, "sign-out removes it");
+}
+finally
+{
+    if (File.Exists(storePath)) File.Delete(storePath);
+}
+
+// A stored sign-in is preferred over the Claude Code file, and an expired one
+// with no refresh token reads as "sign in again" rather than falling through.
+string chainDir = Path.Combine(Path.GetTempPath(), $"kss-chain-{Guid.NewGuid():N}");
+Directory.CreateDirectory(chainDir);
+string chainStore = Path.Combine(chainDir, "oauth.bin");
+try
+{
+    var live = new ClaudeOAuthStore(chainStore);
+    live.Save(new ClaudeOAuthTokens("acc-live", "ref-live", DateTimeOffset.Now.AddHours(1)));
+    var chainHandler = new ClaudeHandler(new Queue<string>(new[]
+    {
+        """{"five_hour":{"utilization":11,"resets_at":"2099-01-01T00:00:00Z"}}"""
+    }));
+    using var httpClient = new HttpClient(chainHandler);
+    using var source = new ClaudeUsageSnapshotSource(httpClient, credentialReader: null, oauthStore: live)
+    { BaseUrl = "https://anthropic.test" };
+    var snap = await source.ReadAsync(new ClaudeUsageSettings());
+    Assert(snap.Available, "a stored sign-in is used with no Claude Code file present");
+    Assert(chainHandler.AuthorizationHeaders.Any(h => h == "Bearer acc-live"),
+        "and its access token is what is presented");
+}
+finally
+{
+    Directory.Delete(chainDir, recursive: true);
+}
+
+Console.WriteLine("PASS Claude usage: credential discovery, bearer auth on api.anthropic.com, throttle backoff, payload spellings, limits[], OAuth sign-in");
 
 // ---- Binance crypto source -----------------------------------------------
 Assert(BinanceStockSnapshotSource.NormalizeSymbol("btcusdt") == "BTCUSDT", "Binance pairs must upper-case");

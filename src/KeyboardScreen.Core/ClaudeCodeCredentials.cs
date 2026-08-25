@@ -254,13 +254,23 @@ public static class ClaudeCodeCredentials
     /// Being told the wrong reason is worse than being told nothing: it sends
     /// you off to reinstall something that was never missing.
     /// </summary>
+    /// <summary>
+    /// Just the environment-variable override, so a caller can give it priority
+    /// without also triggering the file search.
+    /// </summary>
+    public static ClaudeCodeCredential? FromEnvironment()
+    {
+        string? value = ReadEnvironment(TokenEnvironmentVariable);
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : new ClaudeCodeCredential(value.Trim(), null, TokenEnvironmentVariable);
+    }
+
     public static ClaudeCredentialLookup Locate(string? credentialsPath = null)
     {
-        string? fromEnvironment = ReadEnvironment(TokenEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(fromEnvironment))
+        if (FromEnvironment() is { } fromEnvironment)
         {
-            return ClaudeCredentialLookup.From(
-                new ClaudeCodeCredential(fromEnvironment.Trim(), null, TokenEnvironmentVariable));
+            return ClaudeCredentialLookup.From(fromEnvironment);
         }
 
         if (credentialsPath is not null)

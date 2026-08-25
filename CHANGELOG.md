@@ -4,6 +4,21 @@
 
 ### Added
 
+- **Sign in to Claude from the app, no command-line tool required.** The screen
+  could only borrow the login the Claude Code command-line tool stores, which
+  left out anyone who uses only the Claude desktop or web app. There is now a
+  "Sign in with your Claude account" button in the Claude settings: it opens
+  your browser, you approve, you paste back a short code, and the app reads your
+  limits directly. It runs the same sign-in Claude Code itself uses.
+
+  The token this produces belongs to the app, so unlike the borrowed login it
+  is stored - in its own file, sealed with Windows DPAPI under your user
+  account, never in the settings file or an exported backup. It asks only for
+  permission to read your usage and profile, and "Sign out" deletes it. The
+  borrowed Claude Code login still works and is still tried; this is an
+  additional way in, not a replacement.
+
+
 - **Each meter says when it resets, not only how long is left.** "In 37
   minutes" and "at 12:34" answer different questions, and the second is the one
   you act on when deciding whether to start something now. Windows more than a

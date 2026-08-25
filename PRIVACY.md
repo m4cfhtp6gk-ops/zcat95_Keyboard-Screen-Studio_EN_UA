@@ -36,6 +36,18 @@ Optional online features contact third-party services directly:
   by signing out of Claude Code. Because only Claude Code refreshes it, and it
   expires about once an hour, the screen reports an expired login until Claude
   Code next runs.
+- You can instead sign in from the app itself, without Claude Code. This runs
+  the same browser sign-in Claude Code uses: you approve in your browser and
+  paste back a short code. Unlike the borrowed login above, the token this
+  produces belongs to the app, so it is stored on this computer - in its own
+  file under your local application data, separate from the settings file, and
+  sealed with Windows DPAPI under your user account, so another user on the
+  machine cannot read it and it does not survive being copied elsewhere. It is
+  never written into the settings file and never included in an exported or
+  synced settings backup. This sign-in also keeps a refresh token, which is
+  what lets the app renew the hourly access token without asking you again;
+  "Sign out" deletes both from disk. The app requests only the permissions to
+  read your usage and profile - not the permission to create API keys.
 - The percentages and reset times shown are the account's own figures. The
   endpoint they come from is not a documented public API and may change or stop
   working without notice; when it does, the screen says it is not connected

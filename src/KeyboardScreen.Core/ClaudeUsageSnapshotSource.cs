@@ -77,6 +77,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
     private readonly Func<ClaudeCredentialLookup> _credentialReader;
+    private readonly ClaudeOAuthStore? _oauthStore;
+    private readonly ClaudeOAuth? _oauth;
 
     private ClaudeUsageSnapshot? _cached;
     private string _cachedKey = string.Empty;
@@ -88,7 +90,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
 
     public ClaudeUsageSnapshotSource(
         HttpClient? client = null,
-        Func<ClaudeCredentialLookup>? credentialReader = null)
+        Func<ClaudeCredentialLookup>? credentialReader = null,
+        ClaudeOAuthStore? oauthStore = null)
     {
         _ownsClient = client is null;
         _client = client ?? new HttpClient(new SocketsHttpHandler { UseCookies = false })
@@ -96,7 +99,25 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
             Timeout = TimeSpan.FromSeconds(15)
         };
         _credentialReader = credentialReader ?? (() => ClaudeCodeCredentials.Locate());
+
+        // A store is used only when the caller does not inject its own reader,
+        // so the existing tests - which do - keep their exact behaviour. In the
+        // app it lets a token this app signed in for be tried ahead of a
+        // borrowed Claude Code file.
+        if (credentialReader is null)
+        {
+            _oauthStore = oauthStore ?? new ClaudeOAuthStore();
+            _oauth = new ClaudeOAuth(_client) { TokenEndpoint = OAuthTokenEndpoint };
+        }
+        else
+        {
+            _oauthStore = oauthStore;
+            _oauth = oauthStore is null ? null : new ClaudeOAuth(_client) { TokenEndpoint = OAuthTokenEndpoint };
+        }
     }
+
+    /// <summary>Overridable so a test can point token refresh at a stub.</summary>
+    public string OAuthTokenEndpoint { get; init; } = "https://console.anthropic.com/v1/oauth/token";
 
     public string BaseUrl { get; init; } = "https://api.anthropic.com";
 
@@ -113,7 +134,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCodeCredential? credential = _credentialReader().Credential;
+        ClaudeCredentialLookup lookup = await ResolveCredentialAsync(cancellationToken);
+        ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
             return ClaudeUsageSnapshot.Unavailable(Loc.T("ClaudeNoCredentials"));
@@ -376,7 +398,7 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ClaudeCredentialLookup lookup = _credentialReader();
+        ClaudeCredentialLookup lookup = await ResolveCredentialAsync(default);
         ClaudeCodeCredential? credential = lookup.Credential;
         if (credential is null)
         {
@@ -434,6 +456,57 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
     {
         _lastReport = report;
         return report;
+    }
+
+    /// <summary>
+    /// The credential to use, best source first: an explicit environment
+    /// override, then a token this app signed in for (refreshed if the hour is
+    /// up), then a login borrowed from Claude Code's own file. When no store is
+    /// configured - the tests - this is just the injected reader.
+    /// </summary>
+    private async Task<ClaudeCredentialLookup> ResolveCredentialAsync(CancellationToken cancellationToken)
+    {
+        if (_oauthStore is null)
+        {
+            return _credentialReader();
+        }
+
+        if (ClaudeCodeCredentials.FromEnvironment() is { } fromEnvironment)
+        {
+            return ClaudeCredentialLookup.From(fromEnvironment);
+        }
+
+        ClaudeOAuthTokens? tokens = _oauthStore.Load();
+        if (tokens is not null)
+        {
+            if (tokens.NeedsRefresh && tokens.CanRefresh && _oauth is not null)
+            {
+                ClaudeOAuthResult refreshed = await _oauth.RefreshAsync(tokens.RefreshToken, cancellationToken);
+                if (refreshed.Tokens is { } fresh)
+                {
+                    // A refresh reply may omit the refresh token, meaning "keep
+                    // the one you have" - losing it would strand the next hour.
+                    tokens = fresh.RefreshToken.Length > 0
+                        ? fresh
+                        : fresh with { RefreshToken = tokens.RefreshToken };
+                    _oauthStore.Save(tokens);
+                }
+            }
+
+            if (tokens.NeedsRefresh && !tokens.CanRefresh)
+            {
+                // Signed in once, the access token has aged out and there is no
+                // refresh token to renew it - the same "sign in again" state a
+                // borrowed login reaches, said the same way.
+                return new ClaudeCredentialLookup(null, ClaudeCredentialProblem.None,
+                    Loc.T("ClaudeOAuthSource"), string.Empty);
+            }
+
+            return ClaudeCredentialLookup.From(
+                new ClaudeCodeCredential(tokens.AccessToken, tokens.ExpiresAt, Loc.T("ClaudeOAuthSource")));
+        }
+
+        return ClaudeCodeCredentials.Locate();
     }
 
     /// <summary>
