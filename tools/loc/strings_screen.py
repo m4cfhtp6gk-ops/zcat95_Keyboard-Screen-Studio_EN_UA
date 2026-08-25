@@ -132,6 +132,8 @@ SCREEN = [
     ("ScreenClaudeConnectHint", "Sign in to Claude Code", "Увійдіть у Claude Code", "请登录 Claude Code"),
     ("ScreenClaudeStale",       "Last known data", "Останні дані", "上次数据"),
     ("ScreenClaudeResetNow",    "resetting",     "скидання",      "重置中"),
+    ("ScreenClaudeResetsAt", "resets at {0}", "скидання о {0}", "{0} 重置"),
+    ("ScreenClaudeResetsOn", "resets {0} at {1}", "скидання {0} о {1}", "{0} {1} 重置"),
     ("ScreenClaudeDaysHours",   "{0}d {1}h",     "{0}д {1}год",   "{0}天{1}小时"),
     ("ScreenClaudeHoursMinutes","{0}h {1}m",     "{0}год {1}хв",  "{0}小时{1}分"),
     ("ScreenClaudeMinutes",     "{0}m",          "{0}хв",         "{0}分"),

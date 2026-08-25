@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- **Each meter says when it resets, not only how long is left.** "In 37
+  minutes" and "at 12:34" answer different questions, and the second is the one
+  you act on when deciding whether to start something now. Windows more than a
+  day out carry the weekday, since "at 19:29" is ambiguous four days ahead.
+- **A set-up guide in the Claude settings, collapsed until it is needed.** The
+  screen borrows the login the Claude Code command-line tool stores, and
+  nothing in the app ever said so - which is how a machine with the Claude
+  desktop app installed could look correctly set up while holding no login this
+  can use. The guide is the whole path from nothing to numbers, including the
+  part where the folder looks full and is not.
+
 ### Fixed
 
 - **A moment's throttling blanked a screen that was working.** Anthropic's

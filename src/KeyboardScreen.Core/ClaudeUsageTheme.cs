@@ -17,8 +17,8 @@ public sealed class ClaudeUsageTheme : IScreenTheme
     private static readonly Color Muted = Color.FromRgb(102, 112, 124);
     private static readonly Color Track = Color.FromRgb(35, 42, 51);
 
-    private const double CardHeight = 84;
-    private const double CardGap = 12;
+    private const double CardHeight = 94;
+    private const double CardGap = 11;
 
     /// <summary>Space between the percentage and the countdown that shares its line.</summary>
     private const double ColumnGap = 8;
@@ -121,11 +121,18 @@ public sealed class ClaudeUsageTheme : IScreenTheme
         }
 
         canvas.AlignedText(figure, size, Colors.White,
-            new Rect(card.Left + inset, card.Top + 26, contentWidth, 34),
+            new Rect(card.Left + inset, card.Top + 24, contentWidth, 34),
             FontWeights.SemiBold, TextAlignment.Left);
 
+        // "In 37 minutes" and "at 14:30" answer different questions, and the
+        // second is the one you act on when deciding whether to start something
+        // now. It gets its own line rather than crowding the countdown.
+        canvas.AlignedText(ResetMoment(window), 9, Muted,
+            new Rect(card.Left + inset, card.Top + 59, contentWidth, 12),
+            FontWeights.Normal, TextAlignment.Right);
+
         canvas.ProgressBar(
-            new Rect(card.Left + inset, card.Bottom - 19, contentWidth, 9),
+            new Rect(card.Left + inset, card.Bottom - 18, contentWidth, 9),
             percent, Track, ClaudeUsagePalette.ForPercent(percent));
     }
 
@@ -144,6 +151,27 @@ public sealed class ClaudeUsageTheme : IScreenTheme
         ClaudeUsageWindowKind.Week => Loc.T("ScreenClaudeWeek"),
         _ => string.IsNullOrWhiteSpace(window.ScopeName) ? Loc.T("ScreenClaudeWeek") : window.ScopeName
     };
+
+    /// <summary>
+    /// The clock time the window comes back, with the weekday when that is not
+    /// today - "at 14:30" is ambiguous four days out, and the weekly windows
+    /// are. A weekday rather than a date because none of these windows is more
+    /// than seven days off, and "29 серп" did not fit where "пт" does.
+    /// </summary>
+    private static string ResetMoment(ClaudeUsageWindow window)
+    {
+        if (window.ResetsAt is not { } resetsAt || resetsAt <= DateTimeOffset.Now)
+        {
+            return string.Empty;
+        }
+
+        DateTimeOffset local = resetsAt.ToLocalTime();
+        // Two forms rather than one with the weekday spliced in: "скидання о сб
+        // 19:27" is not a sentence in any of these languages.
+        return local.Date == DateTimeOffset.Now.Date
+            ? Loc.T("ScreenClaudeResetsAt", DisplayUnits.Time(local))
+            : Loc.T("ScreenClaudeResetsOn", local.ToString("ddd", Loc.Culture), DisplayUnits.Time(local));
+    }
 
     /// <summary>Time left before the window resets, in the coarsest unit that still reads.</summary>
     private static string Countdown(ClaudeUsageWindow window)

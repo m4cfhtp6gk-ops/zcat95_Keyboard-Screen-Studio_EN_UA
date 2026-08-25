@@ -563,6 +563,23 @@
                           <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeModelScopeHint}" TextWrapping="Wrap" />
+                        <!--
+                          Collapsed by default: once it works, nobody needs this
+                          again. Open, it is the whole path from nothing to
+                          numbers - which took six releases to establish and was
+                          never written down anywhere the user could see it.
+                        -->
+                        <Expander Classes="settings-group" Header="{infra:Localize ClaudeSetupHeading}">
+                          <StackPanel Spacing="8" Margin="0,6,0,0">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSetupNeeds}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep1}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep2}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep3}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep4}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep5}" TextWrapping="Wrap" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSetupExpiry}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Expander>
                       </StackPanel>
                     </Border>
 
