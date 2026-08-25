@@ -1,42 +1,35 @@
-# v1.10.4
+# v1.10.5
 
-v1.10.3 asked the Claude screen to say what the credentials file holds. What
-it reported named a mistake in v1.10.3 itself.
+With the limits finally connecting, the Claude screen turned out to be cutting
+off the one number it exists to show.
 
 ## Fixed
 
-- **A token belonging to another service could have been sent to Anthropic.**
-  Claude Code's credentials file holds more than your Claude login: it also
-  stores the OAuth state of every MCP server a plugin has connected - Linear,
-  Notion, whatever else - and each of those has its own access token.
+- **The percentages were truncated.** The figure and the reset countdown were
+  each given a fixed fraction of the same line, and those fractions overlapped
+  by a quarter of the row. Only a single digit ever fitted: 63% drew as "6…"
+  and 100% as "10…".
 
-  Loosening how names were matched in v1.10.3 put those within reach. On a
-  machine with a connected MCP server and no Claude login in that file, this
-  app would have taken one of those tokens and presented it to
-  api.anthropic.com. The request would have failed, and a credential belonging
-  to one service would have been handed to another.
+  The countdown moves up beside the label - a line that held one short word and
+  had room to spare - and the figure takes the full width. Both are measured
+  rather than apportioned, with the label given priority since it names which
+  window you are reading.
 
-  Those sections are now skipped outright. A real Claude login sitting beside
-  them is still found.
+## Changed
 
-- **The diagnostic buried the one fact worth reporting.** It read the file
-  depth first and stopped at its limit inside the first branch it entered, so
-  a file whose first key opens a large plugin section spent every name it had
-  on one server's internals and never reached the top level. Whether your file
-  contains a Claude login at all is the entire question, and the report could
-  not answer it. It reads breadth first now, so the top-level keys always come
-  first.
+- **The bars run green to red instead of jumping.** The old rule drew the
+  accent colour below 75%, amber to 90%, then red, so a bar at 4% and a bar at
+  74% looked the same and only the number carried the change. The fill now
+  moves continuously through amber, so the colour says what the length says.
 
-## Notes
+  The screen builder's Claude block keeps its own accent colour instead, since
+  that is a setting you chose per block.
 
-- If the check reports fields but no Claude login, that is now a reliable
-  answer rather than an artifact: the file genuinely holds no subscription
-  token, and Claude Code is keeping yours somewhere else.
-- The fallback that works regardless: `claude setup-token` prints a long-lived
-  token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, which this app
-  reads ahead of any file.
-- Field names only ever leave the file as names. No value is read, and a test
-  asserts that a secret-looking value never reaches the screen. See PRIVACY.md.
+- **Asking for a model your account is not metered on now explains itself.**
+  Which models get their own weekly window is Anthropic's decision. A name it
+  does not report - "fable", for instance - used to leave the third row
+  silently missing. The connection test now names the scopes your account does
+  report, so you can put one of those in the model row.
 
 ## Platforms
 
