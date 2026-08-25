@@ -1,60 +1,50 @@
-# v1.10.2
+# v1.10.3
 
-v1.10.1 sent the Claude request to the right place. This release finds the
-login it needs, and stops lying about it when it cannot.
+v1.10.2 made the Claude screen say what it actually saw. What it said was
+"read the file, but there is no access token in it" - which moved the problem
+from finding the login to understanding it.
 
 ## Fixed
 
-- **The login is looked for wherever it might be, not in one guessed place.**
-  `%USERPROFILE%\.claude\.credentials.json` is the documented path and it is
-  right for a login made by the Windows CLI under your account. It is wrong
-  for one made from WSL, where the file lives in the Linux home; wrong for one
-  moved with `CLAUDE_CONFIG_DIR`; wrong for an install under AppData. When the
-  one guess missed, the screen could only quote that same path back at you.
+- **The credentials file was being read and then not understood.** On a
+  machine with Claude Code installed and signed in, the file is found, opened
+  and parsed - and the walk through it came back empty. Three reasons, all in
+  the reading: underscores were not folded when comparing names, names were
+  compared for exact equality so a prefixed or wrapped one missed, and a
+  credential kept as a serialized JSON document inside a string value was
+  invisible.
 
-  All of those are searched now, in order. More usefully, the connection test
-  **names every path it tried**. If your login is somewhere this still does
-  not look, you can see that at a glance and say so - which was impossible
-  while the app only ever repeated its own assumption.
+  All three are fixed. A second pass also accepts weaker names like a bare
+  `token`, but only after the whole file has been searched for a real access
+  token, so a file holding both never answers with the weaker one.
 
-- **A login being refreshed read as a login that was not there.** Claude Code
-  rewrites its credentials file about once an hour and can hold it open while
-  it does. The read did not share write access, so a refresh in flight failed,
-  the error was swallowed, and the screen reported a missing file.
+  A refresh token is never picked up. It does not work as a bearer, and it is
+  the more sensitive half of the pair, so loosening the match without that
+  exclusion would have made things worse rather than better.
 
-- **The connection test blamed the wrong thing.** It said "no Claude Code
-  login found at <path>" for six different situations: no folder, no file, a
-  file it was not allowed to open, a file held open mid-refresh, half-written
-  JSON, and a file with no token in it. Being told the wrong reason is worse
-  than being told nothing - it sends you off to reinstall something that was
-  never missing. Each case now says what it actually is, and "no file" lists
-  what the folder does hold, which is what separates "never signed in" from
-  "this machine keeps its login somewhere else".
+- **When there is still no token, the check now names the fields the file does
+  hold.** Which login your machine has is what decides whether this screen can
+  work at all: a Claude subscription login has an access token, a Console
+  API-key login does not. The app has never once said which one it was looking
+  at. Now it does.
 
-- **Environment variables set after the app started are picked up.** A program
-  inherits its environment when it launches, so setting
-  `CLAUDE_CODE_OAUTH_TOKEN` or `CLAUDE_CONFIG_DIR` in System Properties did
-  nothing until your next sign-out. On Windows the stored user and machine
-  values are read as well.
-
-## Changed
-
-- The Claude settings card mentions the documented fallback for a machine
-  where the file cannot be found: `claude setup-token` prints a long-lived
-  token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, which this app
-  reads ahead of any file. Anthropic documents that token as being for model
-  requests, so it may not be accepted for limits - the card says so rather
-  than promising it.
+  Field names only. No value is read, the walk stops at three levels and
+  twelve names, and a test asserts that a secret-looking value never reaches
+  the screen.
 
 ## Notes
 
 - Your Claude Code token is read fresh when needed, sent to api.anthropic.com
   and nowhere else, and never written into settings, an exported backup or a
-  log. The diagnostic line reports only where it looked and what it found -
-  folder and file names, never contents, never the token. See PRIVACY.md.
+  log. The diagnostic line reports only where it looked and what shape it
+  found - paths and field names, never contents, never the token. See
+  PRIVACY.md.
 - The access token expires about once an hour and only Claude Code refreshes
   it. If the screen says the login expired, run Claude Code and it recovers on
   its own.
+- If the file cannot be found at all, `claude setup-token` prints a long-lived
+  token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, which this app
+  reads ahead of any file.
 
 ## Platforms
 
