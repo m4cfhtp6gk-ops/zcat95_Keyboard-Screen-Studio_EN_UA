@@ -727,6 +727,34 @@ Assert(ClaudeCodeCredentials.Parse("""{"expiresAt":1,"accessToken":"tok-old"}"""
 Assert(ClaudeCodeCredentials.Parse("""{"accessToken":""}""", "t") is null,
     "an empty token is not a credential");
 Assert(ClaudeCodeCredentials.Parse("not json", "t") is null, "a torn file must not throw");
+
+// A file that holds only a refresh token holds nothing we can use. Presenting
+// one as a bearer fails, and it is the more sensitive half of the pair, so it
+// must never be picked up by a looser name match.
+Assert(ClaudeCodeCredentials.Parse("""{"claudeAiOauth":{"refreshToken":"ref-only"}}""", "t") is null,
+    "a refresh token is never the credential");
+Assert(ClaudeCodeCredentials.Parse(
+    """{"a":{"refreshToken":"ref"},"b":{"accessToken":"acc"}}""", "t")?.AccessToken == "acc",
+    "and a real access token beside one still wins");
+
+// A real token wins over a weaker name no matter which comes first in the file.
+Assert(ClaudeCodeCredentials.Parse(
+    """{"gateway":{"token":"weak"},"claudeAiOauth":{"accessToken":"strong"}}""", "t")?.AccessToken == "strong",
+    "an access token outranks a bare 'token' found earlier");
+Assert(ClaudeCodeCredentials.Parse("""{"gateway":{"token":"only-this"}}""", "t")?.AccessToken == "only-this",
+    "but a bare 'token' is better than giving up");
+
+// Some stores keep the credential as one serialized blob inside a string.
+Assert(ClaudeCodeCredentials.Parse(
+    """{"payload":"{\"accessToken\":\"nested-blob\"}"}""", "t")?.AccessToken == "nested-blob",
+    "a JSON document inside a string value must be stepped into");
+
+// When there is genuinely no token, the shape is what tells us which login the
+// machine actually has - names only, never values.
+string shape = ClaudeCodeCredentials.DescribeShape("""{"claudeApiKey":{"apiKey":"sk-secret"}}""");
+Assert(shape.Contains("claudeApiKey", StringComparison.Ordinal) && shape.Contains("apiKey", StringComparison.Ordinal),
+    "the property names are reported");
+Assert(!shape.Contains("sk-secret", StringComparison.Ordinal), "and no value ever is");
 Assert(ClaudeCodeCredentials.Read(Path.Combine(Path.GetTempPath(), $"kss-no-creds-{Guid.NewGuid():N}.json")) is null,
     "a missing credentials file simply means Claude Code is not signed in");
 

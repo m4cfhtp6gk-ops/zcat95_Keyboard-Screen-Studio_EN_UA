@@ -778,7 +778,7 @@
   "KnobUsageVolumeUp": "Volume Up",
   "ClaudeCheckButton": "Test connection",
   "ClaudeCheckRunning": "Checking...",
-  "ClaudeCheckNoToken": "Read {0}, but there is no access token anywhere in it",
+  "ClaudeCheckNoToken": "Read {0}, but found no access token in it. It holds: {1}",
   "ClaudeCheckAlsoLooked": "Also looked in: {0}",
   "ClaudeCheckUnparseable": "{0} is there but its contents are not valid JSON - try again in a moment",
   "ClaudeCheckUnreadable": "{0} is there but could not be opened ({1})",
