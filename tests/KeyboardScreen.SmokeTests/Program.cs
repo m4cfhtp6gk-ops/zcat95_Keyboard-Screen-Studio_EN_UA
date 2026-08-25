@@ -749,6 +749,38 @@ Assert(ClaudeCodeCredentials.Parse(
     """{"payload":"{\"accessToken\":\"nested-blob\"}"}""", "t")?.AccessToken == "nested-blob",
     "a JSON document inside a string value must be stepped into");
 
+// The same file stores the OAuth state of every MCP server a plugin connected.
+// Each of those has its own accessToken belonging to Linear, Notion or whoever
+// else - sending one to api.anthropic.com would fail and would hand a third
+// party's credential to a fourth. Loosening the name match in v1.10.3 opened
+// that door on a real user's file; it stays shut.
+const string mcpOnly = """
+{"mcpOAuth":{"plugin:design:linear|638130da58374":{"serverName":"linear",
+"accessToken":"lin_oauth_SECRET","clientId":"c1"},
+"plugin:design:notion|eac663db915250e7":{"serverName":"notion",
+"accessToken":"ntn_SECRET","clientId":"c2"}}}
+""";
+Assert(ClaudeCodeCredentials.Parse(mcpOnly, "t") is null,
+    "an MCP server's own access token is never Claude Code's login");
+
+Assert(ClaudeCodeCredentials.Parse(
+    """{"mcpOAuth":{"plugin:x|1":{"accessToken":"third-party"}},"claudeAiOauth":{"accessToken":"ours"}}""",
+    "t")?.AccessToken == "ours",
+    "and the real login is still found in a file that holds both");
+
+// The shape report must reach the top-level keys. Walking depth first hit the
+// cap inside the first branch, so on the file above it listed one MCP server's
+// fields and never reached claudeAiOauth - which was the whole question.
+string mcpShape = ClaudeCodeCredentials.DescribeShape(mcpOnly);
+Assert(mcpShape.StartsWith("mcpOAuth", StringComparison.Ordinal),
+    "the top-level key comes first");
+Assert(!mcpShape.Contains("SECRET", StringComparison.Ordinal), "and never a value");
+
+string bothShape = ClaudeCodeCredentials.DescribeShape(
+    """{"mcpOAuth":{"a":{"b":{"c":{"d":{"e":1}}}}},"claudeAiOauth":{"accessToken":"x"}}""");
+Assert(bothShape.Contains("claudeAiOauth", StringComparison.Ordinal),
+    "a top-level key is never buried by a deep branch that came before it");
+
 // When there is genuinely no token, the shape is what tells us which login the
 // machine actually has - names only, never values.
 string shape = ClaudeCodeCredentials.DescribeShape("""{"claudeApiKey":{"apiKey":"sk-secret"}}""");

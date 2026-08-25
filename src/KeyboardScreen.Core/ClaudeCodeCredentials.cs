@@ -397,13 +397,25 @@ public static class ClaudeCodeCredentials
     }
 
     private static ClaudeCodeCredential? Find(JsonElement element, string source, int depth) =>
-        Find(element, source, depth, TokenNames) ?? Find(element, source, depth, FallbackTokenNames);
+        Find(element, source, depth, TokenNames, false)
+        ?? Find(element, source, depth, FallbackTokenNames, false);
+
+    /// <summary>
+    /// Sections that hold somebody else's credential. This same file stores the
+    /// OAuth state for every MCP server a plugin has connected - Linear, Notion,
+    /// whatever else - each with its own accessToken. Those belong to those
+    /// services, and sending one to api.anthropic.com would both fail and hand a
+    /// third party's token to a fourth. Loosening the name match in v1.10.3
+    /// opened that door; this closes it.
+    /// </summary>
+    private static readonly string[] ForeignSections = ["mcp", "plugin"];
 
     private static ClaudeCodeCredential? Find(
         JsonElement element,
         string source,
         int depth,
-        string[] wanted)
+        string[] wanted,
+        bool foreign)
     {
         if (depth > 8)
         {
@@ -414,7 +426,7 @@ public static class ClaudeCodeCredentials
         {
             foreach (JsonElement item in element.EnumerateArray())
             {
-                if (Find(item, source, depth + 1, wanted) is { } nested)
+                if (Find(item, source, depth + 1, wanted, foreign) is { } nested)
                 {
                     return nested;
                 }
@@ -428,20 +440,24 @@ public static class ClaudeCodeCredentials
             return null;
         }
 
-        foreach (JsonProperty property in element.EnumerateObject())
+        if (!foreign)
         {
-            if (property.Value.ValueKind == JsonValueKind.String
-                && Wants(property.Name, wanted)
-                && property.Value.GetString() is { Length: > 0 } token)
+            foreach (JsonProperty property in element.EnumerateObject())
             {
-                // The expiry, when there is one, sits beside the token.
-                return new ClaudeCodeCredential(token.Trim(), ReadExpiry(element), source);
+                if (property.Value.ValueKind == JsonValueKind.String
+                    && Wants(property.Name, wanted)
+                    && property.Value.GetString() is { Length: > 0 } token)
+                {
+                    // The expiry, when there is one, sits beside the token.
+                    return new ClaudeCodeCredential(token.Trim(), ReadExpiry(element), source);
+                }
             }
         }
 
         foreach (JsonProperty property in element.EnumerateObject())
         {
-            if (Find(property.Value, source, depth + 1, wanted) is { } nested)
+            bool nowForeign = foreign || IsForeignSection(property.Name);
+            if (Find(property.Value, source, depth + 1, wanted, nowForeign) is { } nested)
             {
                 return nested;
             }
@@ -455,7 +471,7 @@ public static class ClaudeCodeCredentials
                 try
                 {
                     using JsonDocument inner = JsonDocument.Parse(text);
-                    if (Find(inner.RootElement, source, depth + 1, wanted) is { } embedded)
+                    if (Find(inner.RootElement, source, depth + 1, wanted, nowForeign) is { } embedded)
                     {
                         return embedded;
                     }
@@ -475,6 +491,13 @@ public static class ClaudeCodeCredentials
     /// it is the more sensitive of the pair. Everything else is matched on a
     /// contains so a prefixed name still counts.
     /// </summary>
+    /// <summary>True for a key that opens somebody else's credential store.</summary>
+    private static bool IsForeignSection(string name)
+    {
+        string normalized = Normalize(name);
+        return ForeignSections.Any(marker => normalized.Contains(marker, StringComparison.Ordinal));
+    }
+
     private static bool Wants(string name, string[] wanted)
     {
         string normalized = Normalize(name);
@@ -484,51 +507,67 @@ public static class ClaudeCodeCredentials
 
     /// <summary>
     /// The property names in the document, so a file that holds no token can say
-    /// what it does hold. Names only - no value is ever read here, and the walk
-    /// is capped so a large file cannot fill the screen.
+    /// what it does hold. Names only - no value is ever read here.
+    ///
+    /// Breadth first, deliberately. The first version walked depth first and hit
+    /// its cap inside the first branch it entered, which on a real file meant it
+    /// reported twelve names from one MCP server's OAuth state and never reached
+    /// the top-level keys - and whether a key like claudeAiOauth is present is
+    /// the entire question.
     /// </summary>
     internal static string DescribeShape(string json)
     {
-        var names = new List<string>();
+        JsonDocument document;
         try
         {
-            using JsonDocument document = JsonDocument.Parse(json);
-            Collect(document.RootElement, 0);
+            document = JsonDocument.Parse(json);
         }
         catch (JsonException)
         {
             return string.Empty;
         }
 
-        return string.Join(", ", names.Distinct(StringComparer.Ordinal).Take(12));
-
-        void Collect(JsonElement element, int depth)
+        using (document)
         {
-            if (depth > 3 || names.Count > 24)
-            {
-                return;
-            }
+            var names = new List<string>();
+            var queue = new Queue<(JsonElement Element, int Depth)>();
+            queue.Enqueue((document.RootElement, 0));
 
-            if (element.ValueKind == JsonValueKind.Array)
+            while (queue.Count > 0 && names.Count < 18)
             {
-                foreach (JsonElement item in element.EnumerateArray())
+                (JsonElement element, int depth) = queue.Dequeue();
+                if (depth > 3)
                 {
-                    Collect(item, depth + 1);
+                    continue;
                 }
 
-                return;
+                if (element.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (JsonElement item in element.EnumerateArray())
+                    {
+                        queue.Enqueue((item, depth + 1));
+                    }
+
+                    continue;
+                }
+
+                if (element.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    if (!names.Contains(property.Name, StringComparer.Ordinal))
+                    {
+                        names.Add(property.Name);
+                    }
+
+                    queue.Enqueue((property.Value, depth + 1));
+                }
             }
 
-            if (element.ValueKind != JsonValueKind.Object)
-            {
-                return;
-            }
-
-            foreach (JsonProperty property in element.EnumerateObject())
-            {
-                names.Add(property.Name);
-                Collect(property.Value, depth + 1);
-            }
+            return string.Join(", ", names);
         }
     }
 

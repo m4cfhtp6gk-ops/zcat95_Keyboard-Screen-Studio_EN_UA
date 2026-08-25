@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **A third party's access token could have been sent to Anthropic.** The same
+  `.credentials.json` also stores the OAuth state of every MCP server a plugin
+  has connected - Linear, Notion, whatever else - and each of those has its own
+  `accessToken` field. Loosening the name matching in v1.10.3 made those
+  reachable: on a file with a completed MCP connection and no Claude login, the
+  screen would have picked up somebody else's credential and presented it to
+  `api.anthropic.com`. It would have failed, and it would have handed a token
+  belonging to one service to another. Those sections are now skipped
+  entirely, and a real Claude login sitting beside them is still found.
+- **The diagnostic buried the one fact that mattered.** It walked the file
+  depth first and stopped at its name cap inside the first branch it entered,
+  so a file whose first key opens a large MCP section reported twelve fields
+  belonging to one plugin server and never reached the top-level keys - and
+  whether a key like `claudeAiOauth` is present is the entire question. It
+  reads breadth first now, so the top level always comes first.
+
 ## v1.10.3 - 2026-08-25
 
 ### Fixed
