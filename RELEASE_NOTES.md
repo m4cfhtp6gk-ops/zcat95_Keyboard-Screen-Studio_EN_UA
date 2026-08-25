@@ -1,50 +1,42 @@
-# v1.10.3
+# v1.10.4
 
-v1.10.2 made the Claude screen say what it actually saw. What it said was
-"read the file, but there is no access token in it" - which moved the problem
-from finding the login to understanding it.
+v1.10.3 asked the Claude screen to say what the credentials file holds. What
+it reported named a mistake in v1.10.3 itself.
 
 ## Fixed
 
-- **The credentials file was being read and then not understood.** On a
-  machine with Claude Code installed and signed in, the file is found, opened
-  and parsed - and the walk through it came back empty. Three reasons, all in
-  the reading: underscores were not folded when comparing names, names were
-  compared for exact equality so a prefixed or wrapped one missed, and a
-  credential kept as a serialized JSON document inside a string value was
-  invisible.
+- **A token belonging to another service could have been sent to Anthropic.**
+  Claude Code's credentials file holds more than your Claude login: it also
+  stores the OAuth state of every MCP server a plugin has connected - Linear,
+  Notion, whatever else - and each of those has its own access token.
 
-  All three are fixed. A second pass also accepts weaker names like a bare
-  `token`, but only after the whole file has been searched for a real access
-  token, so a file holding both never answers with the weaker one.
+  Loosening how names were matched in v1.10.3 put those within reach. On a
+  machine with a connected MCP server and no Claude login in that file, this
+  app would have taken one of those tokens and presented it to
+  api.anthropic.com. The request would have failed, and a credential belonging
+  to one service would have been handed to another.
 
-  A refresh token is never picked up. It does not work as a bearer, and it is
-  the more sensitive half of the pair, so loosening the match without that
-  exclusion would have made things worse rather than better.
+  Those sections are now skipped outright. A real Claude login sitting beside
+  them is still found.
 
-- **When there is still no token, the check now names the fields the file does
-  hold.** Which login your machine has is what decides whether this screen can
-  work at all: a Claude subscription login has an access token, a Console
-  API-key login does not. The app has never once said which one it was looking
-  at. Now it does.
-
-  Field names only. No value is read, the walk stops at three levels and
-  twelve names, and a test asserts that a secret-looking value never reaches
-  the screen.
+- **The diagnostic buried the one fact worth reporting.** It read the file
+  depth first and stopped at its limit inside the first branch it entered, so
+  a file whose first key opens a large plugin section spent every name it had
+  on one server's internals and never reached the top level. Whether your file
+  contains a Claude login at all is the entire question, and the report could
+  not answer it. It reads breadth first now, so the top-level keys always come
+  first.
 
 ## Notes
 
-- Your Claude Code token is read fresh when needed, sent to api.anthropic.com
-  and nowhere else, and never written into settings, an exported backup or a
-  log. The diagnostic line reports only where it looked and what shape it
-  found - paths and field names, never contents, never the token. See
-  PRIVACY.md.
-- The access token expires about once an hour and only Claude Code refreshes
-  it. If the screen says the login expired, run Claude Code and it recovers on
-  its own.
-- If the file cannot be found at all, `claude setup-token` prints a long-lived
+- If the check reports fields but no Claude login, that is now a reliable
+  answer rather than an artifact: the file genuinely holds no subscription
+  token, and Claude Code is keeping yours somewhere else.
+- The fallback that works regardless: `claude setup-token` prints a long-lived
   token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, which this app
   reads ahead of any file.
+- Field names only ever leave the file as names. No value is read, and a test
+  asserts that a secret-looking value never reaches the screen. See PRIVACY.md.
 
 ## Platforms
 
