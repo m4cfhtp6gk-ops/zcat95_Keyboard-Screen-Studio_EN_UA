@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The credentials file was being read and then not understood.** v1.10.2's
+  diagnostic did its job and moved the diagnosis: on a machine where Claude
+  Code is installed and signed in, the file is found, opened and parsed - and
+  the walk through it comes back with no token. So the search was never the
+  last problem; the matching was.
+
+  The walk is now less literal. Names are matched on a normalized form with
+  underscores folded as well as hyphens, on a contains rather than an exact
+  equality, and with a second pass for weaker names like a bare `token` that
+  runs only after the whole document has been searched for a real access
+  token. A refresh token is excluded outright at every step: presenting one as
+  a bearer fails, and it is the more sensitive half of the pair. A value that
+  is itself a JSON document is stepped into, since some stores keep the whole
+  credential as one serialized blob.
+
+  And when there is still no token, the check now reports the property names
+  the file does hold - names only, never values. Which login a machine has is
+  the thing that decides whether this screen can work at all, and it was the
+  one thing the app never said.
+
 ## v1.10.2 - 2026-08-24
 
 ### Fixed

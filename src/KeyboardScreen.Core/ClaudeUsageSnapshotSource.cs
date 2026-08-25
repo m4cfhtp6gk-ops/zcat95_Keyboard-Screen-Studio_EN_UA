@@ -342,7 +342,8 @@ public sealed class ClaudeUsageSnapshotSource : IDisposable
                 lookup.Detail.Length > 0 ? lookup.Detail : "-"),
             ClaudeCredentialProblem.Unreadable => Loc.T("ClaudeCheckUnreadable", lookup.Path, lookup.Detail),
             ClaudeCredentialProblem.Unparseable => Loc.T("ClaudeCheckUnparseable", lookup.Path),
-            _ => Loc.T("ClaudeCheckNoToken", lookup.Path)
+            _ => Loc.T("ClaudeCheckNoToken", lookup.Path,
+                lookup.Detail.Length > 0 ? lookup.Detail : "-")
         };
 
         // Naming the other places turns "it is not where I expected" into

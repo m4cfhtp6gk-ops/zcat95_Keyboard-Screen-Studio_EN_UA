@@ -80,7 +80,17 @@ public static class ClaudeCodeCredentials
     /// <summary>Documented override for a long-lived token, used by CI and scripts.</summary>
     public const string TokenEnvironmentVariable = "CLAUDE_CODE_OAUTH_TOKEN";
 
-    private static readonly string[] TokenNames = ["accesstoken", "access_token"];
+    /// <summary>
+    /// Names that carry the bearer token itself. Matched on a normalized name so
+    /// accessToken, access_token and access-token are one case.
+    /// </summary>
+    private static readonly string[] TokenNames = ["accesstoken", "oauthaccesstoken"];
+
+    /// <summary>
+    /// Weaker names, tried only after the whole document has been searched for a
+    /// real access token, so a file that has both does not answer with this one.
+    /// </summary>
+    private static readonly string[] FallbackTokenNames = ["token", "oauthtoken", "bearertoken", "bearer"];
     private static readonly string[] ExpiryNames = ["expiresat", "expires_at", "expiry"];
 
     private const string ConfigDirectoryVariable = "CLAUDE_CONFIG_DIR";
@@ -346,7 +356,7 @@ public static class ClaudeCodeCredentials
             null,
             wellFormed ? ClaudeCredentialProblem.NoTokenInside : ClaudeCredentialProblem.Unparseable,
             path,
-            string.Empty);
+            wellFormed ? DescribeShape(json) : string.Empty);
     }
 
     /// <summary>
@@ -386,9 +396,16 @@ public static class ClaudeCodeCredentials
         }
     }
 
-    private static ClaudeCodeCredential? Find(JsonElement element, string source, int depth)
+    private static ClaudeCodeCredential? Find(JsonElement element, string source, int depth) =>
+        Find(element, source, depth, TokenNames) ?? Find(element, source, depth, FallbackTokenNames);
+
+    private static ClaudeCodeCredential? Find(
+        JsonElement element,
+        string source,
+        int depth,
+        string[] wanted)
     {
-        if (depth > 6)
+        if (depth > 8)
         {
             return null;
         }
@@ -397,7 +414,7 @@ public static class ClaudeCodeCredentials
         {
             foreach (JsonElement item in element.EnumerateArray())
             {
-                if (Find(item, source, depth + 1) is { } nested)
+                if (Find(item, source, depth + 1, wanted) is { } nested)
                 {
                     return nested;
                 }
@@ -414,7 +431,7 @@ public static class ClaudeCodeCredentials
         foreach (JsonProperty property in element.EnumerateObject())
         {
             if (property.Value.ValueKind == JsonValueKind.String
-                && TokenNames.Contains(Normalize(property.Name))
+                && Wants(property.Name, wanted)
                 && property.Value.GetString() is { Length: > 0 } token)
             {
                 // The expiry, when there is one, sits beside the token.
@@ -424,13 +441,95 @@ public static class ClaudeCodeCredentials
 
         foreach (JsonProperty property in element.EnumerateObject())
         {
-            if (Find(property.Value, source, depth + 1) is { } nested)
+            if (Find(property.Value, source, depth + 1, wanted) is { } nested)
             {
                 return nested;
+            }
+
+            // A value that is itself a JSON document is worth stepping into: some
+            // stores keep the credential as one serialized blob.
+            if (property.Value.ValueKind == JsonValueKind.String
+                && property.Value.GetString() is { Length: > 1 } text
+                && text.TrimStart().StartsWith('{'))
+            {
+                try
+                {
+                    using JsonDocument inner = JsonDocument.Parse(text);
+                    if (Find(inner.RootElement, source, depth + 1, wanted) is { } embedded)
+                    {
+                        return embedded;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Not JSON after all; it was only ever a guess.
+                }
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// A refresh token is never the answer: presenting one as a bearer fails, and
+    /// it is the more sensitive of the pair. Everything else is matched on a
+    /// contains so a prefixed name still counts.
+    /// </summary>
+    private static bool Wants(string name, string[] wanted)
+    {
+        string normalized = Normalize(name);
+        return !normalized.Contains("refresh", StringComparison.Ordinal)
+            && wanted.Any(candidate => normalized.Contains(candidate, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The property names in the document, so a file that holds no token can say
+    /// what it does hold. Names only - no value is ever read here, and the walk
+    /// is capped so a large file cannot fill the screen.
+    /// </summary>
+    internal static string DescribeShape(string json)
+    {
+        var names = new List<string>();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            Collect(document.RootElement, 0);
+        }
+        catch (JsonException)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(", ", names.Distinct(StringComparer.Ordinal).Take(12));
+
+        void Collect(JsonElement element, int depth)
+        {
+            if (depth > 3 || names.Count > 24)
+            {
+                return;
+            }
+
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in element.EnumerateArray())
+                {
+                    Collect(item, depth + 1);
+                }
+
+                return;
+            }
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                names.Add(property.Name);
+                Collect(property.Value, depth + 1);
+            }
+        }
     }
 
     private static DateTimeOffset? ReadExpiry(JsonElement owner)
@@ -462,5 +561,6 @@ public static class ClaudeCodeCredentials
         return null;
     }
 
-    private static string Normalize(string name) => name.Replace("-", string.Empty).ToLowerInvariant();
+    private static string Normalize(string name) =>
+        name.Replace("-", string.Empty).Replace("_", string.Empty).ToLowerInvariant();
 }
