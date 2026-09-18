@@ -283,6 +283,23 @@ private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) =>
     private void ThemeAccentResetButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.CurrentThemeAccentColor = string.Empty;
 
+    private void FindKeyboardButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.PrepareNetworkScan();
+
+    private async void ScanNetworksButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await _viewModel.ScanSelectedNetworksAsync();
+
+    private void StopFindKeyboardButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _viewModel.CancelNetworkScan();
+
+    private void UseDiscoveredDeviceButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is DiscoveredDeviceViewModel device)
+        {
+            _viewModel.UseDiscoveredDevice(device);
+        }
+    }
+
     private void ClaudeStatuslineSetupButton_OnClick(object? sender, RoutedEventArgs e) =>
         _viewModel.SetUpClaudeStatusline();
 

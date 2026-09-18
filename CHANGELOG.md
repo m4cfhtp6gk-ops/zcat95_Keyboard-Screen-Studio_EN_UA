@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.9.0 - 2026-09-18
+
+### Fixed
+
+- A keyboard that went offline could stay blank: failed pushes were
+  remembered as delivered, so the frame the device missed was never
+  re-sent. Only an acknowledged push is recorded now, any failure forgets
+  what the device holds, and extra keyboards are tracked separately.
+- An unchanged picture is re-sent every two minutes, so a device that was
+  unplugged or reset repaints without waiting for the picture to change.
+
+### Added
+
+- "Find keyboard" beside the address field: it shows which networks would
+  be scanned and sends nothing until confirmed, probes with a plain GET
+  that cannot alter any screen, and sticks to private ranges, narrowing
+  anything wider than a /24 and skipping VPN and virtual adapters.
+
 ## v1.8.0 - 2026-08-23
 
 ### Added

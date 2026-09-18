@@ -1158,10 +1158,37 @@
                     </Border>
 <Border Classes="card" Padding="16">
                       <StackPanel Spacing="12">
-                        <Grid ColumnDefinitions="92,*">
+                        <Grid ColumnDefinitions="92,*,Auto" ColumnSpacing="8">
                           <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DeviceAddress}" />
                           <controls:IpAddressEditor Grid.Column="1" Value="{Binding DeviceIp, Mode=TwoWay}" />
+                          <Button Grid.Column="2" VerticalAlignment="Center"
+                                  IsVisible="{Binding !IsScanningDevices}"
+                                  Click="FindKeyboardButton_OnClick" Content="{infra:Localize DeviceScanButton}" />
+                          <Button Grid.Column="2" VerticalAlignment="Center"
+                                  IsVisible="{Binding IsScanningDevices}"
+                                  Click="StopFindKeyboardButton_OnClick" Content="{infra:Localize DeviceScanStop}" />
                         </Grid>
+                        <StackPanel Spacing="8" IsVisible="{Binding HasDiscoveryPlan}">
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize DeviceScanPlanHint}" TextWrapping="Wrap" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{Binding DiscoveryPlanText}" TextWrapping="Wrap" />
+                          <Button HorizontalAlignment="Left" Click="ScanNetworksButton_OnClick" Content="{infra:Localize DeviceScanConfirm}" />
+                        </StackPanel>
+                        <TextBlock Classes="secondary" FontSize="11" IsVisible="{Binding DiscoveryStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Text="{Binding DiscoveryStatus}" TextWrapping="Wrap" />
+                        <ItemsControl IsVisible="{Binding HasDiscoveredDevices}" ItemsSource="{Binding DiscoveredDevices}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,6">
+                                <StackPanel Spacing="2">
+                                  <TextBlock FontWeight="SemiBold" Text="{Binding Address}" />
+                                  <TextBlock Classes="secondary" FontSize="11" Text="{Binding Evidence}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" VerticalAlignment="Center"
+                                        Click="UseDiscoveredDeviceButton_OnClick" Content="{infra:Localize DeviceScanUse}" />
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
                           <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize DevicesExtraLabel}" />
                           <TextBox Grid.Column="1" MaxLength="128" PlaceholderText="192.168.1.51, 192.168.1.52" Text="{Binding AdditionalDevices, Mode=TwoWay}" />

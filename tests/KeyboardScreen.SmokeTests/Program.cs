@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Net.NetworkInformation;
 using KeyboardScreen.Core;
 
 Loc.Instance.Initialize(AppLanguage.English);
@@ -2182,6 +2183,212 @@ Assert(KnobControl.PickBinding([new("SHARED", 0x00E9, 0)], [new("SHARED", 0x00E9
 Assert(KnobControl.PickBinding([], [new("SHARED", 0x00E9, 0)]) is null,
     "hearing nothing from the knob must not bind anything");
 Console.WriteLine("PASS knob switching: circular cycle, carousel fallback, VID/PID, hot keys, knob detection");
+
+// ---- push ledger: never re-send, never leave a screen blank ----------------
+// The old dedup recorded every attempt, so a push that failed was remembered as
+// delivered and the identical next frame was skipped - the keyboard came back
+// online and stayed blank. These assertions pin the two rules that fix it.
+{
+    var primary = new Uri("http://192.168.1.50/image/upload");
+    var mirror = new Uri("http://192.168.1.77/image/upload");
+    DateTimeOffset t0 = DateTimeOffset.Now;
+    string frameA = FrameHash.Compute([1, 2, 3]);
+    string frameB = FrameHash.Compute([1, 2, 4]);
+    Assert(frameA != frameB, "different bytes must hash differently");
+    Assert(frameA == FrameHash.Compute([1, 2, 3]), "identical bytes must hash identically");
+
+    var ledger = new FramePushLedger(TimeSpan.FromSeconds(120));
+    Assert(ledger.ShouldSend(primary, frameA, t0), "a device we know nothing about must be sent to");
+    ledger.RecordSuccess(primary, frameA, t0);
+    Assert(!ledger.ShouldSend(primary, frameA, t0.AddSeconds(1)),
+        "a frame the device acknowledged must not be re-sent");
+    Assert(ledger.ShouldSend(primary, frameB, t0.AddSeconds(1)), "a changed frame must be sent");
+    Assert(ledger.ShouldSend(primary, frameA, t0.AddSeconds(1), force: true), "force must bypass the ledger");
+
+    // The bug this whole class exists for.
+    ledger.Invalidate(primary);
+    Assert(ledger.ShouldSend(primary, frameA, t0.AddSeconds(2)),
+        "after a failed push the same frame must be retried, not suppressed");
+
+    // A keyboard that was power-cycled while the picture stood still.
+    var freshLedger = new FramePushLedger(TimeSpan.FromSeconds(120));
+    freshLedger.RecordSuccess(primary, frameA, t0);
+    Assert(!freshLedger.ShouldSend(primary, frameA, t0.AddSeconds(119)), "inside the keep-alive nothing is sent");
+    Assert(freshLedger.ShouldSend(primary, frameA, t0.AddSeconds(120)),
+        "the keep-alive must re-send an unchanged frame so a rebooted screen recovers");
+
+    // A clock that jumped backwards must not freeze pushing until it catches up.
+    Assert(freshLedger.ShouldSend(primary, frameA, t0.AddSeconds(-30)),
+        "a backwards clock step must not suppress pushes");
+
+    // "Unchanged since" must survive keep-alive re-sends, or it can never report
+    // that a screen has been quiet for an hour.
+    var steady = new FramePushLedger(TimeSpan.FromSeconds(120));
+    steady.RecordSuccess(primary, frameA, t0);
+    steady.RecordSuccess(primary, frameA, t0.AddSeconds(120));
+    Assert(steady.UnchangedSince(primary) == t0, "a keep-alive re-send must not reset 'unchanged since'");
+    Assert(steady.LastSentAt(primary) == t0.AddSeconds(120), "the last send time must follow the keep-alive");
+    steady.RecordSuccess(primary, frameB, t0.AddSeconds(150));
+    Assert(steady.UnchangedSince(primary) == t0.AddSeconds(150), "a new picture restarts 'unchanged since'");
+
+    // Devices are tracked apart: one failing must not silence the other.
+    var multi = new FramePushLedger(TimeSpan.FromSeconds(120));
+    multi.RecordSuccess(primary, frameA, t0);
+    Assert(multi.ShouldSend(mirror, frameA, t0), "a second device has its own record");
+    multi.RecordSuccess(mirror, frameA, t0);
+    multi.Invalidate(mirror);
+    Assert(multi.ShouldSend(mirror, frameA, t0.AddSeconds(1)), "the failed mirror retries");
+    Assert(!multi.ShouldSend(primary, frameA, t0.AddSeconds(1)), "the healthy primary stays quiet");
+
+    // Removing an address must not leave its record behind.
+    multi.RetainOnly([primary]);
+    Assert(multi.LastSentAt(mirror) is null, "records for devices no longer configured are dropped");
+    Assert(multi.LastSentAt(primary) is not null, "the configured device keeps its record");
+}
+Console.WriteLine("PASS push ledger: success-only records, retry after failure, keep-alive, per-device");
+
+// ---- finding the keyboard: what may be probed ------------------------------
+// The planner decides what a sweep is allowed to touch. Every assertion here is
+// about NOT probing something: other people's networks, VPN tunnels, and ranges
+// too wide to sweep politely.
+{
+    LanInterface Wifi(string name, string address, string mask,
+        NetworkInterfaceType type = NetworkInterfaceType.Wireless80211,
+        OperationalStatus status = OperationalStatus.Up, string description = "")
+        => new(name, description, IPAddress.Parse(address), IPAddress.Parse(mask), type, status);
+
+    Assert(DeviceDiscoveryPlan.PrefixLength(IPAddress.Parse("255.255.255.0")) == 24, "/24 mask");
+    Assert(DeviceDiscoveryPlan.PrefixLength(IPAddress.Parse("255.255.0.0")) == 16, "/16 mask");
+    Assert(DeviceDiscoveryPlan.PrefixLength(IPAddress.Parse("255.0.255.0")) == -1,
+        "a mask with holes must be rejected rather than guessed at");
+
+    Assert(DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("192.168.1.5")), "192.168/16 is private");
+    Assert(DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("10.1.2.3")), "10/8 is private");
+    Assert(DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("172.20.0.1")), "172.16/12 is private");
+    Assert(!DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("172.32.0.1")), "172.32 is outside the private block");
+    Assert(!DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("100.64.0.1")),
+        "carrier-grade NAT is not a home network and must never be swept");
+    Assert(!DeviceDiscoveryPlan.IsPrivateIPv4(IPAddress.Parse("8.8.8.8")), "public space is never swept");
+
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Wi-Fi", "192.168.1.5", "255.255.255.0")) == ScanSkipReason.None,
+        "an ordinary home Wi-Fi address is scannable");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Loopback", "127.0.0.1", "255.0.0.0", NetworkInterfaceType.Loopback)) == ScanSkipReason.Loopback,
+        "loopback is skipped");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Wi-Fi", "192.168.1.5", "255.255.255.0", status: OperationalStatus.Down)) == ScanSkipReason.NotUp,
+        "a down adapter is skipped");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Wi-Fi", "169.254.10.2", "255.255.0.0")) == ScanSkipReason.LinkLocal,
+        "a link-local address means no DHCP, not a network to sweep");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Ethernet", "203.0.113.4", "255.255.255.0")) == ScanSkipReason.NotPrivate,
+        "a public address is somebody else's network");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("VPN", "10.8.0.2", "255.255.255.0", NetworkInterfaceType.Tunnel)) == ScanSkipReason.Tunnel,
+        "a tunnel adapter is skipped");
+    // The enterprise VPN clients report as plain Ethernet - the type test alone
+    // would walk straight into a corporate network.
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("Ethernet 3", "10.20.30.40", "255.255.255.0",
+            NetworkInterfaceType.Ethernet, description: "Cisco AnyConnect Secure Mobility Client Virtual Miniport Adapter"))
+        == ScanSkipReason.VirtualAdapter,
+        "a VPN adapter that calls itself Ethernet must still be skipped");
+    Assert(DeviceDiscoveryPlan.Classify(Wifi("vEthernet (WSL)", "172.20.1.1", "255.255.240.0",
+            NetworkInterfaceType.Ethernet)) == ScanSkipReason.VirtualAdapter,
+        "the WSL switch is not a network the keyboard is on");
+
+    // A corporate /16 must never become 65k probes.
+    ScanPlan wide = DeviceDiscoveryPlan.Build([Wifi("Ethernet", "10.4.7.9", "255.255.0.0", NetworkInterfaceType.Ethernet)]);
+    Assert(wide.Subnets.Count == 1 && wide.Subnets[0].PrefixLength == 24,
+        "anything wider than a /24 is narrowed to the /24 around this machine");
+    Assert(wide.Subnets[0].WasClamped && wide.Subnets[0].ClampedFromPrefix == 16,
+        "the narrowing must be visible so the panel can say so");
+    Assert(wide.Subnets[0].Network.ToString() == "10.4.7.0", "the narrowed range is the one we are in");
+    Assert(wide.Subnets[0].HostCount == 253, "a /24 minus network, broadcast and ourselves");
+
+    // Two adapters on the same prefix are two different LANs.
+    ScanPlan docked = DeviceDiscoveryPlan.Build([
+        Wifi("Ethernet", "192.168.1.5", "255.255.255.0", NetworkInterfaceType.Ethernet),
+        Wifi("Wi-Fi", "192.168.1.20", "255.255.255.0")
+    ]);
+    Assert(docked.Subnets.Count == 2,
+        "a docked laptop on Ethernet and Wi-Fi sits on two networks that share a prefix");
+
+    ScanPlan nothing = DeviceDiscoveryPlan.Build([Wifi("VPN", "10.8.0.2", "255.255.255.0", NetworkInterfaceType.Tunnel)]);
+    Assert(nothing.Subnets.Count == 0 && nothing.Skipped.Count == 1,
+        "with nothing scannable the plan is empty and says why");
+
+    var subnet = new ScanSubnet(IPAddress.Parse("192.168.1.0"), 24, IPAddress.Parse("192.168.1.5"), "Wi-Fi", 253, false, 24);
+    var hosts = DeviceDiscoveryPlan.HostsIn(subnet);
+    Assert(hosts.Count == 253, "a /24 yields 253 addresses to ask");
+    Assert(!hosts.Any(host => host.ToString() is "192.168.1.0" or "192.168.1.255" or "192.168.1.5"),
+        "the network, broadcast and our own address are never probed");
+
+    var second = new ScanSubnet(IPAddress.Parse("10.0.0.0"), 24, IPAddress.Parse("10.0.0.1"), "Ethernet", 253, false, 24);
+    var interleaved = DeviceDiscoveryPlan.Interleave([subnet, second]);
+    Assert(interleaved.Count == 506, "both networks are covered");
+    Assert(!interleaved.Take(10).All(target => target.Subnet == subnet),
+        "the sweep alternates networks so stopping early still covered both");
+}
+Console.WriteLine("PASS discovery plan: private ranges only, VPN and virtual adapters skipped, wide masks narrowed");
+
+// ---- finding the keyboard: what counts as proof ----------------------------
+// Guessing wrong here means offering a stranger's device as the user's keyboard
+// and then uploading pictures to it every second, so the bar is high.
+{
+    DeviceProbeResponse Answer(int? status, string[]? allow = null, string? server = null,
+        string? cors = null, string? cache = null, string? contentType = null,
+        string body = "", bool truncated = false)
+        => new(status, allow ?? [], server, cors, cache, contentType, body, truncated, "/image/upload");
+
+    Assert(DeviceProbeRules.Evaluate(Answer(null)) == DeviceProbeVerdict.NoResponse, "silence is silence");
+
+    // The decisive answer, and the reason the probe is a GET.
+    Assert(DeviceProbeRules.Evaluate(Answer(405, allow: ["POST"])) == DeviceProbeVerdict.Keyboard,
+        "405 with Allow: POST is the upload endpoint answering a GET");
+    Assert(DeviceProbeRules.Evaluate(Answer(405, allow: ["POST, OPTIONS"])) == DeviceProbeVerdict.Keyboard,
+        "Allow may list several methods");
+    Assert(DeviceProbeRules.Evaluate(Answer(405, allow: ["POSTMAN-PING"])) != DeviceProbeVerdict.Keyboard,
+        "Allow must be matched as a whole token, not as a substring");
+
+    // The trap: a bare 405 is what every unknown path returns.
+    Assert(DeviceProbeRules.Evaluate(Answer(405)) == DeviceProbeVerdict.Possible,
+        "a bare 405 is not evidence - nginx and printers answer that for any path");
+    Assert(DeviceProbeRules.Evaluate(Answer(405, allow: ["GET, HEAD"])) == DeviceProbeVerdict.Possible,
+        "an Allow header without POST is not the upload endpoint");
+    Assert(DeviceProbeRules.Evaluate(Answer(404, server: "nginx/1.24.0")) == DeviceProbeVerdict.NotKeyboard,
+        "a known web server is not a keyboard");
+    Assert(DeviceProbeRules.Evaluate(Answer(401)) == DeviceProbeVerdict.NotKeyboard,
+        "a device asking for a password is somebody's camera or NAS");
+    Assert(DeviceProbeRules.Evaluate(Answer(500)) == DeviceProbeVerdict.NotKeyboard,
+        "a server error tells us nothing good");
+
+    // ESPHome, Tasmota, WLED and Shelly all ship this banner.
+    Assert(DeviceProbeRules.Evaluate(Answer(404, server: "esp-idf/1.0")) == DeviceProbeVerdict.Possible,
+        "an ESP banner alone must never be offered as the keyboard");
+
+    Assert(DeviceProbeRules.Evaluate(Answer(204, cors: "*", cache: "no-store", contentType: "text/plain"))
+        == DeviceProbeVerdict.Keyboard, "the firmware's own empty answer, all four parts present");
+    Assert(DeviceProbeRules.Evaluate(Answer(204, cors: "*", cache: "no-store")) == DeviceProbeVerdict.Possible,
+        "a 204 missing any part of that signature is not proof");
+    Assert(DeviceProbeRules.Evaluate(Answer(204)) == DeviceProbeVerdict.Possible,
+        "a bare 204 is a very ordinary answer");
+
+    Assert(DeviceProbeRules.Evaluate(Answer(400, body: "expected a jpeg body")) == DeviceProbeVerdict.Keyboard,
+        "a body naming the JPEG format is firmware-specific");
+    Assert(DeviceProbeRules.Evaluate(Answer(404, body: "no route for /image/upload")) == DeviceProbeVerdict.Possible,
+        "echoing the requested path back is not evidence - the path contains 'image'");
+    Assert(DeviceProbeRules.Evaluate(Answer(404, body: "<html><body>jpeg</body></html>")) == DeviceProbeVerdict.Possible,
+        "an HTML error page is a web server, whatever words it contains");
+    Assert(DeviceProbeRules.Evaluate(Answer(400, body: new string('x', 256) + "jpeg", truncated: true))
+        == DeviceProbeVerdict.Possible,
+        "a body we only read the start of cannot be judged on what came after");
+
+    Assert(DeviceProbeRules.DescribeEvidence(Answer(405, allow: ["POST"])).Contains("POST"),
+        "the evidence line says what was seen");
+    Assert(DeviceProbeRules.DescribeEvidence(Answer(null)).Length > 0, "even silence describes itself");
+
+    Assert(KeyboardScreenScanner.BudgetFor(253) >= TimeSpan.FromSeconds(45),
+        "a sweep always gets a usable minimum of time");
+    Assert(KeyboardScreenScanner.BudgetFor(10_000) > KeyboardScreenScanner.BudgetFor(253),
+        "a bigger sweep gets proportionally longer");
+}
+Console.WriteLine("PASS probe rules: Allow POST decisive, bare 405 and ESP banners refused, foreign servers vetoed");
 
 // ---- screen builder (composer) --------------------------------------------
 // Layout math: widgets stack with gaps, the first that does not fit is
