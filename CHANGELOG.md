@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.12.0 - 2026-09-18
+
+### Added
+
+- "Find keyboard" beside the address field: it shows which networks would
+  be scanned and sends nothing until confirmed, probes with a plain GET
+  that cannot alter any screen, and sticks to private ranges, narrowing
+  anything wider than a /24 and skipping VPN and virtual adapters.
+
+### Fixed
+
+- An unchanged picture is re-sent every two minutes, so a device that was
+  unplugged or reset repaints without waiting for the picture to change.
+- Extra keyboards keep their own delivery records: an unchanged primary no
+  longer silences the mirrors, and a failed mirror retries.
+- A cancelled push is no longer treated as delivered, and a backwards
+  clock step no longer suppresses pushing.
+
 ## v1.11.0 - 2026-08-25
 
 ### Added

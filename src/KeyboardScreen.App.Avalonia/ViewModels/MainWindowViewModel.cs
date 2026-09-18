@@ -89,6 +89,14 @@ public sealed class ComposerRowViewModel(
     public void ClearAccent() => Accent = string.Empty;
 }
 
+/// <summary>One address the sweep answered from, with why it was listed.</summary>
+public sealed class DiscoveredDeviceViewModel(string address, string evidence)
+{
+    public string Address { get; } = address;
+
+    public string Evidence { get; } = evidence;
+}
+
 public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly ISystemSnapshotSource _systemSource = new WindowsSystemSnapshotSource();
@@ -105,6 +113,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private readonly GitHubContributionSource _gitHubSource = new();
     private readonly AirAlertSource _airAlertSource = new();
     private readonly HttpImageDeviceTransport _transport = new();
+    private readonly FramePushLedger _pushLedger = new();
+    private readonly SemaphoreSlim _pushLock = new(1, 1);
     private readonly JsonSettingsStore _settingsStore = new();
     private readonly IWindowsDesktopServices _desktopServices;
     private readonly ImageTheme _imageTheme = new();
@@ -117,7 +127,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private IReadOnlyList<IScreenTheme> _themes = [];
     private IReadOnlyList<ScreenFontOption> _fonts = [];
     private ScreenRenderer _renderer = new();
-    private RenderedFrame? _latestFrame;
+    /// <summary>A rendered frame together with its identity, published as one value.</summary>
+    private sealed record FrameSnapshot(RenderedFrame Frame, string Hash);
+
+    private volatile FrameSnapshot? _latest;
     public PushDiagnostics PushDiagnostics { get; } = new();
     private CancellationTokenSource? _lifetime;
     private CancellationTokenSource? _commitDelay;
@@ -306,7 +319,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _notifyBelow3 = string.Empty;
     private bool _isUpdateAvailable;
     private string? _latestReleaseUrl;
-    private byte[]? _lastPushedJpeg;
     private bool _perfVisualCpuEnabled = true;
     private bool _perfVisualMemoryEnabled = true;
     private bool _perfVisualDownloadEnabled = true;
@@ -2597,6 +2609,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
         _lifetime = new CancellationTokenSource();
         _ = RunRefreshLoopAsync(_lifetime.Token);
+        _ = RunKeepAliveLoopAsync(_lifetime.Token);
         // A stored session means the user already logged in - reconnect quietly.
         if (_settings.Telegram is { IsConfigured: true } && _telegramService is { HasStoredSession: true })
         {
@@ -3214,6 +3227,158 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    // ---- finding the keyboard on the network ------------------------------
+    // Two presses, on purpose: the first only enumerates this machine's own
+    // networks and shows them, the second is what actually sends anything. No
+    // timer, no startup hook - a probe leaves this computer only when asked.
+
+    private bool _isScanningDevices;
+    private string _discoveryStatus = string.Empty;
+    private string _discoveryPlanText = string.Empty;
+    private IReadOnlyList<ScanSubnet> _plannedSubnets = [];
+    private CancellationTokenSource? _discoveryCts;
+
+    public bool IsScanningDevices
+    {
+        get => _isScanningDevices;
+        private set => SetProperty(ref _isScanningDevices, value);
+    }
+
+    public string DiscoveryStatus
+    {
+        get => _discoveryStatus;
+        private set => SetProperty(ref _discoveryStatus, value);
+    }
+
+    /// <summary>Which networks the sweep would touch; shown before anything is sent.</summary>
+    public string DiscoveryPlanText
+    {
+        get => _discoveryPlanText;
+        private set
+        {
+            if (SetProperty(ref _discoveryPlanText, value))
+            {
+                OnPropertyChanged(nameof(HasDiscoveryPlan));
+            }
+        }
+    }
+
+    public bool HasDiscoveryPlan => _discoveryPlanText.Length > 0;
+
+    public ObservableCollection<DiscoveredDeviceViewModel> DiscoveredDevices { get; } = [];
+
+    public bool HasDiscoveredDevices => DiscoveredDevices.Count > 0;
+
+    /// <summary>First press: work out what could be scanned. Sends nothing.</summary>
+    public void PrepareNetworkScan()
+    {
+        DiscoveredDevices.Clear();
+        OnPropertyChanged(nameof(HasDiscoveredDevices));
+        DiscoveryStatus = string.Empty;
+
+        ScanPlan plan;
+        try
+        {
+            plan = DeviceDiscoveryPlan.Build(KeyboardScreenScanner.EnumerateLocalInterfaces());
+        }
+        catch (Exception)
+        {
+            DiscoveryPlanText = string.Empty;
+            DiscoveryStatus = Loc.T("DeviceScanFailed");
+            return;
+        }
+
+        _plannedSubnets = plan.Subnets;
+        if (plan.Subnets.Count == 0)
+        {
+            DiscoveryPlanText = string.Empty;
+            DiscoveryStatus = Loc.T("DeviceScanNoNetwork");
+            return;
+        }
+
+        DiscoveryPlanText = string.Join(Environment.NewLine, plan.Subnets.Select(subnet =>
+        {
+            string line = Loc.T("DeviceScanSubnetLabel", subnet.AdapterName, subnet.ToString(), subnet.HostCount);
+            return subnet.WasClamped
+                ? line + " · " + Loc.T("DeviceScanSubnetClamped", "/" + subnet.ClampedFromPrefix)
+                : line;
+        }));
+    }
+
+    /// <summary>Second press: the only path that puts a packet on the network.</summary>
+    public async Task ScanSelectedNetworksAsync()
+    {
+        if (IsScanningDevices || _plannedSubnets.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<ScanTarget> targets = DeviceDiscoveryPlan.Interleave(_plannedSubnets);
+        if (targets.Count == 0)
+        {
+            DiscoveryStatus = Loc.T("DeviceScanNoNetwork");
+            return;
+        }
+
+        _discoveryCts?.Dispose();
+        _discoveryCts = new CancellationTokenSource();
+        IsScanningDevices = true;
+        DiscoveredDevices.Clear();
+        OnPropertyChanged(nameof(HasDiscoveredDevices));
+
+        try
+        {
+            using var scanner = new KeyboardScreenScanner();
+            var progress = new Progress<DiscoveryProgress>(report =>
+                DiscoveryStatus = Loc.T("DeviceScanRunning", report.Probed, report.Total));
+            DiscoveryOutcome outcome = await scanner.ScanAsync(targets, progress, _discoveryCts.Token);
+
+            foreach (DiscoveredDevice device in outcome.Matches.Concat(outcome.Possible))
+            {
+                DiscoveredDevices.Add(new DiscoveredDeviceViewModel(
+                    device.Address.ToString(),
+                    device.Verdict == DeviceProbeVerdict.Keyboard
+                        ? Loc.T("DeviceScanFound") + " · " + device.Evidence
+                        : Loc.T("DeviceScanMaybe") + " · " + device.Evidence));
+            }
+
+            OnPropertyChanged(nameof(HasDiscoveredDevices));
+            DiscoveryStatus = outcome.Cancelled
+                ? Loc.T("DeviceScanStopped")
+                : outcome.BudgetExpired
+                    ? Loc.T("DeviceScanTimedOut")
+                    : DiscoveredDevices.Count == 0
+                        ? Loc.T("DeviceScanNone")
+                        : Loc.T("DeviceScanDone", outcome.Probed, outcome.Responded);
+            DiscoveryPlanText = string.Empty;
+        }
+        catch (Exception)
+        {
+            DiscoveryStatus = Loc.T("DeviceScanFailed");
+        }
+        finally
+        {
+            IsScanningDevices = false;
+        }
+    }
+
+    public void CancelNetworkScan() => _discoveryCts?.Cancel();
+
+    /// <summary>
+    /// Adopts a found address. The DeviceIp setter already schedules a commit and
+    /// a forced push, so the keyboard lights up without a second mechanism.
+    /// </summary>
+    public void UseDiscoveredDevice(DiscoveredDeviceViewModel device)
+    {
+        if (device is not null)
+        {
+            DeviceIp = device.Address;
+            DiscoveryStatus = string.Empty;
+            DiscoveredDevices.Clear();
+            OnPropertyChanged(nameof(HasDiscoveredDevices));
+        }
+    }
+
     private void SelectTheme(string? id)
     {
         ThemeItemViewModel? item = ThemeGroups
@@ -3706,6 +3871,35 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         await _settingsStore.SaveAsync(_settings, cancellationToken);
     }
 
+    /// <summary>
+    /// Re-offers the current frame on a slow tick so the ledger's keep-alive can
+    /// fire. The refresh loop cannot carry this: on a static picture it skips the
+    /// push path entirely, which is exactly the case where a keyboard that was
+    /// unplugged and plugged back in would otherwise stay dark.
+    /// </summary>
+    private async Task RunKeepAliveLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+                if (AutoPush)
+                {
+                    await PushLatestAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Recovery must outlive a single bad tick.
+            }
+        }
+    }
+
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -3986,7 +4180,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 popupOverlay = overlayCanvas =>
                     TelegramPopupOverlay.Draw(overlayCanvas, popupTitle, popupPreview);
             }
-            _latestFrame = _renderer.Render(
+            RenderedFrame rendered = _renderer.Render(
                 theme,
                 snapshot,
                 100,
@@ -4013,7 +4207,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 alertTakeover.Active ? 100 : ThemeSchedule.BrightnessPercent(_settings.Schedule, scheduleNow),
                 popupOverlay);
 
-            using var stream = new MemoryStream(_latestFrame.JpegBytes, writable: false);
+            // One publish: a reader can never see the frame without its hash.
+            _latest = new FrameSnapshot(rendered, FrameHash.Compute(rendered.JpegBytes));
+            using var stream = new MemoryStream(rendered.JpegBytes, writable: false);
             var bitmap = new Bitmap(stream);
             bool accepted = false;
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -4050,45 +4246,84 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Sends the current frame to every configured device that does not already
+    /// hold it. A device is only ever recorded as holding a frame it actually
+    /// acknowledged, so a failed or cancelled push is retried rather than
+    /// silently skipped - that mistake leaves a keyboard blank until the picture
+    /// happens to change.
+    /// </summary>
     private async Task PushLatestAsync(CancellationToken cancellationToken, bool forcePush = false)
     {
-        if (_latestFrame is null || !TryCreateEndpoint(DeviceIp, out Uri? endpoint))
+        FrameSnapshot? snapshot = _latest;
+        if (snapshot is null)
         {
-            // No address is not a failed connection: nothing was attempted.
-            SetDeviceUnknown(hasAddress: false);
             return;
         }
 
-        if (!forcePush &&
-            _lastPushedJpeg is not null &&
-            _latestFrame.JpegBytes.AsSpan().SequenceEqual(_lastPushedJpeg))
+        // A forced push (settings commit, manual send) waits its turn; the
+        // refresh tick gives up instead of queueing behind an 8-second timeout.
+        if (forcePush)
         {
-            // An identical frame needs no bytes on the wire. The status stays on
-            // the last real result: a failed push is no longer recorded as sent,
-            // so a genuine outage retries on the next tick instead of sticking.
+            await _pushLock.WaitAsync(cancellationToken);
+        }
+        else if (!await _pushLock.WaitAsync(0, cancellationToken))
+        {
             return;
         }
 
-        DevicePushResult result = await _transport.PushAsync(endpoint, _latestFrame, cancellationToken);
-        PushDiagnostics.Record(result, _latestFrame.JpegBytes.Length);
-        Dispatcher.UIThread.Post(RaiseDiagnosticsProperties);
-        // Only a delivered frame counts as sent. Recording a failed push here
-        // fed the de-dupe check below, so a Wi-Fi blip on a stable frame meant
-        // the keyboard never received that content again.
-        if (result.Success)
+        try
         {
-            _lastPushedJpeg = _latestFrame.JpegBytes;
-        }
+            bool hasPrimary = TryCreateEndpoint(DeviceIp, out Uri? endpoint);
+            List<Uri> extras = ReadAdditionalEndpoints();
+            _pushLedger.RetainOnly([.. hasPrimary ? new[] { endpoint! } : [], .. extras]);
+            DateTimeOffset now = DateTimeOffset.Now;
 
-        SetDeviceStatus(result.Success);
-        await PushToAdditionalDevicesAsync(_latestFrame, cancellationToken);
+            if (!hasPrimary)
+            {
+                // No address is not a failed connection: nothing was attempted.
+                SetDeviceUnknown(hasAddress: false);
+            }
+            else if (_pushLedger.ShouldSend(endpoint!, snapshot.Hash, now, forcePush))
+            {
+                try
+                {
+                    DevicePushResult result = await _transport.PushAsync(endpoint!, snapshot.Frame, cancellationToken);
+                    PushDiagnostics.Record(result, snapshot.Frame.JpegBytes.Length);
+                    // Only a delivered frame counts as held by the device.
+                    if (result.Success)
+                    {
+                        _pushLedger.RecordSuccess(endpoint!, snapshot.Hash, now);
+                    }
+                    else
+                    {
+                        _pushLedger.Invalidate(endpoint!);
+                    }
+
+                    SetDeviceStatus(result.Success);
+                    Dispatcher.UIThread.Post(RaiseDiagnosticsProperties);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Nothing came back, so nothing is known about what the
+                    // device holds - and a guess here is what blanks a screen.
+                    _pushLedger.Invalidate(endpoint!);
+                    throw;
+                }
+            }
+
+            // Always: the mirrors keep their own records, so a primary that is
+            // unchanged, failing or not configured must not silence them.
+            await PushToAdditionalDevicesAsync(snapshot, extras, forcePush, now, cancellationToken);
+        }
+        finally
+        {
+            _pushLock.Release();
+        }
     }
 
-    /// <summary>
-    /// Mirrors the frame to the extra keyboards. Their failures show in the
-    /// diagnostics line but never affect the primary device's status.
-    /// </summary>
-    private async Task PushToAdditionalDevicesAsync(RenderedFrame frame, CancellationToken cancellationToken)
+    /// <summary>The extra keyboards, as endpoints; invalid entries are dropped.</summary>
+    private List<Uri> ReadAdditionalEndpoints()
     {
         var endpoints = new List<Uri>();
         foreach (string address in _settings.AdditionalEndpoints ?? [])
@@ -4098,7 +4333,21 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 endpoints.Add(extra);
             }
         }
+        return endpoints;
+    }
 
+    /// <summary>
+    /// Mirrors the frame to the extra keyboards. Their failures show in the
+    /// diagnostics line but never affect the primary device's status, and each
+    /// one is tracked separately so one failing mirror does not hold back the rest.
+    /// </summary>
+    private async Task PushToAdditionalDevicesAsync(
+        FrameSnapshot snapshot,
+        IReadOnlyList<Uri> endpoints,
+        bool forcePush,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
         if (endpoints.Count == 0)
         {
             if (_additionalPushStatus.Length > 0)
@@ -4108,11 +4357,48 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        DevicePushResult[] results = await Task.WhenAll(
-            endpoints.Select(extra => _transport.PushAsync(extra, frame, cancellationToken)));
-        int succeeded = results.Count(pushResult => pushResult.Success);
+        async Task<FramePushOutcome> PushOneAsync(Uri extra)
+        {
+            if (!_pushLedger.ShouldSend(extra, snapshot.Hash, now, forcePush))
+            {
+                return FramePushOutcome.Skipped;
+            }
+
+            try
+            {
+                DevicePushResult result = await _transport.PushAsync(extra, snapshot.Frame, cancellationToken);
+                if (result.Success)
+                {
+                    _pushLedger.RecordSuccess(extra, snapshot.Hash, now);
+                    return FramePushOutcome.Sent;
+                }
+
+                _pushLedger.Invalidate(extra);
+                return FramePushOutcome.Failed;
+            }
+            catch (OperationCanceledException)
+            {
+                _pushLedger.Invalidate(extra);
+                return FramePushOutcome.Cancelled;
+            }
+        }
+
+        FramePushOutcome[] outcomes = await Task.WhenAll(endpoints.Select(PushOneAsync));
+        if (outcomes.Any(outcome => outcome == FramePushOutcome.Cancelled))
+        {
+            // A superseded refresh knows nothing; it must not overwrite the line.
+            return;
+        }
+
+        if (outcomes.All(outcome => outcome == FramePushOutcome.Skipped))
+        {
+            return;
+        }
+
+        int upToDate = outcomes.Count(outcome =>
+            outcome is FramePushOutcome.Sent or FramePushOutcome.Skipped);
         Dispatcher.UIThread.Post(() =>
-            AdditionalPushStatus = Loc.T("DevicesExtraStatus", succeeded, endpoints.Count));
+            AdditionalPushStatus = Loc.T("DevicesExtraStatus", upToDate, endpoints.Count));
     }
 
     private void SetDeviceStatus(bool connected) =>
