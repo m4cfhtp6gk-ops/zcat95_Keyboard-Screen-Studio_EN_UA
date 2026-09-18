@@ -1,15 +1,6 @@
 # Changelog
 
-## v1.9.0 - 2026-09-18
-
-### Fixed
-
-- A keyboard that went offline could stay blank: failed pushes were
-  remembered as delivered, so the frame the device missed was never
-  re-sent. Only an acknowledged push is recorded now, any failure forgets
-  what the device holds, and extra keyboards are tracked separately.
-- An unchanged picture is re-sent every two minutes, so a device that was
-  unplugged or reset repaints without waiting for the picture to change.
+## v1.12.0 - 2026-09-18
 
 ### Added
 
@@ -17,6 +8,293 @@
   be scanned and sends nothing until confirmed, probes with a plain GET
   that cannot alter any screen, and sticks to private ranges, narrowing
   anything wider than a /24 and skipping VPN and virtual adapters.
+
+### Fixed
+
+- An unchanged picture is re-sent every two minutes, so a device that was
+  unplugged or reset repaints without waiting for the picture to change.
+- Extra keyboards keep their own delivery records: an unchanged primary no
+  longer silences the mirrors, and a failed mirror retries.
+- A cancelled push is no longer treated as delivered, and a backwards
+  clock step no longer suppresses pushing.
+
+## v1.11.0 - 2026-08-25
+
+### Added
+
+- **Sign in to Claude from the app, no command-line tool required.** The screen
+  could only borrow the login the Claude Code command-line tool stores, which
+  left out anyone who uses only the Claude desktop or web app. There is now a
+  "Sign in with your Claude account" button in the Claude settings: it opens
+  your browser, you approve, you paste back a short code, and the app reads your
+  limits directly. It runs the same sign-in Claude Code itself uses.
+
+  The token this produces belongs to the app, so unlike the borrowed login it
+  is stored - in its own file, sealed with Windows DPAPI under your user
+  account, never in the settings file or an exported backup. It asks only for
+  permission to read your usage and profile, and "Sign out" deletes it. The
+  borrowed Claude Code login still works and is still tried; this is an
+  additional way in, not a replacement.
+
+
+- **Each meter says when it resets, not only how long is left.** "In 37
+  minutes" and "at 12:34" answer different questions, and the second is the one
+  you act on when deciding whether to start something now. Windows more than a
+  day out carry the weekday, since "at 19:29" is ambiguous four days ahead.
+- **A set-up guide in the Claude settings, collapsed until it is needed.** The
+  screen borrows the login the Claude Code command-line tool stores, and
+  nothing in the app ever said so - which is how a machine with the Claude
+  desktop app installed could look correctly set up while holding no login this
+  can use. The guide is the whole path from nothing to numbers, including the
+  part where the folder looks full and is not.
+
+### Fixed
+
+- **A moment's throttling blanked a screen that was working.** Anthropic's
+  usage endpoint refuses calls that come too often, and the screen treated that
+  refusal like any other: it threw away the figures it had and drew "not
+  connected" over them. But being asked too often says nothing about whether
+  the last answer was true. A good reading now stays up for twenty minutes
+  through failures, labelled stale, instead of being replaced by nothing.
+- **The connection test could cause the failure it was there to explain.** It
+  cleared its caches and made a live call on every press, so three impatient
+  presses were three requests to an endpoint that rate-limits on frequency.
+  Within a minute of the last one it now repeats that answer instead of asking
+  again.
+- **An empty model row reported having no window for `""`.** The blank box
+  falls back to the default scope, but the message quoted the raw setting, so
+  it named a scope nobody had asked for and told the user nothing about what to
+  type instead. It now names the scope the payload was actually read with.
+
+## v1.10.5 - 2026-08-25
+
+### Fixed
+
+- **The Claude screen cut off its own numbers.** The percentage and the reset
+  countdown were each given a fixed fraction of the same line - 0.62 of it,
+  starting at 0 and at 0.38 - so they overlapped by a quarter of the row.
+  Anything past one digit was ellipsized: 63% drew as "6…" and 100% as "10…".
+  On a screen whose entire job is that number, that is worse than showing
+  nothing.
+
+  The countdown moves up beside the label, which is one short word and had the
+  line to itself, and the figure takes the full width. Both are measured rather
+  than apportioned, with the label given priority since it says which window
+  you are looking at.
+
+### Changed
+
+- **The bars run green to red instead of jumping.** The old rule drew the
+  accent colour below 75%, amber to 90%, then red - so a bar at 4% and a bar at
+  74% were the same colour and only the number carried the change. The fill now
+  moves continuously through amber, so the colour says what the length says.
+- **A model row for a model your account is not metered on now explains
+  itself.** Which models get their own weekly window is Anthropic's decision.
+  Asking for one that has none - "fable", say - used to leave the third row
+  silently missing. The connection test now names the scopes the account does
+  report.
+
+## v1.10.4 - 2026-08-25
+
+### Fixed
+
+- **A third party's access token could have been sent to Anthropic.** The same
+  `.credentials.json` also stores the OAuth state of every MCP server a plugin
+  has connected - Linear, Notion, whatever else - and each of those has its own
+  `accessToken` field. Loosening the name matching in v1.10.3 made those
+  reachable: on a file with a completed MCP connection and no Claude login, the
+  screen would have picked up somebody else's credential and presented it to
+  `api.anthropic.com`. It would have failed, and it would have handed a token
+  belonging to one service to another. Those sections are now skipped
+  entirely, and a real Claude login sitting beside them is still found.
+- **The diagnostic buried the one fact that mattered.** It walked the file
+  depth first and stopped at its name cap inside the first branch it entered,
+  so a file whose first key opens a large MCP section reported twelve fields
+  belonging to one plugin server and never reached the top-level keys - and
+  whether a key like `claudeAiOauth` is present is the entire question. It
+  reads breadth first now, so the top level always comes first.
+
+## v1.10.3 - 2026-08-25
+
+### Fixed
+
+- **The credentials file was being read and then not understood.** v1.10.2's
+  diagnostic did its job and moved the diagnosis: on a machine where Claude
+  Code is installed and signed in, the file is found, opened and parsed - and
+  the walk through it comes back with no token. So the search was never the
+  last problem; the matching was.
+
+  The walk is now less literal. Names are matched on a normalized form with
+  underscores folded as well as hyphens, on a contains rather than an exact
+  equality, and with a second pass for weaker names like a bare `token` that
+  runs only after the whole document has been searched for a real access
+  token. A refresh token is excluded outright at every step: presenting one as
+  a bearer fails, and it is the more sensitive half of the pair. A value that
+  is itself a JSON document is stepped into, since some stores keep the whole
+  credential as one serialized blob.
+
+  And when there is still no token, the check now reports the property names
+  the file does hold - names only, never values. Which login a machine has is
+  the thing that decides whether this screen can work at all, and it was the
+  one thing the app never said.
+
+## v1.10.2 - 2026-08-24
+
+### Fixed
+
+- **The Claude login is now looked for wherever it might be, not in one
+  guessed place.** The old code knew exactly one path - the documented
+  `%USERPROFILE%\.claude\.credentials.json` - and when the file was not there
+  it could only repeat that path back at you. That is fine when the guess is
+  right and useless when it is not: a login made from WSL, or moved with
+  `CLAUDE_CONFIG_DIR`, or kept under AppData, was simply invisible. The search
+  now covers all of those, in order, and the connection test names every place
+  it tried, so a machine that keeps its login somewhere else can be reported
+  rather than guessed at.
+- **Environment variables set after the app started are picked up.** A process
+  inherits its environment when it launches, so setting `CLAUDE_CODE_OAUTH_TOKEN`
+  or `CLAUDE_CONFIG_DIR` in System Properties did nothing until the next sign-out.
+  On Windows the stored user and machine values are now read as well.
+- **The Claude connection test blamed the wrong thing.** It reported "no
+  Claude Code login found at <path>" for six different situations: the folder
+  missing, the file missing, the file there but not openable, the file held
+  open by Claude Code mid-refresh, torn JSON, and a file with no token in it.
+  Being told the wrong reason is worse than being told nothing - it sends you
+  off to reinstall something that was never missing. Each case now says what
+  it actually is, and "no file" additionally lists what the folder does hold,
+  so "never signed in" can be told from "wrong folder entirely".
+- **A login being refreshed read as a login that was not there.** Claude Code
+  rewrites its credentials file about once an hour and can hold it open while
+  it does; the read did not share, so the failure was swallowed and reported
+  as a missing file. It shares now.
+
+### Changed
+
+- The Claude settings card mentions the documented fallback for machines where
+  the credentials file cannot be found: `claude setup-token` mints a
+  long-lived token for the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
+  which this app already reads first. Anthropic documents that token as being
+  for model requests, so it may not be accepted for limits - the card says so
+  rather than promising it.
+
+## v1.10.1 - 2026-08-24
+
+### Fixed
+
+- **Claude limits: right token, wrong host.** v1.10.0 found the credential
+  that is actually meant for a non-browser client - the OAuth token Claude
+  Code stores - and then sent it to `claude.ai/api`, which authenticates a
+  browser session and has no idea what a bearer token is. The limits now come
+  from `api.anthropic.com/api/oauth/usage`, which is the endpoint that takes
+  that token.
+
+  Two headers turned out not to be optional. `anthropic-beta: oauth-2025-04-20`
+  selects the OAuth contract, and the user agent must be `claude-code/` - any
+  other one is served by a bucket that throttles hard enough to look like a
+  broken feature. The endpoint is scoped by the token, so the organization
+  lookup and its cached id are gone and one request now does the whole job.
+
+  It is also polled far more slowly - three minutes rather than thirty seconds -
+  and a refusal is now remembered for five minutes instead of retried on the
+  next tick, which is what turns a minute of throttling into an hour of it.
+  A 429 says so on screen rather than reading as a generic failure.
+
+- **The scrollbar was eating clicks along the right edge of every list.** It
+  is a 10 px overlay drawn on top of the scrolled content, and it is
+  hit-testable, so anything stretched to the full width lost its right edge to
+  it. In the theme sidebar that was the rightmost 16 px of every row - the
+  margin/padding pair meant to reserve that space did not work, because the
+  negative margin widened the viewer and `ScrollViewer.Padding` never reached
+  the viewport. On the settings pages there was no reservation at all: the
+  `page-content` class it should have come from had no style behind it, which
+  put the right edge of every toggle, dropdown and spinner in the Auto column
+  under the bar. The reservation now sits on the content, where it applies.
+
+### Changed
+
+- The string generator under `tools/loc/` is back in step with the catalogues
+  it generates. It had gone stale across v1.9.0 and v1.10.0: running
+  `python3 tools/loc/gen.py`, which its README gives as the way to regenerate,
+  would have dropped 20 strings added in those releases and reverted 13 more.
+
+## v1.10.0 - 2026-08-24
+
+### Changed
+
+- **Claude limits are the account's real figures now.** The screen asks
+  claude.ai for your subscription's own windows, authenticated with the
+  OAuth token Claude Code already stores when you sign in. Nothing to
+  paste, nothing to configure. The token budgets and plan presets are
+  gone with the local token tally they were a denominator for: when the
+  login is missing or expired, the screen says so instead of drawing a
+  substitute number. Each meter now shows the time until it resets, in
+  the space the local token count used to take.
+- The knob's hot-key mode takes a combination you record yourself instead
+  of a fixed F13-F24 list. The Linx68 has no such keys, so that list only
+  ever worked on a board you could remap in VIA/QMK. A modifier is
+  recommended and a binding without one is called out in red, because the
+  listener swallows whatever it binds. Existing F13-F24 settings keep
+  working untouched.
+- Screen builder blocks can each use the dot-matrix face for their
+  numbers and carry their own accent colour, revealed by a chevron on the
+  row. Labels stay in the normal face - the dot font has no Cyrillic - and
+  the switch appears only on blocks that actually draw a number.
+
+### Fixed
+
+- The weekday no longer gets cut to "понеді…" beside the date on the
+  dot-matrix analog clock. The line was split 42/58 with the longer
+  string given the smaller half; it is now divided by what the two
+  strings measure.
+- The dot-matrix clock drops its "Hours / Minutes / Seconds" captions -
+  three numbers stacked largest to smallest say which is which - and
+  centres the column in the freed space.
+
+## v1.9.0 - 2026-08-24
+
+### Changed
+
+- Claude limits now come from Claude Code's own transcripts on this PC. No
+  cookie, no session key, no status-line setup, no request to claude.ai -
+  and nothing that can be rate-limited or challenged. The meters fill
+  against a token budget you set, with plan presets as a starting point,
+  because no local file records the account's real quota. Counts cover this
+  machine only, so they are a floor on real usage.
+- "Screen setup" and "Theme settings" were the wrong way round: the first
+  was a read-only status page, the second held the actual screen setup.
+  They are now "Overview" and "Screen setup", and the accent hint no longer
+  points at the wrong page.
+- The screen builder's editor moved from Automation onto the theme page,
+  next to the other theme settings.
+- Telegram, notifications, the knob and diagnostics collapse in Other
+  settings, so the device address is not below an MTProto login form.
+- Scrollbars are visible and draggable again, at the 10 px the design system
+  always specified. They had been set to zero opacity and no hit-testing, so
+  nothing indicated that 25 of the 33 themes were below the fold.
+
+### Fixed
+
+- The first-run IP field corrupted any address with a three-digit octet -
+  192.168.1.50 became 192..168.150 - and "Save and continue" then did
+  nothing at all, silently, because the validation line was never filled in.
+  Pasting a whole address works now too.
+- The picture theme's clock was frozen: the refresh loop skipped that screen
+  as "static", but it always draws a clock. Fixed on both platforms; the
+  photo is cached so the restored refresh does not re-read it every frame.
+- A failed push was recorded as delivered, so a network blip on an unchanged
+  frame meant the keyboard never received that content again.
+- The device badge no longer claims "Disconnected" before anything has been
+  tried, or forever when automatic push is off.
+- There is now a manual "Send now", by the preview and in the tray menu. The
+  command existed but had never been bound to anything.
+- A bad weather city reported "this theme uses only local time and settings"
+  instead of the real error.
+- Secondary text in the light theme now meets WCAG AA; it measured 3.89:1.
+- The shipped default font id matched nothing, so the font list was empty on
+  every first launch.
+- An exception during startup no longer wedges every later settings change
+  into a silent no-op, and is written to the crash log instead of a
+  Debug.WriteLine that Release builds compile out.
 
 ## v1.8.0 - 2026-08-23
 

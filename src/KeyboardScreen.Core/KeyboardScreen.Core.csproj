@@ -17,6 +17,12 @@
     <EmbeddedResource Include="Localization/Strings.zh-Hans.json" LogicalName="KeyboardScreen.Core.Localization.Strings.zh-Hans.json" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The smoke tests exercise the parsing helpers directly; they stay
+         internal so they are not part of the app's supported surface. -->
+    <InternalsVisibleTo Include="KeyboardScreen.SmokeTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\Fonts\Doto.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="Assets\Fonts\Doto-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Fonts\MiSans-Medium.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
@@ -25,6 +31,10 @@
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <!-- DPAPI for the stored Claude sign-in. Referenced on both targets so the
+         code compiles for the Linux test host; the calls are guarded by
+         OperatingSystem.IsWindows() and never run there. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'" />
   </ItemGroup>
 </Project>

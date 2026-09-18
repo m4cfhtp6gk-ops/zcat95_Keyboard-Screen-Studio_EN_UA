@@ -14,19 +14,17 @@ public enum ClaudeUsageWindowKind
 }
 
 /// <summary>
-/// One Claude limit window.
+/// One Claude usage window, exactly as the account reports it.
 ///
-/// <see cref="UtilizationPercent"/> is what the account actually reports. Token
-/// counts are not part of any limit response, so <see cref="TokensUsed"/> is
-/// summed from the local Claude Code transcripts and only covers this machine —
-/// it is a floor on real usage, never the account total, and it is null when no
-/// transcripts were read.
+/// <see cref="UtilizationPercent"/> is the account's own figure, not arithmetic
+/// done here. There is deliberately no token count: the usage payload carries
+/// none, and the previous design's local tally measured one machine against a
+/// budget the user invented, which looked like data and was not.
 /// </summary>
 public sealed record ClaudeUsageWindow(
     ClaudeUsageWindowKind Kind,
     double UtilizationPercent,
     DateTimeOffset? ResetsAt = null,
-    long? TokensUsed = null,
     string? ScopeName = null)
 {
     public double ClampedPercent => Math.Clamp(UtilizationPercent, 0d, 100d);
@@ -37,22 +35,16 @@ public sealed record ClaudeUsageWindow(
     public double EffectivePercent => HasReset ? 0d : ClampedPercent;
 }
 
-/// <summary>The three limit windows drawn by <see cref="ClaudeUsageTheme"/>.</summary>
 /// <summary>
-/// What one diagnostic round-trip found. Deliberately verbatim: the point is to
-/// replace guesswork with the status code and body the server actually sent.
+/// What one diagnostic pass found: whether a Claude Code credential exists on
+/// this machine and what claude.ai said when it was used. Never the token.
 /// </summary>
-/// <param name="Cookies">Cookie names and value lengths only - never the values.</param>
-public sealed record ClaudeConnectionReport(
-    bool Success,
-    string Stage,
-    int StatusCode,
-    string Message,
-    string Cookies)
+/// <param name="Detail">Where the credential came from, or why the call failed.</param>
+public sealed record ClaudeConnectionReport(bool Success, string Detail)
 {
     public string ToDisplayString() => Success
-        ? Loc.T("ClaudeCheckLineOk", Message, Cookies)
-        : Loc.T("ClaudeCheckLineFailed", Stage, StatusCode, Message, Cookies);
+        ? Loc.T("ClaudeCheckLineOk", Detail)
+        : Loc.T("ClaudeCheckLineFailed", Detail);
 }
 
 public sealed record ClaudeUsageSnapshot(
@@ -64,6 +56,18 @@ public sealed record ClaudeUsageSnapshot(
     bool IsStale = false,
     string? ErrorMessage = null)
 {
+    /// <summary>
+    /// Every per-model window the account reported, whether or not one of them
+    /// is the configured scope.
+    ///
+    /// The model row is chosen by a name the user types, and until this existed
+    /// a name the account does not meter - "fable", say - simply produced no
+    /// third row and no explanation. Anthropic decides which models get their
+    /// own weekly window; the only honest thing the app can do is show which
+    /// ones came back.
+    /// </summary>
+    public IReadOnlyList<string> AvailableModelScopes { get; init; } = [];
+
     public static ClaudeUsageSnapshot Unavailable(string? message = null) =>
         new(false, UpdatedAt: DateTimeOffset.MinValue, ErrorMessage: message);
 

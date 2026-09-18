@@ -10,15 +10,21 @@ public sealed class ImageTheme : IScreenTheme
     public string Details => Loc.T("ThemeImageDetails");
     public string? ImagePath { get; set; }
 
+    private string? _cachedPath;
+    private DateTime _cachedWriteTime;
+    private long _cachedLength;
+    private byte[]? _cachedBytes;
+
     public void Draw(ScreenCanvas canvas, SystemSnapshot snapshot)
     {
         canvas.Fill(Color.FromRgb(8, 10, 14));
         var hasImage = false;
-        if (!string.IsNullOrWhiteSpace(ImagePath) && File.Exists(ImagePath))
+        byte[]? bytes = LoadImageBytes();
+        if (bytes is not null)
         {
             try
             {
-                canvas.Image(File.ReadAllBytes(ImagePath), new Rect(0, 0, canvas.Profile.Width, canvas.Profile.Height));
+                canvas.Image(bytes, new Rect(0, 0, canvas.Profile.Width, canvas.Profile.Height));
                 hasImage = true;
             }
             catch
@@ -47,6 +53,54 @@ public sealed class ImageTheme : IScreenTheme
             default:
                 DrawDigitalOverlay(canvas, snapshot);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// The clock on this screen ticks, so Draw runs on every refresh. Re-reading
+    /// the photo from disk each second was affordable only while the refresh
+    /// loop skipped this theme entirely - which is exactly the bug that froze
+    /// the clock. Cache on path, size and write time so an edited file is still
+    /// picked up.
+    /// </summary>
+    private byte[]? LoadImageBytes()
+    {
+        string? path = ImagePath;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            _cachedBytes = null;
+            _cachedPath = null;
+            return null;
+        }
+
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists)
+            {
+                _cachedBytes = null;
+                _cachedPath = null;
+                return null;
+            }
+
+            if (_cachedBytes is not null
+                && string.Equals(_cachedPath, path, StringComparison.Ordinal)
+                && _cachedWriteTime == info.LastWriteTimeUtc
+                && _cachedLength == info.Length)
+            {
+                return _cachedBytes;
+            }
+
+            byte[] bytes = File.ReadAllBytes(path);
+            _cachedBytes = bytes;
+            _cachedPath = path;
+            _cachedWriteTime = info.LastWriteTimeUtc;
+            _cachedLength = info.Length;
+            return bytes;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return _cachedBytes;
         }
     }
 

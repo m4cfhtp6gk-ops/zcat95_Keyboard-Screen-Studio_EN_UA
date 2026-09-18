@@ -29,9 +29,13 @@ public sealed class CarouselOptionViewModel(ThemeItemViewModel theme, Action cha
 }
 
 /// <summary>One row of the screen-builder editor: a placed widget.</summary>
-public sealed class ComposerRowViewModel(string kind, string text, Action changed) : ObservableObject
+public sealed class ComposerRowViewModel(
+    string kind, string text, bool dotFont, string accent, Action changed) : ObservableObject
 {
     private string _text = text;
+    private bool _dotFont = dotFont;
+    private string _accent = accent;
+    private bool _isExpanded;
 
     public string Kind { get; } = kind;
 
@@ -39,11 +43,50 @@ public sealed class ComposerRowViewModel(string kind, string text, Action change
 
     public bool IsText => Kind == "text";
 
+    /// <summary>
+    /// The font switch only appears where the widget draws a number. Doto has no
+    /// Cyrillic, so offering it on a prose widget would promise a look it cannot
+    /// deliver.
+    /// </summary>
+    public bool SupportsDotFont => ComposerWidgets.Find(Kind)?.HasNumber == true;
+
+    /// <summary>Font and colour live behind a click, so the list stays a list.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
+
     public string Text
     {
         get => _text;
         set { if (SetProperty(ref _text, value)) changed(); }
     }
+
+    public bool DotFont
+    {
+        get => _dotFont;
+        set { if (SetProperty(ref _dotFont, value)) changed(); }
+    }
+
+    /// <summary>#RRGGBB, or empty to follow the theme's accent.</summary>
+    public string Accent
+    {
+        get => _accent;
+        set
+        {
+            string cleaned = (value ?? string.Empty).Trim();
+            if (SetProperty(ref _accent, cleaned))
+            {
+                OnPropertyChanged(nameof(HasAccent));
+                changed();
+            }
+        }
+    }
+
+    public bool HasAccent => _accent.Length > 0;
+
+    public void ClearAccent() => Accent = string.Empty;
 }
 
 /// <summary>One address the sweep answered from, with why it was listed.</summary>
@@ -96,8 +139,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string _selectedNavigation = "screen";
     private ThemeItemViewModel? _selectedTheme;
     private Bitmap? _previewImage;
-    private string _deviceStatus = Loc.T("StatusDisconnected");
+    // Three states, not two. Seeding this as "Disconnected" asserted a failure
+    // before anything had been attempted, and with AutoPush off nothing ever
+    // pushes, so a healthy setup used to sit on red forever.
+    private string _deviceStatus = Loc.T("DeviceStatusUnknown");
     private bool _deviceConnected;
+    private bool _deviceChecked;
     private string _deviceIp = string.Empty;
     private string _accentColor = "#E4694C";
     private string _selectedFontId = ScreenFontOption.DefaultId;
@@ -167,9 +214,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private UiThemeMode _uiThemeMode = UiThemeMode.System;
     private string _updateStatusText = string.Empty;
     private AppLanguageInfo _selectedLanguage = AppLanguageInfo.For(Loc.Language);
-    private string _claudeSessionKey = string.Empty;
     private string _claudeModelScope = ClaudeUsageSettings.DefaultModelScope;
-    private bool _claudeCountLocalTokens = true;
     private ClaudeUsageSnapshot? _claudeUsage;
     private string _currencyBase = "USD";
     private CurrencySourceKind _currencySourceKind = CurrencySourceKind.CurrencyApi;
@@ -296,7 +341,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         OpenFontsFolderCommand = new RelayCommand(() => _desktopServices.OpenFolder(_fontCatalog.FolderPath));
         OpenAuthorCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/zcat95"));
         OpenTokscaleDocsCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://github.com/junhoyeo/tokscale"));
-        OpenClaudeSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://claude.ai"));
         OpenAlertsSiteCommand = new RelayCommand(() => _desktopServices.OpenUrl("https://alerts.in.ua"));
         StartKnobDetectCommand = new RelayCommand(StartKnobDetect);
         KnobDetectNextCommand = new RelayCommand(() => SetKnobDetectStep(2));
@@ -343,7 +387,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public ICommand OpenFontsFolderCommand { get; }
     public ICommand OpenAuthorCommand { get; }
     public ICommand OpenTokscaleDocsCommand { get; }
-    public ICommand OpenClaudeSiteCommand { get; }
     public ICommand OpenAlertsSiteCommand { get; }
     public ICommand StartKnobDetectCommand { get; }
     public ICommand KnobDetectNextCommand { get; }
@@ -1411,34 +1454,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public bool IsClaudeTheme => SelectedTheme?.Id == "claude-usage";
 
-    /// <summary>
-    /// The claude.ai session cookie. It is written to this machine's settings
-    /// file and sent to claude.ai only; the risk notice says so before it is asked for.
-    /// </summary>
-    public string ClaudeSessionKey
-    {
-        get => _claudeSessionKey;
-        set
-        {
-            if (SetProperty(ref _claudeSessionKey, value))
-            {
-                // A different account means the cached organization is wrong.
-                _settings.ClaudeUsage.OrganizationId = string.Empty;
-                ScheduleCommit();
-            }
-        }
-    }
-
     public string ClaudeModelScope
     {
         get => _claudeModelScope;
         set { if (SetProperty(ref _claudeModelScope, value)) ScheduleCommit(); }
-    }
-
-    public bool ClaudeCountLocalTokens
-    {
-        get => _claudeCountLocalTokens;
-        set { if (SetProperty(ref _claudeCountLocalTokens, value)) ScheduleCommit(); }
     }
 
     public bool IsCurrencyTheme => SelectedTheme?.Id == "currency";
@@ -1708,24 +1727,110 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     public bool IsKnobVolumeMode => _knobMode == KnobMode.VolumeKnob;
     public bool IsKnobHotKeyMode => _knobMode == KnobMode.HotKeys;
 
-    public IReadOnlyList<string> KnobKeyOptions => KnobControl.HotKeyNames;
-
     public string KnobKeyForward
     {
         get => _knobKeyForward;
-        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyForward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyBackward
     {
         get => _knobKeyBackward;
-        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyBackward, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
     }
 
     public string KnobKeyToggle
     {
         get => _knobKeyToggle;
-        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RestartKnobListener(); ScheduleCommit(); } }
+        set { if (value is not null && SetProperty(ref _knobKeyToggle, value)) { RaiseKnobKeyText(); RestartKnobListener(); ScheduleCommit(); } }
+    }
+
+    private KnobAction? _knobCapture;
+
+    /// <summary>The combination each action is bound to, spaced out to read as a chord.</summary>
+    public string KnobKeyForwardText => Describe(KnobAction.NextTheme);
+    public string KnobKeyBackwardText => Describe(KnobAction.PreviousTheme);
+    public string KnobKeyToggleText => Describe(KnobAction.ToggleCarousel);
+
+    public bool IsCapturingKnobKey => _knobCapture is not null;
+
+    /// <summary>
+    /// Names any binding that has no modifier. The listener swallows what it
+    /// binds, so a bare key stops working everywhere else while KSS runs - which
+    /// is fine for F13 and ruinous for M. Allowed, but never silently.
+    /// </summary>
+    public string KnobBareKeyWarning
+    {
+        get
+        {
+            string[] bare = new[] { KnobAction.NextTheme, KnobAction.PreviousTheme, KnobAction.ToggleCarousel }
+                .Select(action => KnobControl.ShortcutFor(BuildKnobSettings(), action))
+                .Where(shortcut => shortcut.IsSet && !shortcut.HasModifier)
+                .Select(shortcut => shortcut.Describe())
+                .ToArray();
+            return bare.Length == 0 ? string.Empty : Loc.T("KnobBareKeyWarning", string.Join(", ", bare));
+        }
+    }
+
+    /// <summary>Arms the capture; the window hands back the next real key press.</summary>
+    public void BeginKnobCapture(KnobAction action)
+    {
+        _knobCapture = action;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    public void CancelKnobCapture()
+    {
+        if (_knobCapture is null)
+        {
+            return;
+        }
+
+        _knobCapture = null;
+        OnPropertyChanged(nameof(IsCapturingKnobKey));
+    }
+
+    /// <summary>
+    /// Stores what was pressed. Modifier keys alone are ignored so holding Ctrl
+    /// on the way to Ctrl+Alt+P does not end the capture early.
+    /// </summary>
+    public void ApplyKnobCapture(int virtualKey, KnobModifiers modifiers)
+    {
+        if (_knobCapture is not { } action || virtualKey == 0 || KnobShortcut.IsModifierKey(virtualKey))
+        {
+            return;
+        }
+
+        string stored = new KnobShortcut(virtualKey, modifiers).ToStorageString();
+        switch (action)
+        {
+            case KnobAction.NextTheme: KnobKeyForward = stored; break;
+            case KnobAction.PreviousTheme: KnobKeyBackward = stored; break;
+            default: KnobKeyToggle = stored; break;
+        }
+
+        CancelKnobCapture();
+    }
+
+    private string Describe(KnobAction action)
+    {
+        KnobShortcut shortcut = KnobControl.ShortcutFor(BuildKnobSettings(), action);
+        return shortcut.IsSet ? shortcut.Describe() : Loc.T("KnobKeyUnset");
+    }
+
+    private KnobSettings BuildKnobSettings() => new()
+    {
+        KeyForward = _knobKeyForward,
+        KeyBackward = _knobKeyBackward,
+        KeyToggle = _knobKeyToggle
+    };
+
+    private void RaiseKnobKeyText()
+    {
+        OnPropertyChanged(nameof(KnobKeyForwardText));
+        OnPropertyChanged(nameof(KnobKeyBackwardText));
+        OnPropertyChanged(nameof(KnobKeyToggleText));
+        OnPropertyChanged(nameof(KnobBareKeyWarning));
     }
 
     /// <summary>The selected theme's own accent (#RRGGBB), or empty for the global one.</summary>
@@ -2491,9 +2596,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ReloadFonts();
         ApplySettings();
         _loading = true;
-        await RefreshTokscaleAsync(force: false);
-
-        _loading = false;
+        try
+        {
+            await RefreshTokscaleAsync(force: false);
+        }
+        finally
+        {
+            // Without this, a throw here leaves _loading latched on and
+            // ScheduleCommit early-returns for the rest of the session: every
+            // settings change becomes a silent no-op, saved nowhere.
+            _loading = false;
+        }
         _lifetime = new CancellationTokenSource();
         _ = RunRefreshLoopAsync(_lifetime.Token);
         _ = RunKeepAliveLoopAsync(_lifetime.Token);
@@ -2687,7 +2800,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _loading = true;
         DeviceIp = ExtractDeviceIp(_settings.DeviceEndpoint);
         AccentColor = string.IsNullOrWhiteSpace(_settings.AccentColor) ? "#E4694C" : _settings.AccentColor;
-        SelectedFontId = _settings.SelectedFontId;
+        // ReloadFonts already repaired an unknown id; assigning the stored one
+        // back unvalidated undid that and left the drop-down showing nothing.
+        SelectedFontId = Fonts.Any(font => font.Id == _settings.SelectedFontId)
+            ? _settings.SelectedFontId
+            : ScreenFontOption.DefaultId;
         SelectedLanguage = AppLanguageInfo.For(
             string.IsNullOrWhiteSpace(_settings.Language)
                 ? Loc.Language
@@ -2724,14 +2841,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         StockQuantity4 = FormatQuantity(stockItems[3].Quantity);
         StockQuantity5 = FormatQuantity(stockItems[4].Quantity);
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _claudeSourceKind = _settings.ClaudeUsage.SourceKind;
-        OnPropertyChanged(nameof(ClaudeSourcePreference));
-        OnPropertyChanged(nameof(IsClaudeCookieSource));
-        ClaudeSessionKey = _settings.ClaudeUsage.SessionKey;
         ClaudeModelScope = string.IsNullOrWhiteSpace(_settings.ClaudeUsage.ModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : _settings.ClaudeUsage.ModelScope;
-        ClaudeCountLocalTokens = _settings.ClaudeUsage.CountLocalTokens;
         _settings.Currency ??= new CurrencySettings();
         _currencySourceKind = _settings.Currency.SourceKind;
         OnPropertyChanged(nameof(CurrencySourcePreference));
@@ -2907,7 +3019,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             if (ComposerWidgets.Find(widget.Kind) is not null)
             {
-                ComposerRows.Add(new ComposerRowViewModel(widget.Kind, widget.Text, OnComposerChanged));
+                ComposerRows.Add(new ComposerRowViewModel(
+                    widget.Kind, widget.Text, widget.DotFont, widget.Accent, OnComposerChanged));
             }
         }
         if (_composerTheme is { } composerTheme)
@@ -3276,50 +3389,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     }
 
     private string _claudeCheckResult = string.Empty;
-    private ClaudeUsageSourceKind _claudeSourceKind = ClaudeUsageSourceKind.StatusLine;
-    private bool _claudeStatuslineReplacePending;
 
-    public IReadOnlyList<string> ClaudeSourceOptions =>
-        [Loc.T("ClaudeSourceStatusLine"), Loc.T("ClaudeSourceWebCookie")];
-
-    public string ClaudeSourcePreference
-    {
-        get => ClaudeSourceOptions[(int)_claudeSourceKind];
-        set
-        {
-            IReadOnlyList<string> options = ClaudeSourceOptions;
-            int index = Math.Max(0, options.ToList().IndexOf(value));
-            var kind = (ClaudeUsageSourceKind)index;
-            if (_claudeSourceKind == kind)
-            {
-                return;
-            }
-
-            _claudeSourceKind = kind;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsClaudeCookieSource));
-            ScheduleCommit();
-        }
-    }
-
-    /// <summary>The cookie card only makes sense while the cookie source is chosen.</summary>
-    public bool IsClaudeCookieSource => _claudeSourceKind == ClaudeUsageSourceKind.WebCookie;
-
-    /// <summary>
-    /// Points Claude Code's status line at the file this app reads. A status
-    /// line the user set up themselves is never replaced without a second press.
-    /// </summary>
-    public void SetUpClaudeStatusline()
-    {
-        ClaudeStatuslineSetup.Result result = ClaudeStatuslineSetup.Install(
-            replace: _claudeStatuslineReplacePending);
-        // A foreign status line asks once; pressing again is the confirmation.
-        _claudeStatuslineReplacePending =
-            result.Outcome == ClaudeStatuslineSetup.Outcome.ForeignStatusLine;
-        ClaudeCheckResult = result.Describe();
-    }
-
-    /// <summary>The last diagnostic line, so a Cloudflare block can be read instead of guessed at.</summary>
+    /// <summary>The last diagnostic line: which directory was read, and what it held.</summary>
     public string ClaudeCheckResult
     {
         get => _claudeCheckResult;
@@ -3331,13 +3402,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
         var settings = new ClaudeUsageSettings
         {
-            SourceKind = _claudeSourceKind,
-            SessionKey = ClaudeSessionKey.Trim(),
-            // Resolve the organization from scratch: a stale id is one of the
-            // things a check has to be able to catch.
-            OrganizationId = string.Empty,
-            ModelScope = ClaudeModelScope,
-            CountLocalTokens = ClaudeCountLocalTokens
+            ModelScope = ClaudeModelScope
         };
 
         try
@@ -3349,6 +3414,109 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             ClaudeCheckResult = ex.Message;
         }
+
+        RefreshClaudeSignInState();
+    }
+
+    private readonly ClaudeOAuthStore _claudeOAuthStore = new();
+    private readonly ClaudeOAuth _claudeOAuth = new();
+    private ClaudeOAuthChallenge? _claudeSignInChallenge;
+
+    private bool _claudeSignedIn;
+
+    /// <summary>Whether a sign-in this app made is stored, so the UI can offer sign-out instead.</summary>
+    public bool ClaudeSignedIn
+    {
+        get => _claudeSignedIn;
+        private set
+        {
+            if (SetProperty(ref _claudeSignedIn, value))
+            {
+                OnPropertyChanged(nameof(ClaudeCanSignIn));
+            }
+        }
+    }
+
+    private bool _claudeAwaitingCode;
+
+    /// <summary>True between opening the browser and pasting the code back: the paste box shows only then.</summary>
+    public bool ClaudeAwaitingCode
+    {
+        get => _claudeAwaitingCode;
+        private set
+        {
+            if (SetProperty(ref _claudeAwaitingCode, value))
+            {
+                OnPropertyChanged(nameof(ClaudeCanSignIn));
+            }
+        }
+    }
+
+    /// <summary>The sign-in button shows only when there is no sign-in and none in progress.</summary>
+    public bool ClaudeCanSignIn => !ClaudeSignedIn && !ClaudeAwaitingCode;
+
+    private string _claudePastedCode = string.Empty;
+
+    public string ClaudePastedCode
+    {
+        get => _claudePastedCode;
+        set => SetProperty(ref _claudePastedCode, value);
+    }
+
+    /// <summary>Set by the window so the view model can open the system browser.</summary>
+    public Action<string>? OpenUrl { get; set; }
+
+    public void RefreshClaudeSignInState() => ClaudeSignedIn = _claudeOAuthStore.HasTokens;
+
+    /// <summary>Start a browser sign-in: build the challenge, open the URL, reveal the paste box.</summary>
+    public void BeginClaudeSignIn()
+    {
+        _claudeSignInChallenge = _claudeOAuth.BeginSignIn();
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = true;
+        ClaudeCheckResult = Loc.T("ClaudeOAuthOpened");
+        OpenUrl?.Invoke(_claudeSignInChallenge.Url);
+    }
+
+    /// <summary>Finish the sign-in with the pasted code, store the token, and verify it live.</summary>
+    public async Task CompleteClaudeSignInAsync()
+    {
+        if (_claudeSignInChallenge is not { } challenge)
+        {
+            return;
+        }
+
+        ClaudeCheckResult = Loc.T("ClaudeCheckRunning");
+        ClaudeOAuthResult result = await _claudeOAuth.CompleteSignInAsync(challenge, ClaudePastedCode);
+        if (result.Tokens is not { } tokens)
+        {
+            ClaudeCheckResult = Loc.T("ClaudeCheckLineFailed", result.Error ?? string.Empty);
+            return;
+        }
+
+        _claudeOAuthStore.Save(tokens);
+        _claudeSignInChallenge = null;
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = false;
+        RefreshClaudeSignInState();
+
+        // Prove the token works before declaring success, so a stored-but-dead
+        // sign-in never reads as connected.
+        await CheckClaudeConnectionAsync();
+    }
+
+    public void CancelClaudeSignIn()
+    {
+        _claudeSignInChallenge = null;
+        ClaudePastedCode = string.Empty;
+        ClaudeAwaitingCode = false;
+    }
+
+    public void SignOutClaude()
+    {
+        _claudeOAuthStore.Clear();
+        RefreshClaudeSignInState();
+        ClaudeCheckResult = Loc.T("ClaudeOAuthSignedOut");
     }
 
     private ComposerTheme? _composerTheme;
@@ -3382,7 +3550,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             .Select(row => new ComposerWidgetSettings
             {
                 Kind = row.Kind,
-                Text = row.IsText ? row.Text : string.Empty
+                Text = row.IsText ? row.Text : string.Empty,
+                DotFont = row.SupportsDotFont && row.DotFont,
+                Accent = row.Accent
             })
             .ToList();
 
@@ -3390,7 +3560,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         int index = Math.Clamp(SelectedComposerChoiceIndex, 0, ComposerWidgets.Catalog.Count - 1);
         ComposerRows.Add(new ComposerRowViewModel(
-            ComposerWidgets.Catalog[index].Kind, string.Empty, OnComposerChanged));
+            ComposerWidgets.Catalog[index].Kind, string.Empty, false, string.Empty, OnComposerChanged));
         OnComposerChanged();
     }
 
@@ -3588,12 +3758,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _settings.Weather.UseAutomaticLocation = WeatherAutomaticLocation;
         _settings.Weather.LocationQuery = string.IsNullOrWhiteSpace(WeatherLocation) ? WeatherSettings.DefaultLocationQuery : WeatherLocation.Trim();
         _settings.ClaudeUsage ??= new ClaudeUsageSettings();
-        _settings.ClaudeUsage.SourceKind = _claudeSourceKind;
-        _settings.ClaudeUsage.SessionKey = ClaudeSessionKey.Trim();
         _settings.ClaudeUsage.ModelScope = string.IsNullOrWhiteSpace(ClaudeModelScope)
             ? ClaudeUsageSettings.DefaultModelScope
             : ClaudeModelScope.Trim();
-        _settings.ClaudeUsage.CountLocalTokens = ClaudeCountLocalTokens;
         _settings.Stocks = new StockSettings
         {
             SourceKind = StockSource,
@@ -3755,13 +3922,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 await Task.Delay(
                     ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
                     cancellationToken);
-                bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || alertTakeoverArmed ||
-                    _settings.Schedule?.Enabled == true ||
-                    _settings.Carousel?.Enabled == true)
-                {
-                    await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
-                }
+                // No "static image" shortcut. ImageClockStyle has no "off" and
+                // ImageTimePlacement is only Top or Bottom, so the picture theme
+                // always draws a clock - skipping its refresh froze that clock at
+                // whatever minute a setting was last touched. The byte-identical
+                // frame check in PushLatestAsync already keeps a genuinely
+                // unchanged screen off the wire.
+                await RefreshAndPushAsync(AutoPush, forcePush: false, cancellationToken: cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -4114,7 +4281,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
             if (!hasPrimary)
             {
-                SetDeviceStatus(false);
+                // No address is not a failed connection: nothing was attempted.
+                SetDeviceUnknown(hasAddress: false);
             }
             else if (_pushLedger.ShouldSend(endpoint!, snapshot.Hash, now, forcePush))
             {
@@ -4122,6 +4290,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 {
                     DevicePushResult result = await _transport.PushAsync(endpoint!, snapshot.Frame, cancellationToken);
                     PushDiagnostics.Record(result, snapshot.Frame.JpegBytes.Length);
+                    // Only a delivered frame counts as held by the device.
                     if (result.Success)
                     {
                         _pushLedger.RecordSuccess(endpoint!, snapshot.Hash, now);
@@ -4235,8 +4404,26 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private void SetDeviceStatus(bool connected) =>
         Dispatcher.UIThread.Post(() =>
         {
+            _deviceChecked = true;
             DeviceConnected = connected;
             DeviceStatus = Loc.T(connected ? "StatusOnline" : "StatusDisconnected");
+        });
+
+    /// <summary>
+    /// Before the first push there is nothing to report. Distinguishing "no
+    /// address yet" from "tried and failed" is the difference between a hint and
+    /// an accusation.
+    /// </summary>
+    private void SetDeviceUnknown(bool hasAddress) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_deviceChecked)
+            {
+                return;
+            }
+
+            DeviceConnected = false;
+            DeviceStatus = Loc.T(hasAddress ? "DeviceStatusUnknown" : "DeviceStatusNoAddress");
         });
 
     private void ReloadFonts()
@@ -4410,7 +4597,10 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                         music.Title,
                         music.Artist)
                     : Loc.T("SummaryNoMediaSession"),
-            "clock-weather-dot" or "weather-five-day" or "image" when weather is { Available: true } =>
+            // No `when` guard: it made the else branch unreachable, so a bad city
+            // fell through to "this theme uses only local time and settings" -
+            // false about the theme and pointing away from the actual cause.
+            "clock-weather-dot" or "weather-five-day" or "image" =>
                 weather is { Available: true }
                     ? Loc.T("SummaryWeather", weather.LocationName, weather.TemperatureC.ToString("0"), weather.ConditionText)
                     : weather?.ErrorMessage ?? Loc.T("SummaryNoWeather"),

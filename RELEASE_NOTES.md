@@ -1,22 +1,7 @@
-# v1.9.0
+# v1.12.0
 
 Find the keyboard instead of typing its address, and a screen that comes
 back by itself after the keyboard is unplugged.
-
-## Fixed
-
-- **A keyboard that went offline could stay blank.** The app remembered
-  every push as delivered, including the ones that failed - so once a
-  push failed, the identical next frame was skipped and the device was
-  never sent the picture it had missed. A frame is now recorded only when
-  the device acknowledged it, any failure forgets what that device holds,
-  and each extra keyboard is tracked on its own, so one failing mirror no
-  longer holds back the others.
-- **An unchanged picture is re-sent every two minutes** even when nothing
-  needs updating, so a keyboard that was unplugged, power-cycled or reset
-  itself repaints on its own instead of waiting for the picture to change.
-  This covers the static-wallpaper case, where nothing would otherwise be
-  sent for hours.
 
 ## Added
 
@@ -31,8 +16,24 @@ back by itself after the keyboard is unplugged.
   present themselves as ordinary Ethernet. It never runs on its own:
   there is no timer and no startup scan.
 - Devices that answered without identifying themselves are listed too,
-  under their own heading, because a real keyboard can legitimately land
-  there and the address is still worth trying.
+  because a real keyboard can legitimately land there and the address is
+  still worth trying.
+
+## Fixed
+
+- **An unchanged picture is re-sent every two minutes**, so a keyboard
+  that was unplugged, power-cycled or reset itself repaints on its own
+  instead of waiting for the picture to change. v1.10.0 stopped a failed
+  push from being remembered as delivered; this covers the case it could
+  not - a device that quietly lost the frame we still believe it holds,
+  which on a static wallpaper meant a dark screen for hours.
+- **Extra keyboards are tracked on their own.** They used to sit inside
+  the primary device's de-duplication check, so an unchanged primary also
+  silenced the mirrors, and a mirror that failed was never retried until
+  the picture changed.
+- A push abandoned mid-flight no longer counts as delivered, and a
+  backwards clock step (NTP, daylight saving, resume from sleep) no
+  longer suppresses pushing until real time catches up.
 
 ## Platforms
 

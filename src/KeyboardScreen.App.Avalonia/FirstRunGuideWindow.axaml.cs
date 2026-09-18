@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Transformation;
+using KeyboardScreen.Core;
 
 namespace KeyboardScreen.App.Avalonia;
 
@@ -49,15 +50,22 @@ public sealed partial class FirstRunGuideWindow : Window
             return;
         }
 
+        TextBlock? validation = this.FindControl<TextBlock>("ValidationText");
         string candidate = editor.Value.Trim();
         if (!IPAddress.TryParse(candidate, out IPAddress? address) ||
             address.AddressFamily != AddressFamily.InterNetwork)
         {
+            // Saying nothing here is what made this button look dead: the field
+            // is four separate boxes, so a bad address is not obvious by looking.
+            if (validation is not null)
+            {
+                validation.Text = Loc.T("GuideInvalidIp");
+            }
+
             editor.Focus();
             return;
         }
 
-        TextBlock? validation = this.FindControl<TextBlock>("ValidationText");
         if (validation is not null)
         {
             validation.Text = string.Empty;

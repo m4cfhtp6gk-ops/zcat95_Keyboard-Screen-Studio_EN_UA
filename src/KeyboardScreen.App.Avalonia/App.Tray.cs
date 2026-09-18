@@ -10,12 +10,14 @@ public sealed partial class App
     {
         ShowWindowCommand = new RelayCommand(ShowMainWindow);
         TogglePomodoroCommand = new RelayCommand(TogglePomodoro);
+        PushNowCommand = new RelayCommand(PushNow);
         ExitCommand = new RelayCommand(ExitApplication);
         DataContext = this;
     }
 
     public ICommand ShowWindowCommand { get; }
     public ICommand TogglePomodoroCommand { get; }
+    public ICommand PushNowCommand { get; }
     public ICommand ExitCommand { get; }
 
     private void ShowMainWindow()
@@ -33,6 +35,20 @@ public sealed partial class App
             desktop.MainWindow?.DataContext is ViewModels.MainWindowViewModel viewModel)
         {
             viewModel.TogglePomodoro();
+        }
+    }
+
+    /// <summary>
+    /// The app lives in the tray by default, so a failed push has to be
+    /// retryable without opening the window first.
+    /// </summary>
+    private void PushNow()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+            desktop.MainWindow?.DataContext is ViewModels.MainWindowViewModel viewModel &&
+            viewModel.RefreshCommand.CanExecute(null))
+        {
+            viewModel.RefreshCommand.Execute(null);
         }
     }
 

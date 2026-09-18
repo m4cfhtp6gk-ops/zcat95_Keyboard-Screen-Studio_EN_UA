@@ -132,9 +132,9 @@ CORE = [
     ("ThemeClaudeUsageName",        "Claude Usage", "Витрати Claude", "Claude 用量"),
     ("ThemeClaudeUsageDescription", "Session, weekly and per-model limits", "Ліміти сесії, тижня та моделі", "会话、每周与按模型的额度"),
     ("ThemeClaudeUsageDetails",
-     "Three meters: the rolling session window, the weekly window across every model, and the weekly window for one model. Percentages come from the account; token counts are summed from the Claude Code transcripts on this machine only.",
-     "Три смуги: рухоме вікно сесії, тижневе вікно по всіх моделях і тижневе вікно однієї моделі. Відсотки надходять з акаунта; токени підсумовуються лише з транскриптів Claude Code на цьому комп'ютері.",
-     "三条量表：滚动会话窗口、覆盖全部模型的每周窗口，以及单个模型的每周窗口。百分比来自账户；Token 数量仅根据本机的 Claude Code 记录汇总。"),
+     "Three meters: the rolling 5-hour window, the week across every model, and one model's week - as your account reports them, with the time until each resets.",
+     "Три смуги: ковзні 5 годин, тиждень по всіх моделях і тиждень однієї моделі - так, як їх повідомляє ваш акаунт, із часом до скидання кожного.",
+     "三条进度条：滚动 5 小时窗口、全模型的一周，以及某个模型的一周——均为你账户上报的数值，并附各自的重置倒计时。"),
 
     ("ThemeCurrencyName",        "Currency Rates", "Курси валют", "汇率"),
     ("ThemeCurrencyDescription", "Daily exchange rates for your currencies", "Щоденні курси обраних валют", "所选货币的每日汇率"),

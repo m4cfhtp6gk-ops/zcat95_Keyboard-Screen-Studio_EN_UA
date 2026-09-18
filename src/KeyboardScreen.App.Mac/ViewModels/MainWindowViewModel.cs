@@ -937,11 +937,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 await Task.Delay(
                     ThemeRefreshPolicy.NextDelay(DateTimeOffset.Now, themeSeconds, _settings.Carousel, pollCap),
                     cancellationToken);
-                bool staticImage = SelectedTheme?.Id == "image" && !ImageWeatherVisible;
-                if (!staticImage || AutoMediaThemeSwitch || alertTakeoverArmed)
-                {
-                    await RefreshAndPushAsync(AutoPush, cancellationToken);
-                }
+                // Same fix as the Windows loop: the picture theme always draws a
+                // clock, so skipping its refresh froze that clock. The identical
+                // frame check in the push path keeps an unchanged screen off the
+                // wire. (This copy had already drifted - it was missing the
+                // schedule and carousel arms the Windows one grew.)
+                await RefreshAndPushAsync(AutoPush, cancellationToken);
             }
             catch (OperationCanceledException)
             {

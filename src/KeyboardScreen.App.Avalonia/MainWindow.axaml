@@ -178,13 +178,21 @@
 
           <Grid Grid.Row="1" Margin="0,24,0,0" RowDefinitions="Auto,*">
             <TextBlock FontSize="13" FontWeight="SemiBold" Text="{infra:Localize SidebarThemesHeading}" />
+            <!--
+              The scrollbar is a 10 px overlay drawn on top of the content, so
+              the content has to stop short of it or it eats the clicks. The
+              margin/padding pair that used to do that here did not: the
+              negative margin widened the viewer and ScrollViewer.Padding never
+              reached the viewport, which left the rightmost 16 px of every
+              theme row swallowing clicks instead of selecting a theme. The
+              reservation belongs on the content, where it is actually applied.
+            -->
             <ScrollViewer
                 Classes="edge-fade"
                 Grid.Row="1"
-                Margin="0,12,-6,0"
-                Padding="0,0,6,0"
+                Margin="0,12,0,0"
                 VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding ThemeGroups}" x:CompileBindings="False">
+              <ItemsControl Margin="0,0,14,0" ItemsSource="{Binding ThemeGroups}" x:CompileBindings="False">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <StackPanel>
@@ -268,6 +276,56 @@
                   </StackPanel>
 
                   <StackPanel x:Name="ThemePage" Classes="page-content" IsVisible="{Binding IsThemePage}" Spacing="16" x:CompileBindings="False">
+                    <Border IsVisible="{Binding IsComposerTheme}" Classes="card">
+                      <StackPanel Spacing="10">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ComposerHeading}" />
+                        <TextBlock Classes="secondary" Text="{infra:Localize ComposerHint}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <ComboBox x:CompileBindings="False" HorizontalAlignment="Stretch"
+                                    ItemsSource="{Binding ComposerChoices}"
+                                    SelectedIndex="{Binding SelectedComposerChoiceIndex, Mode=TwoWay}" />
+                          <Button Grid.Column="1" Click="ComposerAddButton_OnClick" Content="{infra:Localize ComposerAdd}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding ComposerRows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <StackPanel Spacing="4" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="6">
+                                  <ToggleButton Classes="composer-expand" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                Content="⌄" ToolTip.Tip="{infra:Localize ComposerRowOptions}" />
+                                  <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Name}" />
+                                  <Button Grid.Column="2" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
+                                  <Button Grid.Column="3" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
+                                  <Button Grid.Column="4" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
+                                </Grid>
+                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" PlaceholderText="{infra:Localize ComposerTextPlaceholder}" />
+                                <Border IsVisible="{Binding IsExpanded}" Classes="composer-options" Padding="12,10" Margin="0,2,0,4">
+                                  <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding SupportsDotFont}">
+                                      <StackPanel Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerDotFontLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerDotFontHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding DotFont, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                      <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{infra:Localize ComposerAccentLabel}" />
+                                        <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ComposerAccentHint}" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <Button Grid.Column="1" Click="ComposerAccentPick_OnClick" Content="{infra:Localize ThemeAccentPick}" />
+                                      <Button Grid.Column="2" IsVisible="{Binding HasAccent}" Click="ComposerAccentReset_OnClick" Content="{infra:Localize ThemeAccentReset}" />
+                                    </Grid>
+                                  </StackPanel>
+                                </Border>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding ComposerBudgetText}" />
+                      </StackPanel>
+                    </Border>
+
                     <Border Classes="card">
                       <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,72" ColumnSpacing="12">
@@ -490,64 +548,73 @@
 
                     <Border IsVisible="{Binding IsClaudeTheme}" Classes="card">
                       <StackPanel Spacing="14">
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="6">
-                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
-                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyHint}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <Button Grid.Column="1" VerticalAlignment="Top" Command="{Binding OpenClaudeSiteCommand}" Content="{infra:Localize ClaudeOpenSite}" />
-                        </Grid>
-                        <StackPanel Spacing="8">
-                          <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                            <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeSourceLabel}" />
-                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" x:CompileBindings="False"
-                                      ItemsSource="{Binding ClaudeSourceOptions}"
-                                      SelectedItem="{Binding ClaudeSourcePreference, Mode=TwoWay}" />
-                          </Grid>
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSourceHint}" TextWrapping="Wrap" />
-                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" IsVisible="{Binding !IsClaudeCookieSource}">
-                            <Button Click="ClaudeStatuslineSetupButton_OnClick" Content="{infra:Localize ClaudeStatuslineSetup}" />
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
-                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
-                          </Grid>
-                        </StackPanel>
-                        <StackPanel Spacing="10" IsVisible="{Binding IsClaudeCookieSource}">
-                          <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideHeading}" />
-                          <Grid RowDefinitions="Auto,10,Auto,10,Auto" ColumnDefinitions="32,*">
-                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" /></Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep1}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep1Hint}" /></StackPanel>
-                            <Border Grid.Row="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" /></Border>
-                            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep2}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep2Hint}" TextWrapping="Wrap" /></StackPanel>
-                            <Border Grid.Row="4" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource KssSelectedBrush}"><TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" /></Border>
-                            <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Center"><TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeGuideStep3}" /><TextBlock Classes="secondary" Text="{infra:Localize ClaudeGuideStep3Hint}" /></StackPanel>
-                          </Grid>
-                        </StackPanel>
                         <StackPanel Spacing="6">
-                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeSessionKeyLabel}" />
-                          <TextBox PasswordChar="*"
-                                   PlaceholderText="{infra:Localize ClaudeSessionKeyPlaceholder}"
-                                   Text="{Binding ClaudeSessionKey, Mode=TwoWay}" />
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCookieHint}" TextWrapping="Wrap" />
-                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Button Click="ClaudeCheckButton_OnClick" Content="{infra:Localize ClaudeCheckButton}" />
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
-                                       Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
+                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ClaudeHeading}" />
+                          <TextBlock Classes="secondary" Text="{infra:Localize ClaudeLocalSourceHint}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                          <Button Click="ClaudeCheckButton_OnClick" Content="{infra:Localize ClaudeCheckButton}" />
+                          <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                     Text="{Binding ClaudeCheckResult}" TextWrapping="Wrap" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
+
+                        <!--
+                          The second way in, for a machine without the Claude Code
+                          command-line tool: the app runs the same OAuth sign-in
+                          itself. The token it gets is stored encrypted and tried
+                          ahead of any borrowed Claude Code file.
+                        -->
+                        <StackPanel Spacing="8">
+                          <TextBlock FontSize="13" FontWeight="SemiBold" Text="{infra:Localize ClaudeSignInHeading}" />
+                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSignInIntro}" TextWrapping="Wrap" />
+
+                          <Button IsVisible="{Binding ClaudeCanSignIn}"
+                                  HorizontalAlignment="Left"
+                                  Click="ClaudeSignInButton_OnClick"
+                                  Content="{infra:Localize ClaudeSignInButton}" />
+
+                          <StackPanel IsVisible="{Binding ClaudeAwaitingCode}" Spacing="6">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSignInCodeLabel}" TextWrapping="Wrap" />
+                            <TextBox Text="{Binding ClaudePastedCode, Mode=TwoWay}"
+                                     PlaceholderText="{infra:Localize ClaudeSignInCodePlaceholder}" />
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                              <Button Click="ClaudeCompleteSignInButton_OnClick" Content="{infra:Localize ClaudeSignInComplete}" />
+                              <Button Grid.Column="1" Click="ClaudeCancelSignInButton_OnClick" Content="{infra:Localize ClaudeSignInCancel}" />
+                            </Grid>
+                          </StackPanel>
+
+                          <Grid IsVisible="{Binding ClaudeSignedIn}" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock VerticalAlignment="Center" Classes="secondary" FontSize="11"
+                                       Text="{infra:Localize ClaudeSignedInLabel}" TextWrapping="Wrap" />
+                            <Button Grid.Column="1" Click="ClaudeSignOutButton_OnClick" Content="{infra:Localize ClaudeSignOutButton}" />
                           </Grid>
                         </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource KssDividerBrush}" />
                         <Grid ColumnDefinitions="100,*" ColumnSpacing="12">
-                          <StackPanel VerticalAlignment="Center" Spacing="4">
-                            <TextBlock Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
-                          </StackPanel>
+                          <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize ClaudeModelScopeLabel}" />
                           <TextBox Grid.Column="1" MaxLength="24" Text="{Binding ClaudeModelScope, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeModelScopeHint}" TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="5">
-                            <TextBlock FontWeight="SemiBold" Text="{infra:Localize ClaudeCountTokensLabel}" />
-                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeCountTokensHint}" TextWrapping="Wrap" />
+                        <!--
+                          Collapsed by default: once it works, nobody needs this
+                          again. Open, it is the whole path from nothing to
+                          numbers - which took six releases to establish and was
+                          never written down anywhere the user could see it.
+                        -->
+                        <Expander Classes="settings-group" Header="{infra:Localize ClaudeSetupHeading}">
+                          <StackPanel Spacing="8" Margin="0,6,0,0">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSetupNeeds}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep1}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep2}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep3}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep4}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="11" Text="{infra:Localize ClaudeSetupStep5}" TextWrapping="Wrap" />
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize ClaudeSetupExpiry}" TextWrapping="Wrap" />
                           </StackPanel>
-                          <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ClaudeCountLocalTokens, Mode=TwoWay}" />
-                        </Grid>
+                        </Expander>
                       </StackPanel>
                     </Border>
 
@@ -1067,35 +1134,6 @@
                       </StackPanel>
                     </Border>
 
-                    <Border IsVisible="{Binding IsComposerTheme}" Classes="card">
-                      <StackPanel Spacing="10">
-                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize ComposerHeading}" />
-                        <TextBlock Classes="secondary" Text="{infra:Localize ComposerHint}" TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                          <ComboBox x:CompileBindings="False" HorizontalAlignment="Stretch"
-                                    ItemsSource="{Binding ComposerChoices}"
-                                    SelectedIndex="{Binding SelectedComposerChoiceIndex, Mode=TwoWay}" />
-                          <Button Grid.Column="1" Click="ComposerAddButton_OnClick" Content="{infra:Localize ComposerAdd}" />
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding ComposerRows}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <StackPanel Spacing="4" Margin="0,0,0,6">
-                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
-                                  <TextBlock VerticalAlignment="Center" Text="{Binding Name}" />
-                                  <Button Grid.Column="1" Click="ComposerMoveUpButton_OnClick" Content="↑" ToolTip.Tip="{infra:Localize ComposerMoveUp}" />
-                                  <Button Grid.Column="2" Click="ComposerMoveDownButton_OnClick" Content="↓" ToolTip.Tip="{infra:Localize ComposerMoveDown}" />
-                                  <Button Grid.Column="3" Click="ComposerRemoveButton_OnClick" Content="✕" ToolTip.Tip="{infra:Localize ComposerRemove}" />
-                                </Grid>
-                                <TextBox IsVisible="{Binding IsText}" Text="{Binding Text, Mode=TwoWay}" Watermark="{infra:Localize ComposerTextPlaceholder}" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="secondary" FontSize="11" Text="{Binding ComposerBudgetText}" />
-                      </StackPanel>
-                    </Border>
-
                     <Border IsVisible="{Binding IsMusicTheme}" Classes="card">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="7">
@@ -1197,11 +1235,10 @@
                       </StackPanel>
                     </Border>
 
-                    <Border Classes="card" Padding="16">
+                    <Expander Classes="settings-group" Header="{infra:Localize KnobHeading}">
                       <StackPanel Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="4">
-                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize KnobHeading}" />
                             <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobHint}" TextWrapping="Wrap" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1" VerticalAlignment="Top" MinWidth="58" OnContent="" OffContent="" IsChecked="{Binding KnobEnabled, Mode=TwoWay}" />
@@ -1266,28 +1303,36 @@
                             </Border>
                           </StackPanel>
                           <StackPanel Spacing="12" IsVisible="{Binding IsKnobHotKeyMode}">
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobCaptureHint}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyForwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyForward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyForwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureForward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyBackwardLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyBackward, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyBackwardText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureBackward_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
-                            <Grid ColumnDefinitions="150,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="12">
                               <TextBlock VerticalAlignment="Center" Classes="secondary" Text="{infra:Localize KnobKeyToggleLabel}" />
-                              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding KnobKeyOptions}" SelectedItem="{Binding KnobKeyToggle, Mode=TwoWay}" />
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding KnobKeyToggleText}" />
+                              <Button Grid.Column="2" Click="KnobCaptureToggle_OnClick" Content="{infra:Localize KnobCaptureButton}" />
                             </Grid>
+                            <TextBlock IsVisible="{Binding IsCapturingKnobKey}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource KssControlFocusBrush}"
+                                       Text="{infra:Localize KnobCaptureWaiting}" TextWrapping="Wrap" />
+                            <TextBlock IsVisible="{Binding KnobBareKeyWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Classes="secondary" FontSize="11" Foreground="#B43B33"
+                                       Text="{Binding KnobBareKeyWarning}" TextWrapping="Wrap" />
                           </StackPanel>
-                          <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize KnobViaHint}" TextWrapping="Wrap" />
                         </StackPanel>
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card" Padding="16">
+                    <Expander Classes="settings-group" Header="{infra:Localize DiagnosticsHeading}">
                       <StackPanel Spacing="10">
                         <StackPanel Spacing="4">
-                          <TextBlock FontSize="15" FontWeight="SemiBold" Text="{infra:Localize DiagnosticsHeading}" />
                           <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize DiagnosticsHint}" />
                         </StackPanel>
                         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,6,Auto" >
@@ -1299,12 +1344,11 @@
                         <TextBlock Classes="secondary" FontSize="11" Text="{Binding DiagnosticsDetailText}" />
                         <TextBlock Classes="secondary" FontSize="11" Text="{Binding AdditionalPushStatus}" IsVisible="{Binding AdditionalPushStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card">
+                    <Expander Classes="settings-group" Header="{infra:Localize TelegramHeading}">
                       <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
-                          <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize TelegramHeading}" />
                           <TextBlock Classes="secondary" Text="{infra:Localize TelegramHint}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Spacing="10">
@@ -1371,13 +1415,12 @@
                         </Grid>
                         <Button IsVisible="{Binding IsTelegramConnected}" Command="{Binding TelegramLogoutCommand}" Content="{infra:Localize TelegramLogout}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
-                    <Border Classes="card">
+                    <Expander Classes="settings-group" Header="{infra:Localize NotifyHeading}">
                       <StackPanel Spacing="14">
                         <Grid ColumnDefinitions="*,Auto">
                           <StackPanel Spacing="6">
-                            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{infra:Localize NotifyHeading}" />
                             <TextBlock Classes="secondary" Text="{infra:Localize NotifyHint}" TextWrapping="Wrap" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1" IsChecked="{Binding NotifyEnabled, Mode=TwoWay}" />
@@ -1422,7 +1465,7 @@
                         </Grid>
                         <TextBlock Classes="secondary" FontSize="11" Text="{infra:Localize NotifyWindowsOnly}" />
                       </StackPanel>
-                    </Border>
+                    </Expander>
 
                     <Border Classes="card">
                       <StackPanel Spacing="14">
@@ -1562,7 +1605,10 @@
 
               <Border Grid.Column="2" Classes="card" Padding="24">
                 <Grid RowDefinitions="Auto,24,*">
-                  <TextBlock FontSize="18" FontWeight="SemiBold" Text="{infra:Localize PreviewHeading}" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock VerticalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="{infra:Localize PreviewHeading}" />
+                    <Button Grid.Column="1" VerticalAlignment="Center" Command="{Binding RefreshCommand}" Content="{infra:Localize PushNow}" />
+                  </Grid>
                   <Border
                       Grid.Row="2"
                       HorizontalAlignment="Center"
